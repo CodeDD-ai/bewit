@@ -97,6 +97,11 @@ def render_text(view: dict) -> str:
         add(f"Other working-tree changes, not from tracked edits ({len(other)})")
         for f in other:
             add(f"  {_loc(f.get('added'), f.get('removed')):>9}  {f['path']}")
+    outside = view.get("outside_repo", [])
+    if outside:
+        add(f"Written outside this repository ({len(outside)}, excluded from drift)")
+        for path in outside:
+            add(f"  {path}")
     add("")
 
     add(f"Drift     {_drift_line(view)}")
@@ -202,6 +207,8 @@ def render_markdown(view: dict) -> str:
             f"| `{f['path']}` | {_loc(f.get('added'), f.get('removed'))} "
             f"| changed outside tracked edits |"
         )
+    for path in view.get("outside_repo", []):
+        add(f"| `{path}` | — | written outside this repository |")
     add("")
 
     findings = view.get("protected_findings", [])

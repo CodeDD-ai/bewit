@@ -20,6 +20,7 @@ Definitions:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from archrev.config import Config
@@ -30,6 +31,18 @@ from archrev.storage import Session, utc_now_iso
 
 #: Maximum prompt characters stored in views/manifests (full text stays in events).
 _PROMPT_EXCERPT = 2000
+
+
+def _is_outside_repo(path: str) -> bool:
+    """True for paths that are not repo-relative (absolute or parent-escaping).
+
+    Edit events store repo-relative paths for files under the root;
+    anything absolute (``C:/...``, ``/home/...``) or escaping upward
+    (``../``) lies outside the repository.
+    """
+    return bool(
+        re.match(r"^([A-Za-z]:[/\\]|[/\\])", path) or path.startswith("..")
+    )
 
 
 def _areas(paths: list[str]) -> list[str]:
@@ -92,7 +105,14 @@ def compute_view(
     # record of who acknowledged what, when, and why stays in the log.
     acks = [e for e in events if e.get("type") == "ack"]
 
-    touched = session.touched_files()
+    all_touched = session.touched_files()
+    # Paths outside the repository root (other repos, Cursor's own chat
+    # asset saves under C:/Users/.../.cursor/...) can never be declared in
+    # a plan and are not part of this codebase: they are recorded — an
+    # agent writing outside the repo is signal — but segregated from the
+    # files table and drift instead of producing false out-of-plan noise.
+    outside_repo = [p for p in all_touched if _is_outside_repo(p)]
+    touched = [p for p in all_touched if not _is_outside_repo(p)]
 
     # Line statistics: git diff since the session-start HEAD covers both
     # committed and uncommitted changes; untracked files appear separately.
@@ -194,6 +214,7 @@ def compute_view(
         "gate_events": gate_events,
         "edits": edits,
         "files": files,
+        "outside_repo": outside_repo,
         "other_changes": other_changes,
         "drift": drift,
         "protected_findings": protected_findings,

@@ -8,6 +8,30 @@ from archrev.rules import load_rules
 from archrev.storage import SessionStore
 
 
+def test_outside_repo_paths_excluded_from_drift(repo: Path):
+    """Regression: Cursor saving chat-attachment images (absolute paths
+    under C:/Users/.../.cursor/...) fired edit hooks and produced false
+    out-of-plan drift. Outside-root paths are recorded but segregated."""
+    from archrev.config import Config
+
+    session = SessionStore(repo).session("s-outside")
+    session.ensure_meta(Git(repo).head_sha())
+    register_plan(session, "touch `app/main.py`", repo)
+    session.append_event("edit", path="app/main.py")
+    session.append_event(
+        "edit", path="C:/Users/x/.cursor/projects/p/assets/image-1.png"
+    )
+    session.append_event("edit", path="../other-repo/config.yaml")
+
+    view = compute_view(repo, Config(), load_rules(repo), session)
+    assert [f["path"] for f in view["files"]] == ["app/main.py"]
+    assert view["drift"]["out_of_plan"] == []
+    assert sorted(view["outside_repo"]) == [
+        "../other-repo/config.yaml",
+        "C:/Users/x/.cursor/projects/p/assets/image-1.png",
+    ]
+
+
 def test_view_carries_branch_and_plan_progress(repo: Path):
     """The review header needs the working branch; the plan section needs
     per-file progress (touched vs pending)."""

@@ -293,6 +293,12 @@ function chipData(view) {
                  title: "Files the plan declared but no edit event touched (dropped scope, or changed via shell).",
                  items: unrealized });
   }
+  const outside = view.outside_repo || [];
+  if (outside.length)
+    chips.push({ id: "outside-repo", cls: "warn",
+                 label: `outside repo <b>${outside.length}</b>`,
+                 title: "Files the session wrote outside this repository (other repos, editor-internal saves). Recorded for audit, excluded from plan drift.",
+                 items: outside });
   const bypass = (view.protected_findings || []).filter((f) => !f.via_gate);
   if (bypass.length)
     chips.push({ id: "bypass", cls: "bad",
