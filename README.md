@@ -78,6 +78,56 @@ Rules are YAML files in `.archrev/rules/`. Two kinds:
 - **`flag`** — the edit proceeds, but is recorded, shown to the agent, and
   highlighted in the session review.
 
+### Read, shell, MCP, and tool rules — gating beyond edits
+
+The same engine gates what agents may **read**, which **shell commands**
+they may run, and which **MCP servers / tools** they may use at all:
+
+```yaml
+- id: no-secret-reads
+  kind: read                       # gates beforeReadFile
+  match: ["dev-secrets/**", ".env", ".env.*"]
+  action: deny
+  message: "Agents may not read secrets or environment files."
+
+- id: no-push
+  kind: shell                      # gates beforeShellExecution
+  match_command: ["\\bgit\\s+push\\b"]   # case-insensitive regexes
+  action: block
+  message: "Pushing requires explicit approval."
+
+- id: flag-installs
+  kind: shell
+  match_command: ["\\b(pip|uv pip|npm|pnpm|yarn)\\s+(install|add)\\b"]
+  action: flag
+  message: "Dependency installation - recorded for review."
+
+- id: no-web-mcp
+  kind: mcp                        # gates beforeMCPExecution
+  match_tool: ["web|fetch|search"]
+  action: deny
+  message: "Internet-facing MCP tools are not permitted here."
+
+- id: no-subagents
+  kind: tool                       # gates preToolUse by tool name
+  match_tool: ["^Task$"]
+  action: deny
+  message: "Subagents are not permitted in this repository."
+```
+
+All machine-enforced kinds support three actions:
+
+- **`deny`** — hard stop; the agent is refused outright with the message.
+- **`block`** — pause; *you* approve or decline in Cursor's dialog.
+- **`flag`** — allow, record, and highlight in the session review.
+
+**Enforcement honesty:** these rules gate the agent's *attempts* at the
+tool layer and record every attempt, allowed or denied — they are policy
+plus audit, not a sandbox. An allowed process can still do whatever the
+OS permits (an approved script may open network connections). For hard
+containment, run agent sessions inside network-isolated containers; the
+container is the wall, ArchRev is the policy and the evidence.
+
 ### Prompt rules — policies the agent attests during planning
 
 ```yaml
@@ -109,10 +159,13 @@ prompt ──> plan ──> check ──> edits ──> stop ──> commit
 2. **Plan check** (`archrev check plan`): declared files are matched against
    path rules (a preview of what will gate), and the agent records a
    pass/fail attestation for every prompt rule. Exits non-zero on failure.
-3. **Edit gate** (automatic, `preToolUse` hook): every agent file edit is
-   matched against path rules — `block` pauses for your approval, `flag`
-   records. With `strict_plan_check: true`, the *first* edit of a session is
-   denied until a plan check exists: **no validated plan, no code.**
+3. **Live gates** (automatic): every agent file edit is matched against
+   path rules (`preToolUse`), file reads against read rules
+   (`beforeReadFile`), shell commands against shell rules
+   (`beforeShellExecution`), and MCP/tool usage against mcp/tool rules —
+   `deny` refuses, `block` pauses for your approval, `flag` records. With
+   `strict_plan_check: true`, the *first* edit of a session is denied until
+   a **passing** plan check exists: **no validated plan, no code.**
 4. **Finalization** (automatic, `stop` hook): writes `manifest.json` and
    `report.md` with per-file line counts (`git diff --numstat` since session
    start), **drift** (files touched but not planned, files planned but never

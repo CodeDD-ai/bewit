@@ -61,6 +61,16 @@ _STARTER_RULES = """\
 #   kind:    prompt
 #   policy:  the policy text the agent attests with --attest <id>=pass|fail
 #
+# Further machine-enforced kinds (all support deny | block | flag):
+#   kind: read   - globs over files the agent READS (e.g. secrets)
+#   kind: shell  - `match_command` regexes over shell commands
+#   kind: mcp    - `match_tool` regexes over MCP tool identifiers
+#   kind: tool   - `match_tool` regexes over agent tool names
+#
+# Honesty note: these gate the agent's *attempts* at the tool layer and
+# record everything - policy plus audit, not a sandbox. Use containers /
+# network isolation underneath when hard containment is required.
+#
 # The starter rules below are DISABLED examples. Copy, adapt, enable.
 
 - id: example-protect-migrations
@@ -75,6 +85,34 @@ _STARTER_RULES = """\
   match: ["Dockerfile*", "docker-compose*.yml", ".gitlab-ci*.yml", "k8s/**"]
   action: flag
   message: "Infrastructure change - will be highlighted for review."
+  enabled: false
+
+- id: example-no-secret-reads
+  kind: read
+  match: ["dev-secrets/**", ".env", ".env.*"]
+  action: deny
+  message: "Agents may not read secrets or environment files."
+  enabled: false
+
+- id: example-no-push
+  kind: shell
+  match_command: ["\\bgit\\s+push\\b"]
+  action: block
+  message: "Pushing requires explicit approval."
+  enabled: false
+
+- id: example-flag-installs
+  kind: shell
+  match_command: ["\\b(pip|pip3|uv pip|npm|pnpm|yarn)\\s+(install|add)\\b"]
+  action: flag
+  message: "Dependency installation - recorded for review."
+  enabled: false
+
+- id: example-no-subagents
+  kind: tool
+  match_tool: ["^Task$"]
+  action: deny
+  message: "Subagents are not permitted in this repository."
   enabled: false
 
 - id: example-api-rate-limit
@@ -142,10 +180,15 @@ archrev git-trailer "$1" 2>/dev/null || exit 0
 """
 
 #: Hook events wired by init: (event, archrev subcommand, matcher or None).
+#: preToolUse runs unmatched so `tool` rules can gate any tool; the handler
+#: answers in milliseconds when nothing applies.
 _HOOK_SPECS: tuple[tuple[str, str, str | None], ...] = (
     ("beforeSubmitPrompt", "prompt", None),
     ("afterFileEdit", "edit", None),
-    ("preToolUse", "gate", "Write|StrReplace|Edit|MultiEdit|SearchReplace"),
+    ("preToolUse", "gate", None),
+    ("beforeShellExecution", "shell", None),
+    ("beforeReadFile", "read", None),
+    ("beforeMCPExecution", "mcp", None),
     ("stop", "finalize", None),
 )
 
@@ -190,16 +233,27 @@ def _merge_hooks_json(path: Path, result: InitResult) -> None:
             result.warnings.append(f"{path}: '{event}' is not a list; skipped.")
             continue
         command = f"archrev hook {subcommand}"
-        if any(
-            isinstance(e, dict) and str(e.get("command", "")).startswith("archrev hook")
-            for e in entries
-        ):
-            continue
-        entry: dict = {"command": command}
+        desired: dict = {"command": command}
         if matcher:
-            entry["matcher"] = matcher
-        entries.append(entry)
-        changed = True
+            desired["matcher"] = matcher
+        existing = next(
+            (
+                e
+                for e in entries
+                if isinstance(e, dict)
+                and str(e.get("command", "")).startswith("archrev hook")
+            ),
+            None,
+        )
+        if existing is None:
+            entries.append(desired)
+            changed = True
+        elif existing != desired:
+            # Upgrade our own entry in place (command/matcher may evolve
+            # between versions); foreign entries are never touched.
+            existing.clear()
+            existing.update(desired)
+            changed = True
     if changed:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(

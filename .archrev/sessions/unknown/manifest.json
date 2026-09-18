@@ -1,0 +1,162 @@
+{
+  "id": "unknown",
+  "started_at": "2026-09-18T10:32:21Z",
+  "head_sha": "6c3788625044802d3c1e4b06177f1c3950f665c8",
+  "finalized": true,
+  "generated_at": "2026-09-18T10:36:50Z",
+  "prompts": [],
+  "checks": [],
+  "gate_events": [],
+  "edits": [],
+  "files": [],
+  "other_changes": [
+    {
+      "path": ".archrev/rules/10-archrev-repo.yaml",
+      "added": 32,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/rules/90-archrev-self-protection.yaml",
+      "added": 17,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/unknown/events.jsonl",
+      "added": 12,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/unknown/meta.json",
+      "added": 5,
+      "removed": 0
+    },
+    {
+      "path": ".gitattributes",
+      "added": 5,
+      "removed": 0
+    },
+    {
+      "path": "README.md",
+      "added": 11,
+      "removed": 0
+    },
+    {
+      "path": "src/archrev/cli.py",
+      "added": 1,
+      "removed": 1
+    },
+    {
+      "path": "src/archrev/config.py",
+      "added": 6,
+      "removed": 3
+    },
+    {
+      "path": "src/archrev/drift.py",
+      "added": 16,
+      "removed": 2
+    },
+    {
+      "path": "src/archrev/gate.py",
+      "added": 30,
+      "removed": 12
+    },
+    {
+      "path": "src/archrev/gitutil.py",
+      "added": 3,
+      "removed": 3
+    },
+    {
+      "path": "src/archrev/hooks.py",
+      "added": 52,
+      "removed": 10
+    },
+    {
+      "path": "src/archrev/scaffold.py",
+      "added": 28,
+      "removed": 1
+    },
+    {
+      "path": "src/archrev/storage.py",
+      "added": 7,
+      "removed": 0
+    },
+    {
+      "path": "tests/test_finalize.py",
+      "added": 3,
+      "removed": 0
+    },
+    {
+      "path": "tests/test_gate.py",
+      "added": 49,
+      "removed": 2
+    },
+    {
+      "path": "tests/test_hooks.py",
+      "added": 17,
+      "removed": 0
+    }
+  ],
+  "drift": {
+    "out_of_plan": [],
+    "unrealized": []
+  },
+  "protected_findings": [
+    {
+      "path": ".archrev/rules/10-archrev-repo.yaml",
+      "rule_id": "archrev-self-protection",
+      "action": "block",
+      "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": false
+    },
+    {
+      "path": ".archrev/rules/90-archrev-self-protection.yaml",
+      "rule_id": "archrev-self-protection",
+      "action": "block",
+      "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": false
+    },
+    {
+      "path": "src/archrev/config.py",
+      "rule_id": "flag-enforcement-core",
+      "action": "flag",
+      "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py.",
+      "via_gate": false
+    },
+    {
+      "path": "src/archrev/gate.py",
+      "rule_id": "flag-enforcement-core",
+      "action": "flag",
+      "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py.",
+      "via_gate": false
+    },
+    {
+      "path": "src/archrev/gitutil.py",
+      "rule_id": "flag-audit-format",
+      "action": "flag",
+      "message": "This file defines the on-disk audit format / git linkage. Changes must stay backward-compatible with existing session records.",
+      "via_gate": false
+    },
+    {
+      "path": "src/archrev/hooks.py",
+      "rule_id": "flag-enforcement-core",
+      "action": "flag",
+      "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py.",
+      "via_gate": false
+    },
+    {
+      "path": "src/archrev/storage.py",
+      "rule_id": "flag-audit-format",
+      "action": "flag",
+      "message": "This file defines the on-disk audit format / git linkage. Changes must stay backward-compatible with existing session records.",
+      "via_gate": false
+    }
+  ],
+  "commits": [],
+  "areas": [],
+  "event_count": 12,
+  "plan": {
+    "registered": false,
+    "declared_files": []
+  },
+  "finalized_at": "2026-09-18T10:36:50Z"
+}

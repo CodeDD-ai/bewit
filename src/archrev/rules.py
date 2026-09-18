@@ -1,22 +1,32 @@
 """Rule loading and evaluation.
 
 Rules live in ``.archrev/rules/*.yaml``. Each file may contain a single
-rule mapping, a list of rule mappings, or multiple YAML documents. Two
-kinds exist:
+rule mapping, a list of rule mappings, or multiple YAML documents.
 
-``path`` rules (machine-enforced)
-    Glob patterns over repository paths with an ``action``:
+Machine-enforced kinds (evaluated by hooks before the action happens):
 
-    - ``block``: the edit gate stops the agent and asks the user for
-      explicit approval before the edit proceeds.
-    - ``flag``: the edit proceeds but is prominently recorded and surfaced
-      in the session timeline and manifest.
+- ``path``  — globs over repository paths, gating agent *file edits*.
+- ``read``  — globs over repository paths, gating agent *file reads*
+  (e.g. deny reading ``dev-secrets/**``).
+- ``shell`` — regex patterns (``match_command``) over shell commands the
+  agent wants to run (e.g. deny ``git push``, flag ``pip install``).
+- ``mcp``   — regex patterns (``match_tool``) over MCP tool identifiers.
+- ``tool``  — regex patterns (``match_tool``) over agent tool names
+  (e.g. deny ``Task`` to forbid subagents).
 
-``prompt`` rules (LLM-evaluated policy)
-    Free-text policies (e.g. "new API endpoints must declare rate
-    limiting") that the agent must attest to when running
-    ``archrev check plan``. Verdicts are recorded, not verified — they are
-    evidence, and the timeline makes missing or failed attestations loud.
+Actions for all machine-enforced kinds:
+
+- ``deny``  — hard stop; the agent is refused outright with the message.
+- ``block`` — pause; the *user* is asked to approve in Cursor's dialog.
+- ``flag``  — allow, but record prominently in the session review.
+
+``prompt`` rules are LLM-evaluated policies the agent must attest to when
+running ``archrev check plan``; verdicts are recorded evidence, not proof.
+
+Enforcement honesty: these rules gate the agent's *attempts* at the tool
+layer and record everything. They are policy plus audit, not a sandbox —
+an allowed process can still do whatever the OS permits. Use containers /
+network isolation underneath when containment is required.
 
 Loading is total: invalid rules are collected as errors (shown by
 ``archrev rules``) and never crash a hook.
@@ -24,6 +34,7 @@ Loading is total: invalid rules are collected as errors (shown by
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,7 +43,13 @@ import yaml
 from archrev import globmatch
 from archrev.config import archrev_dir
 
-PATH_ACTIONS = ("block", "flag")
+ACTIONS = ("deny", "block", "flag")
+GLOB_KINDS = ("path", "read")
+PATTERN_KINDS = ("shell", "mcp", "tool")
+ALL_KINDS = (*GLOB_KINDS, *PATTERN_KINDS, "prompt")
+
+#: YAML key that carries the regex patterns, per pattern kind.
+_PATTERN_KEY = {"shell": "match_command", "mcp": "match_tool", "tool": "match_tool"}
 
 
 @dataclass(frozen=True)
@@ -40,10 +57,11 @@ class Rule:
     """One validated rule."""
 
     id: str
-    kind: str  # "path" | "prompt"
-    action: str = "flag"  # path rules only
-    match: tuple[str, ...] = ()  # path rules only
-    message: str = ""  # shown to user/agent when a path rule fires
+    kind: str  # see ALL_KINDS
+    action: str = "flag"  # machine-enforced kinds only
+    match: tuple[str, ...] = ()  # glob kinds (path, read)
+    patterns: tuple[str, ...] = ()  # pattern kinds (shell, mcp, tool)
+    message: str = ""  # shown to user/agent when the rule fires
     policy: str = ""  # prompt rules: the policy text to attest
     applies_to: tuple[str, ...] = ()  # optional monorepo scoping globs
     enabled: bool = True
@@ -55,6 +73,10 @@ class Rule:
             return True
         return globmatch.matches_any(self.applies_to, path)
 
+    def pattern_matches(self, text: str) -> bool:
+        """True when any regex pattern matches ``text`` (case-insensitive)."""
+        return any(re.search(p, text, re.IGNORECASE) for p in self.patterns)
+
 
 @dataclass
 class RuleSet:
@@ -63,13 +85,32 @@ class RuleSet:
     rules: list[Rule] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
+    def _enabled(self, kind: str) -> list[Rule]:
+        return [r for r in self.rules if r.kind == kind and r.enabled]
+
     @property
     def path_rules(self) -> list[Rule]:
-        return [r for r in self.rules if r.kind == "path" and r.enabled]
+        return self._enabled("path")
+
+    @property
+    def read_rules(self) -> list[Rule]:
+        return self._enabled("read")
+
+    @property
+    def shell_rules(self) -> list[Rule]:
+        return self._enabled("shell")
+
+    @property
+    def mcp_rules(self) -> list[Rule]:
+        return self._enabled("mcp")
+
+    @property
+    def tool_rules(self) -> list[Rule]:
+        return self._enabled("tool")
 
     @property
     def prompt_rules(self) -> list[Rule]:
-        return [r for r in self.rules if r.kind == "prompt" and r.enabled]
+        return self._enabled("prompt")
 
     def match_path(self, relpath: str) -> list[Rule]:
         """Enabled path rules matching ``relpath``, in declaration order."""
@@ -79,6 +120,19 @@ class RuleSet:
             if rule.scope_matches(relpath)
             and globmatch.matches_any(rule.match, relpath)
         ]
+
+    def match_read(self, relpath: str) -> list[Rule]:
+        """Enabled read rules matching ``relpath``."""
+        return [
+            rule
+            for rule in self.read_rules
+            if rule.scope_matches(relpath)
+            and globmatch.matches_any(rule.match, relpath)
+        ]
+
+    def match_text(self, kind: str, text: str) -> list[Rule]:
+        """Enabled pattern rules of ``kind`` matching ``text``."""
+        return [r for r in self._enabled(kind) if r.pattern_matches(text)]
 
 
 def _string_tuple(value: object) -> tuple[str, ...] | None:
@@ -103,7 +157,7 @@ def _parse_rule(raw: object, source: str, errors: list[str]) -> Rule | None:
     rule_id = rule_id.strip()
 
     kind = raw.get("kind")
-    if kind not in ("path", "prompt"):
+    if kind not in ALL_KINDS:
         errors.append(f"{source}: rule '{rule_id}' has invalid kind {kind!r}")
         return None
 
@@ -117,24 +171,40 @@ def _parse_rule(raw: object, source: str, errors: list[str]) -> Rule | None:
         errors.append(f"{source}: rule '{rule_id}' has invalid 'applies_to'")
         applies_to = ()
 
-    if kind == "path":
-        match = _string_tuple(raw.get("match"))
-        if not match:
-            errors.append(f"{source}: path rule '{rule_id}' needs 'match' globs")
+    if kind == "prompt":
+        policy = raw.get("policy", "")
+        if not isinstance(policy, str) or not policy.strip():
+            errors.append(f"{source}: prompt rule '{rule_id}' needs a 'policy' text")
             return None
-        action = raw.get("action", "flag")
-        if action not in PATH_ACTIONS:
-            errors.append(
-                f"{source}: path rule '{rule_id}' has invalid action {action!r}"
-                f" (expected one of {PATH_ACTIONS})"
-            )
-            return None
-        message = raw.get("message", "")
-        if not isinstance(message, str):
-            message = ""
         return Rule(
             id=rule_id,
-            kind="path",
+            kind="prompt",
+            policy=policy.strip(),
+            applies_to=applies_to,
+            enabled=enabled,
+            source=source,
+        )
+
+    # Machine-enforced kinds share action/message validation.
+    action = raw.get("action", "flag")
+    if action not in ACTIONS:
+        errors.append(
+            f"{source}: {kind} rule '{rule_id}' has invalid action {action!r}"
+            f" (expected one of {ACTIONS})"
+        )
+        return None
+    message = raw.get("message", "")
+    if not isinstance(message, str):
+        message = ""
+
+    if kind in GLOB_KINDS:
+        match = _string_tuple(raw.get("match"))
+        if not match:
+            errors.append(f"{source}: {kind} rule '{rule_id}' needs 'match' globs")
+            return None
+        return Rule(
+            id=rule_id,
+            kind=kind,
             action=action,
             match=match,
             message=message.strip(),
@@ -143,14 +213,29 @@ def _parse_rule(raw: object, source: str, errors: list[str]) -> Rule | None:
             source=source,
         )
 
-    policy = raw.get("policy", "")
-    if not isinstance(policy, str) or not policy.strip():
-        errors.append(f"{source}: prompt rule '{rule_id}' needs a 'policy' text")
+    # Pattern kinds: shell / mcp / tool with validated regexes.
+    key = _PATTERN_KEY[kind]
+    patterns = _string_tuple(raw.get(key))
+    if not patterns:
+        errors.append(
+            f"{source}: {kind} rule '{rule_id}' needs '{key}' regex patterns"
+        )
         return None
+    for pattern in patterns:
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            errors.append(
+                f"{source}: {kind} rule '{rule_id}' has invalid regex "
+                f"{pattern!r} ({exc})"
+            )
+            return None
     return Rule(
         id=rule_id,
-        kind="prompt",
-        policy=policy.strip(),
+        kind=kind,
+        action=action,
+        patterns=patterns,
+        message=message.strip(),
         applies_to=applies_to,
         enabled=enabled,
         source=source,

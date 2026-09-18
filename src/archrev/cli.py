@@ -82,7 +82,12 @@ def init(target: Path | None) -> None:
 
 
 @main.command()
-@click.argument("event", type=click.Choice(["prompt", "edit", "gate", "finalize"]))
+@click.argument(
+    "event",
+    type=click.Choice(
+        ["prompt", "edit", "gate", "shell", "read", "mcp", "finalize"]
+    ),
+)
 def hook(event: str) -> None:
     """Cursor hook adapter (reads the event payload from stdin).
 
@@ -91,7 +96,11 @@ def hook(event: str) -> None:
     """
     from archrev.hooks import run_hook
 
-    response = run_hook(event, sys.stdin.read())
+    # Read raw bytes and decode as UTF-8 with BOM stripping: on Windows,
+    # text-mode stdin decodes Cursor's UTF-8 payload with the locale codec,
+    # which mangles the BOM and breaks JSON parsing (observed in the wild).
+    raw = sys.stdin.buffer.read()
+    response = run_hook(event, raw.decode("utf-8-sig", errors="replace"))
     click.echo(json.dumps(response))
 
 
@@ -271,12 +280,23 @@ def rules() -> None:
         f"enforcement={config.enforcement}  strict_plan_check={config.strict_plan_check}  "
         f"protected_scan={config.protected_scan}"
     )
-    click.echo(f"\nPath rules ({len(ruleset.path_rules)}):")
-    for rule in ruleset.path_rules:
-        scope = f"  applies_to={list(rule.applies_to)}" if rule.applies_to else ""
-        click.echo(f"  [{rule.action:5}] {rule.id}: {list(rule.match)}{scope}")
-        if rule.message:
-            click.echo(f"          {rule.message}")
+    sections = (
+        ("Path rules (edits)", ruleset.path_rules),
+        ("Read rules", ruleset.read_rules),
+        ("Shell rules", ruleset.shell_rules),
+        ("MCP rules", ruleset.mcp_rules),
+        ("Tool rules", ruleset.tool_rules),
+    )
+    for title, group in sections:
+        if not group and title != "Path rules (edits)":
+            continue
+        click.echo(f"\n{title} ({len(group)}):")
+        for rule in group:
+            scope = f"  applies_to={list(rule.applies_to)}" if rule.applies_to else ""
+            targets = list(rule.match) if rule.match else list(rule.patterns)
+            click.echo(f"  [{rule.action:5}] {rule.id}: {targets}{scope}")
+            if rule.message:
+                click.echo(f"          {rule.message}")
     click.echo(f"\nPrompt rules ({len(ruleset.prompt_rules)}):")
     for rule in ruleset.prompt_rules:
         click.echo(f"  {rule.id}: {rule.policy}")

@@ -23,7 +23,14 @@ from pathlib import Path
 
 from archrev.config import Config, archrev_dir, find_root, load_config
 from archrev.drift import compute_view
-from archrev.gate import evaluate_edit, relativize
+from archrev.gate import (
+    GateDecision,
+    evaluate_edit,
+    evaluate_read,
+    evaluate_shell,
+    evaluate_tool,
+    relativize,
+)
 from archrev.gitutil import Git
 from archrev.rules import load_rules
 from archrev.storage import Session, SessionStore, utc_now_iso
@@ -39,7 +46,7 @@ _PATH_KEYS = (
     "notebook_path",
 )
 
-HOOK_EVENTS = ("prompt", "edit", "gate", "finalize")
+HOOK_EVENTS = ("prompt", "edit", "gate", "shell", "read", "mcp", "finalize")
 
 
 def _session_id(payload: dict) -> str:
@@ -162,35 +169,119 @@ def handle_edit(root: Path, config: Config, payload: dict) -> dict:
     return {}
 
 
+def _record_gate(
+    session: Session,
+    decision: GateDecision,
+    kind: str,
+    target: str,
+    paths: list[str] | None = None,
+) -> None:
+    """Persist a gate decision when it stopped, asked, or flagged something."""
+    if decision.permission == "allow" and not decision.hits:
+        return
+    session.append_event(
+        "gate",
+        kind=kind,
+        target=target,
+        permission=decision.permission,
+        paths=paths or [],
+        hits=[
+            {"rule_id": h.rule_id, "action": h.action, "path": h.path}
+            for h in decision.hits
+        ],
+    )
+
+
 def handle_gate(root: Path, config: Config, payload: dict) -> dict:
-    """``preToolUse`` (edit tools): decide allow / ask / deny."""
+    """``preToolUse``: gate tool usage (tool rules) and file edits (path rules)."""
     session = _ensure_session(root, payload, "gate")
     tool_name = str(payload.get("tool_name") or payload.get("tool") or "")
+    ruleset = load_rules(root)
+
+    # Tool rules first: "may this tool be used at all in this repo?"
+    if tool_name:
+        decision = evaluate_tool(config, ruleset, "tool", tool_name)
+        if decision.permission != "allow" or decision.hits:
+            _record_gate(session, decision, "tool", tool_name)
+            if decision.permission != "allow":
+                return decision.to_hook_output()
+
     paths = _paths_from_tool_input(
         payload.get("tool_input") or payload.get("toolInput")
     )
     if not paths:
-        # Not a file edit we can reason about — never obstruct. The gate's
-        # matcher targets edit tools only, so a missing path here usually
-        # means field-name drift: keep the evidence.
-        session.append_event(
-            "payload_debug", hook="gate", payload=_trim_payload(payload)
-        )
+        # Not a file edit we can reason about — never obstruct.
         return {"permission": "allow"}
 
-    ruleset = load_rules(root)
     decision = evaluate_edit(config, ruleset, session, paths, root)
-    if decision.permission != "allow" or decision.hits:
+    _record_gate(
+        session,
+        decision,
+        "edit",
+        tool_name,
+        paths=[relativize(p, root) for p in paths],
+    )
+    return decision.to_hook_output()
+
+
+def handle_shell(root: Path, config: Config, payload: dict) -> dict:
+    """``beforeShellExecution``: gate one shell command."""
+    session = _ensure_session(root, payload, "shell")
+    command = ""
+    for key in ("command", "cmd", "shell_command"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            command = value
+            break
+    if not command:
         session.append_event(
-            "gate",
-            tool=tool_name,
-            permission=decision.permission,
-            paths=[relativize(p, root) for p in paths],
-            hits=[
-                {"rule_id": h.rule_id, "action": h.action, "path": h.path}
-                for h in decision.hits
-            ],
+            "payload_debug", hook="shell", payload=_trim_payload(payload)
         )
+        return {"permission": "allow"}
+    decision = evaluate_shell(config, load_rules(root), command)
+    _record_gate(session, decision, "shell", command.strip()[:200])
+    return decision.to_hook_output()
+
+
+def handle_read(root: Path, config: Config, payload: dict) -> dict:
+    """``beforeReadFile``: gate file reads (e.g. secrets)."""
+    session = _ensure_session(root, payload, "read")
+    raw_path = ""
+    for key in _PATH_KEYS:
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            raw_path = value
+            break
+    if not raw_path:
+        return {"permission": "allow"}
+    decision = evaluate_read(config, load_rules(root), [raw_path], root)
+    _record_gate(session, decision, "read", relativize(raw_path, root))
+    return decision.to_hook_output()
+
+
+def handle_mcp(root: Path, config: Config, payload: dict) -> dict:
+    """``beforeMCPExecution``: gate MCP tool calls by identifier."""
+    session = _ensure_session(root, payload, "mcp")
+    tool = ""
+    for key in ("tool_name", "tool", "name"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            tool = value
+            break
+    server = ""
+    for key in ("server", "server_name", "provider", "namespace"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            server = value
+            break
+    identifier = f"{server}.{tool}" if server else tool
+    if not identifier:
+        session.append_event(
+            "payload_debug", hook="mcp", payload=_trim_payload(payload)
+        )
+        return {"permission": "allow"}
+    decision = evaluate_tool(config, load_rules(root), "mcp", identifier)
+    _record_gate(session, decision, "mcp", identifier)
     return decision.to_hook_output()
 
 
@@ -213,6 +304,9 @@ _HANDLERS = {
     "prompt": handle_prompt,
     "edit": handle_edit,
     "gate": handle_gate,
+    "shell": handle_shell,
+    "read": handle_read,
+    "mcp": handle_mcp,
     "finalize": handle_finalize,
 }
 
@@ -243,16 +337,37 @@ def run_hook(event: str, stdin_text: str) -> dict:
     """
     root: Path | None = None
     payload: dict = {}
-    try:
-        parsed = json.loads(stdin_text) if stdin_text.strip() else {}
+    parse_failed = False
+    text = stdin_text.strip()
+    # Defense in depth against transport artifacts (BOMs, stray prefix
+    # bytes): if direct parsing fails, retry from the first '{'.
+    for candidate in (text, text[text.find("{") :] if "{" in text else ""):
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            parse_failed = True
+            continue
         if isinstance(parsed, dict):
             payload = parsed
-    except json.JSONDecodeError:
-        payload = {}
+            parse_failed = False
+            break
+        parse_failed = True
     try:
         root = _payload_root(payload)
         if root is None:
             return {"permission": "allow"} if event == "gate" else {}
+        if parse_failed or not payload:
+            # The payload was empty or not a JSON object: record the raw
+            # stdin head so the transport problem is diagnosable from the
+            # session record alone.
+            SessionStore(root).session("unknown").append_event(
+                "payload_debug",
+                hook=event,
+                stdin_len=len(stdin_text),
+                stdin_head=stdin_text[:400],
+            )
         config = load_config(root)
         handler = _HANDLERS.get(event)
         if handler is None:

@@ -13,13 +13,27 @@
     ],
     "preToolUse": [
       {
-        "command": "archrev hook gate",
-        "matcher": "Write|StrReplace|Edit|MultiEdit|SearchReplace"
+        "command": "archrev hook gate"
       }
     ],
     "stop": [
       {
         "command": "archrev hook finalize"
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "archrev hook shell"
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": "archrev hook read"
+      }
+    ],
+    "beforeMCPExecution": [
+      {
+        "command": "archrev hook mcp"
       }
     ]
   }

@@ -83,6 +83,75 @@ def relativize(path: str, root: Path) -> str:
     return norm
 
 
+def _apply_mode(action: str, config: Config) -> str:
+    """Downgrade stopping actions to ``flag`` in monitor mode."""
+    if config.enforcement == "monitor" and action in ("block", "deny"):
+        return "flag"
+    return action
+
+
+def decide_from_hits(
+    hits: list[RuleHit], config: Config, what: str
+) -> GateDecision:
+    """Turn rule hits into a decision: deny > block(ask) > flag(allow).
+
+    ``what`` names the gated action ("edit", "shell command", ...) in the
+    user- and agent-facing messages.
+    """
+    if not hits:
+        return GateDecision(permission="allow")
+
+    def _lines(subset: list[RuleHit]) -> str:
+        return "\n".join(
+            f"[{h.rule_id}] {h.path}: {h.message or 'matched rule'}"
+            for h in subset
+        )
+
+    denying = [h for h in hits if h.action == "deny"]
+    if denying:
+        return GateDecision(
+            permission="deny",
+            user_message=(
+                f"ArchRev denied a {what} (hard policy).\n" + _lines(denying)
+            ),
+            agent_message=(
+                f"ArchRev denied this {what} outright (rule(s): "
+                + ", ".join(sorted({h.rule_id for h in denying}))
+                + "). This is a hard policy - do not retry variations or "
+                "work around it; adjust the approach or ask the user."
+            ),
+            hits=tuple(hits),
+        )
+
+    blocking = [h for h in hits if h.action == "block"]
+    if blocking:
+        return GateDecision(
+            permission="ask",
+            user_message=(
+                f"ArchRev: this {what} needs your approval.\n"
+                + _lines(blocking)
+            ),
+            agent_message=(
+                f"ArchRev paused this {what} for explicit user approval "
+                "(rule(s): "
+                + ", ".join(sorted({h.rule_id for h in blocking}))
+                + "). If the user declines, adjust the plan instead of "
+                "working around the gate."
+            ),
+            hits=tuple(hits),
+        )
+
+    flagged = ", ".join(sorted({h.rule_id for h in hits}))
+    return GateDecision(
+        permission="allow",
+        agent_message=(
+            f"ArchRev flagged this {what} (rule(s): {flagged}). It is "
+            "allowed but will be highlighted in the session review."
+        ),
+        hits=tuple(hits),
+    )
+
+
 def evaluate_edit(
     config: Config,
     ruleset: RuleSet,
@@ -126,52 +195,80 @@ def evaluate_edit(
     hits: list[RuleHit] = []
     for rel in actionable:
         for rule in ruleset.match_path(rel):
-            action = rule.action
-            if action == "block" and config.enforcement == "monitor":
-                action = "flag"  # monitor mode records but never stops
             hits.append(
                 RuleHit(
-                    rule_id=rule.id, action=action, path=rel, message=rule.message
+                    rule_id=rule.id,
+                    action=_apply_mode(rule.action, config),
+                    path=rel,
+                    message=rule.message,
                 )
             )
+    return decide_from_hits(hits, config, "edit")
 
-    if not hits:
+
+def evaluate_shell(
+    config: Config, ruleset: RuleSet, command: str
+) -> GateDecision:
+    """Gate one shell command against ``shell`` rules.
+
+    Strict plan mode deliberately does not apply here: the agent must be
+    able to run ``archrev plan register`` / ``check plan`` via shell to
+    satisfy strict mode in the first place.
+    """
+    if config.enforcement == "off" or not command.strip():
         return GateDecision(permission="allow")
-
-    blocking = [h for h in hits if h.action == "block"]
-    if blocking:
-        lines = [
-            f"[{h.rule_id}] {h.path}: {h.message or 'protected path'}"
-            for h in blocking
-        ]
-        return GateDecision(
-            permission="ask",
-            user_message=(
-                "ArchRev: this edit touches protected paths and needs your "
-                "approval.\n" + "\n".join(lines)
-            ),
-            agent_message=(
-                "ArchRev paused this edit for explicit user approval "
-                "(protected path rule"
-                + ("s" if len(blocking) > 1 else "")
-                + ": "
-                + ", ".join(sorted({h.rule_id for h in blocking}))
-                + "). If the user declines, adjust the plan instead of "
-                "working around the gate."
-            ),
-            hits=tuple(hits),
+    excerpt = command.strip()[:200]
+    hits = [
+        RuleHit(
+            rule_id=r.id,
+            action=_apply_mode(r.action, config),
+            path=excerpt,
+            message=r.message,
         )
+        for r in ruleset.match_text("shell", command)
+    ]
+    return decide_from_hits(hits, config, "shell command")
 
-    # Flag-only: allow, and inform the agent so the flag lands in context.
-    flagged_rules = ", ".join(sorted({h.rule_id for h in hits}))
-    return GateDecision(
-        permission="allow",
-        agent_message=(
-            f"ArchRev flagged this edit (rule(s): {flagged_rules}). It is "
-            "allowed but will be highlighted in the session review."
-        ),
-        hits=tuple(hits),
-    )
+
+def evaluate_read(
+    config: Config, ruleset: RuleSet, paths: list[str], root: Path
+) -> GateDecision:
+    """Gate file reads against ``read`` rules (e.g. secrets)."""
+    if config.enforcement == "off":
+        return GateDecision(permission="allow")
+    hits: list[RuleHit] = []
+    for rel in (relativize(p, root) for p in paths):
+        if not rel:
+            continue
+        for rule in ruleset.match_read(rel):
+            hits.append(
+                RuleHit(
+                    rule_id=rule.id,
+                    action=_apply_mode(rule.action, config),
+                    path=rel,
+                    message=rule.message,
+                )
+            )
+    return decide_from_hits(hits, config, "file read")
+
+
+def evaluate_tool(
+    config: Config, ruleset: RuleSet, kind: str, identifier: str
+) -> GateDecision:
+    """Gate a tool or MCP invocation by name (``kind``: 'tool' | 'mcp')."""
+    if config.enforcement == "off" or not identifier:
+        return GateDecision(permission="allow")
+    hits = [
+        RuleHit(
+            rule_id=r.id,
+            action=_apply_mode(r.action, config),
+            path=identifier,
+            message=r.message,
+        )
+        for r in ruleset.match_text(kind, identifier)
+    ]
+    what = "MCP tool call" if kind == "mcp" else "tool call"
+    return decide_from_hits(hits, config, what)
 
 
 def rule_hits_for_paths(ruleset: RuleSet, rel_paths: list[str]) -> list[RuleHit]:

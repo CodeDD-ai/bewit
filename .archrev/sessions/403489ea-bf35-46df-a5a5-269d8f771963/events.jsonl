@@ -1,0 +1,32 @@
+{"ts": "2026-09-18T10:41:40Z", "type": "edit", "path": "src/archrev/cli.py", "tool": "", "edit_count": 2}
+{"ts": "2026-09-18T10:41:43Z", "type": "gate", "tool": "Write", "permission": "allow", "paths": ["src/archrev/hooks.py"], "hits": [{"rule_id": "flag-enforcement-core", "action": "flag", "path": "src/archrev/hooks.py"}]}
+{"ts": "2026-09-18T10:41:44Z", "type": "edit", "path": "src/archrev/hooks.py", "tool": "", "edit_count": 2}
+{"ts": "2026-09-18T10:42:03Z", "type": "edit", "path": "src/archrev/rules.py", "tool": "", "edit_count": 9}
+{"ts": "2026-09-18T10:42:21Z", "type": "hook_error", "event": "gate", "error": "NameError(\"name 'PATH_ACTIONS' is not defined\")"}
+{"ts": "2026-09-18T10:42:21Z", "type": "edit", "path": "src/archrev/rules.py", "tool": "", "edit_count": 9}
+{"ts": "2026-09-18T10:42:39Z", "type": "hook_error", "event": "gate", "error": "NameError(\"name 'PATH_ACTIONS' is not defined\")"}
+{"ts": "2026-09-18T10:42:40Z", "type": "edit", "path": "src/archrev/rules.py", "tool": "", "edit_count": 8}
+{"ts": "2026-09-18T10:42:58Z", "type": "gate", "tool": "Write", "permission": "allow", "paths": ["src/archrev/gate.py"], "hits": [{"rule_id": "flag-enforcement-core", "action": "flag", "path": "src/archrev/gate.py"}]}
+{"ts": "2026-09-18T10:42:58Z", "type": "edit", "path": "src/archrev/gate.py", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:43:16Z", "type": "gate", "tool": "Write", "permission": "allow", "paths": ["src/archrev/gate.py"], "hits": [{"rule_id": "flag-enforcement-core", "action": "flag", "path": "src/archrev/gate.py"}]}
+{"ts": "2026-09-18T10:43:17Z", "type": "edit", "path": "src/archrev/gate.py", "tool": "", "edit_count": 9}
+{"ts": "2026-09-18T10:43:24Z", "type": "gate", "tool": "Write", "permission": "allow", "paths": ["src/archrev/hooks.py"], "hits": [{"rule_id": "flag-enforcement-core", "action": "flag", "path": "src/archrev/hooks.py"}]}
+{"ts": "2026-09-18T10:43:24Z", "type": "edit", "path": "src/archrev/hooks.py", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:43:25Z", "type": "gate", "tool": "Write", "permission": "allow", "paths": ["src/archrev/hooks.py"], "hits": [{"rule_id": "flag-enforcement-core", "action": "flag", "path": "src/archrev/hooks.py"}]}
+{"ts": "2026-09-18T10:43:26Z", "type": "edit", "path": "src/archrev/hooks.py", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:43:42Z", "type": "gate", "tool": "Write", "permission": "allow", "paths": ["src/archrev/hooks.py"], "hits": [{"rule_id": "flag-enforcement-core", "action": "flag", "path": "src/archrev/hooks.py"}]}
+{"ts": "2026-09-18T10:43:43Z", "type": "edit", "path": "src/archrev/hooks.py", "tool": "", "edit_count": 9}
+{"ts": "2026-09-18T10:43:43Z", "type": "gate", "kind": "edit", "target": "Write", "permission": "allow", "paths": ["src/archrev/hooks.py"], "hits": [{"rule_id": "flag-enforcement-core", "action": "flag", "path": "src/archrev/hooks.py"}]}
+{"ts": "2026-09-18T10:43:44Z", "type": "edit", "path": "src/archrev/hooks.py", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:43:54Z", "type": "edit", "path": "src/archrev/scaffold.py", "tool": "", "edit_count": 2}
+{"ts": "2026-09-18T10:44:00Z", "type": "edit", "path": "src/archrev/scaffold.py", "tool": "", "edit_count": 2}
+{"ts": "2026-09-18T10:44:10Z", "type": "edit", "path": "src/archrev/scaffold.py", "tool": "", "edit_count": 2}
+{"ts": "2026-09-18T10:44:21Z", "type": "edit", "path": "src/archrev/report/template.html", "tool": "", "edit_count": 2}
+{"ts": "2026-09-18T10:44:25Z", "type": "edit", "path": "src/archrev/cli.py", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:44:39Z", "type": "edit", "path": "README.md", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:44:42Z", "type": "edit", "path": "README.md", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:45:09Z", "type": "edit", "path": "tests/test_boundaries.py", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:46:05Z", "type": "gate", "kind": "edit", "target": "Read", "permission": "ask", "paths": [".archrev/rules/20-agent-boundaries.yaml"], "hits": [{"rule_id": "archrev-self-protection", "action": "block", "path": ".archrev/rules/20-agent-boundaries.yaml"}]}
+{"ts": "2026-09-18T10:46:06Z", "type": "gate", "kind": "edit", "target": "Write", "permission": "ask", "paths": [".archrev/rules/20-agent-boundaries.yaml"], "hits": [{"rule_id": "archrev-self-protection", "action": "block", "path": ".archrev/rules/20-agent-boundaries.yaml"}]}
+{"ts": "2026-09-18T10:46:07Z", "type": "edit", "path": ".archrev/rules/20-agent-boundaries.yaml", "tool": "", "edit_count": 1}
+{"ts": "2026-09-18T10:46:47Z", "type": "edit", "path": "E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml", "tool": "", "edit_count": 1}

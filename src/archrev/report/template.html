@@ -182,10 +182,14 @@ function timelineItems(view) {
                  detail: (c.prompt_rules || []).map((r) => `${r.rule_id}: ${r.verdict}`).join(", ") });
   for (const g of view.gate_events || []) {
     const kind = g.permission === "allow" ? "gate-flag" : `gate-${g.permission}`;
-    const what = g.permission === "allow" ? "Edit flagged" :
-                 g.permission === "ask" ? "Edit paused for approval" : "Edit denied";
+    const subject = { edit: "Edit", shell: "Shell command", read: "File read",
+                      mcp: "MCP call", tool: "Tool call" }[g.kind] || "Edit";
+    const what = g.permission === "allow" ? `${subject} flagged` :
+                 g.permission === "ask" ? `${subject} paused for approval` :
+                 `${subject} denied`;
+    const where = (g.paths && g.paths.length) ? g.paths.join(", ") : (g.target || "");
     items.push({ ts: g.ts, kind, what,
-                 detail: (g.paths || []).join(", ") + "  [" +
+                 detail: where + "  [" +
                          (g.hits || []).map((h) => `${h.action}:${h.rule_id}`).join(", ") + "]" });
   }
   for (const e of view.edits || [])
