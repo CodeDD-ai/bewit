@@ -184,6 +184,19 @@ prompt ──> plan ──> check ──> edits ──> stop ──> commit
    implementation ends with an explicit rule review instead of a silent
    manifest. The same findings are raised at most once (fingerprint guard +
    hook loop limit), and `final_check: false` turns the notification off.
+   Legitimate findings are resolved with an **audited acknowledgment**:
+
+   ```powershell
+   archrev ack .cursor/hooks.json --note "hooks rewired by archrev init, user-approved"
+   archrev ack plan-check --note "policy X intentionally waived for this hotfix"
+   ```
+
+   Acknowledged targets stop being re-raised, but the ack itself is a
+   hash-chained event showing what was acknowledged, when, and why —
+   resolved, never erased. (Honesty note: an agent *could* run `ack`
+   itself; the event log and timeline make any self-acknowledgment
+   plainly visible, and the protected-path scan result in the manifest is
+   unaffected.)
 5. **Commit linking** (automatic, git hook): staged files are matched against
    recent sessions and `ArchRev-Session: <id>` trailers are appended, even
    when you commit hours after the session ended.

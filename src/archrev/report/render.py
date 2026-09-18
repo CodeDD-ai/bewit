@@ -115,6 +115,12 @@ def render_text(view: dict) -> str:
         for issue in issues:
             add(f"  - {issue}")
 
+    acks = view.get("acks", [])
+    if acks:
+        add(f"Acknowledged findings ({len(acks)})")
+        for a in acks:
+            add(f"  [{a.get('ts')}] {a.get('target')}: {a.get('note', '')}")
+
     human = view.get("human_changes", [])
     if human:
         add(f"Human changes recorded ({len(human)} commit event(s))")
@@ -216,6 +222,13 @@ def render_markdown(view: dict) -> str:
                 add(f"- {issue}")
         else:
             add("Clean - no material findings at session end.")
+        add("")
+
+    acks = view.get("acks", [])
+    if acks:
+        add("## Acknowledged findings")
+        for a in acks:
+            add(f"- {a.get('ts')}: `{a.get('target')}` — {a.get('note', '')}")
         add("")
 
     human = view.get("human_changes", [])

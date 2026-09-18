@@ -79,6 +79,10 @@ def compute_view(
     ]
     final_checks = [e for e in events if e.get("type") == "final_check"]
     human_changes = [e for e in events if e.get("type") == "human_changes"]
+    # Acknowledgments: audited resolutions of final-review findings
+    # (`archrev ack`). The final review skips acknowledged targets; the
+    # record of who acknowledged what, when, and why stays in the log.
+    acks = [e for e in events if e.get("type") == "ack"]
 
     touched = session.touched_files()
 
@@ -167,6 +171,7 @@ def compute_view(
         "checks": checks,
         "final_checks": final_checks,
         "human_changes": human_changes,
+        "acks": acks,
         "gate_events": gate_events,
         "edits": edits,
         "files": files,

@@ -145,6 +145,36 @@ def test_final_check_notifies_agent_once(in_repo: Path):
     assert final[1]["notified"] is False
 
 
+def test_acknowledged_findings_are_not_re_raised(in_repo: Path):
+    """`archrev ack` resolves a finding: audited, and no more follow-ups."""
+    run_hook("prompt", _payload(prompt="do something"))
+    (in_repo / "db" / "migrations" / "0001_init.sql").write_text(
+        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
+    )
+    out = run_hook("finalize", _payload(status="completed"))
+    assert "followup_message" in out
+
+    session = SessionStore(in_repo).session("conv-42")
+    session.append_event(
+        "ack", target="db/migrations/0001_init.sql", note="approved by user"
+    )
+    out = run_hook("finalize", _payload(status="completed"))
+    assert out == {}
+    final = [e for e in session.events() if e["type"] == "final_check"]
+    assert final[-1]["findings"] == []  # resolved, not merely deduplicated
+
+
+def test_ack_of_unrelated_target_does_not_suppress(in_repo: Path):
+    run_hook("prompt", _payload(prompt="do something"))
+    (in_repo / "db" / "migrations" / "0001_init.sql").write_text(
+        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
+    )
+    session = SessionStore(in_repo).session("conv-42")
+    session.append_event("ack", target="some/other/file.py", note="unrelated")
+    out = run_hook("finalize", _payload(status="completed"))
+    assert "followup_message" in out
+
+
 def test_final_check_clean_session_is_silent(in_repo: Path):
     run_hook("prompt", _payload(prompt="hi"))
     run_hook("edit", _payload(file_path="app/main.py"))

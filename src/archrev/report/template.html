@@ -240,6 +240,10 @@ function timelineItems(view) {
     items.push({ ts: h.ts, kind: "human", cat: "human",
                  what: `Human changes recorded (${(h.files || []).length} file(s))`,
                  detail: (h.files || []).join(", ") });
+  for (const a of view.acks || [])
+    items.push({ ts: a.ts, kind: "check", cat: "check",
+                 what: `Finding acknowledged: ${a.target || ""}`,
+                 detail: a.note || "" });
   for (const g of view.gate_events || []) {
     const kind = g.permission === "allow" ? "gate-flag" : `gate-${g.permission}`;
     const subject = { edit: "Edit", shell: "Shell command", read: "File read",

@@ -308,10 +308,22 @@ def handle_mcp(root: Path, config: Config, payload: dict) -> dict:
 
 
 def _final_findings(view: dict) -> list[str]:
-    """Material findings worth confronting the agent with at session end."""
+    """Material findings worth confronting the agent with at session end.
+
+    Targets acknowledged via ``archrev ack`` are skipped: acknowledgment is
+    the review's prescribed resolution for legitimate findings, and the ack
+    itself is an audited, hash-chained event — resolved, not erased.
+    """
+    acked = {
+        str(a.get("target", "")).lower()
+        for a in view.get("acks", [])
+        if a.get("target")
+    }
     findings: list[str] = []
     bypassed = [
-        f for f in view.get("protected_findings", []) if not f.get("via_gate")
+        f
+        for f in view.get("protected_findings", [])
+        if not f.get("via_gate") and f["path"].lower() not in acked
     ]
     if bypassed:
         listed = ", ".join(f["path"] for f in bypassed[:5])
@@ -320,12 +332,16 @@ def _final_findings(view: dict) -> list[str]:
             f"gate (shell/manual): {listed}"
         )
     checks = view.get("checks", [])
-    if checks and not checks[-1].get("ok"):
+    if checks and not checks[-1].get("ok") and "plan-check" not in acked:
         findings.append(
             "the latest plan check did NOT pass (failed or unattested "
             "prompt rules)"
         )
-    out_of_plan = view.get("drift", {}).get("out_of_plan", [])
+    out_of_plan = [
+        p
+        for p in view.get("drift", {}).get("out_of_plan", [])
+        if p.lower() not in acked
+    ]
     if view.get("plan", {}).get("registered") and out_of_plan:
         listed = ", ".join(out_of_plan[:5])
         findings.append(
@@ -373,10 +389,10 @@ def handle_finalize(root: Path, config: Config, payload: dict) -> dict:
             "followup_message": (
                 "ArchRev final review found issues in this session:\n- "
                 + "\n- ".join(findings)
-                + "\nReview them with the user: legitimate changes should be "
-                "acknowledged (and the plan/rules updated if needed); "
-                "unintended ones should be reverted. See `archrev show` for "
-                "the full record."
+                + "\nReview them with the user: confirm legitimate ones with "
+                "`archrev ack <path|plan-check> --note \"<reason>\"` (audited, "
+                "stops re-raising); revert unintended ones. See `archrev "
+                "show` for the full record."
             )
         }
     return {}

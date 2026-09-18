@@ -406,6 +406,33 @@ def trace(target: str) -> None:
 
 
 @main.command()
+@click.argument("target")
+@click.option(
+    "--note",
+    required=True,
+    help="Why this finding is legitimate (stored in the audit log).",
+)
+@click.option("--session", "session_ref", default="latest", show_default=True)
+def ack(target: str, note: str, session_ref: str) -> None:
+    """Acknowledge a final-review finding as legitimate.
+
+    TARGET is the path the finding names (for gate bypasses and
+    out-of-plan drift) or the literal ``plan-check`` (for a failed check).
+    The acknowledgment is an audited, hash-chained event: the finding stops
+    being re-raised at session end, but who acknowledged what, when, and
+    why stays in the permanent record.
+    """
+    root = _require_root()
+    session = _resolve_session(root, session_ref)
+    normalized = target.replace("\\", "/")
+    session.append_event("ack", target=normalized, note=note)
+    click.secho(
+        f"Acknowledged '{normalized}' for session {session.id}.", fg="green"
+    )
+    click.echo("Recorded in the audit log; the final review will skip it.")
+
+
+@main.command()
 @click.argument("session_ref", default=None, required=False)
 @click.option("--all", "verify_all", is_flag=True, help="Verify every session.")
 def verify(session_ref: str | None, verify_all: bool) -> None:
