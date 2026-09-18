@@ -31,6 +31,15 @@
   action: block
   message: "License changes require explicit approval."
 
+# --- Check rules (quality gates over changed files) -------------------------
+
+- id: check-python-syntax
+  kind: check
+  match: ["src/**/*.py", "tests/**/*.py"]
+  command: python -m py_compile {files}
+  action: block
+  message: "Changed Python files must compile (py_compile)."
+
 # --- Prompt rules (attested via `archrev check plan`) -----------------------
 
 - id: hooks-fail-open

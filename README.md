@@ -135,6 +135,35 @@ OS permits (an approved script may open network connections). For hard
 containment, run agent sessions inside network-isolated containers; the
 container is the wall, ArchRev is the policy and the evidence.
 
+### Check rules — real quality gates over changed code
+
+Where path/shell/tool rules gate *names*, `check` rules gate *content* by
+delegating to a real analyzer — Semgrep, ESLint, Ruff, pytest, or any
+script (including an LLM-judge wrapper):
+
+```yaml
+- id: endpoint-validation
+  kind: check
+  match: ["api/**/*.py"]                 # which changed files trigger it
+  command: "semgrep scan --config .archrev/checks/endpoints.yaml --error --quiet {files}"
+  action: block                          # block | flag (post-hoc; no deny)
+  message: "New/changed endpoints must validate input."
+  timeout: 60
+```
+
+- `{files}` is replaced with the session's matched changed files; exit
+  code 0 = pass. Output is captured as evidence in the event log.
+- Checks run **at session end** (failures with `action: block` become
+  final-review findings the agent must resolve or you `ack`) and in
+  **`archrev check diff`** (exits 1 on block failures — CI-ready).
+- Rules whose globs match no changed file are skipped, so sessions only
+  pay for the checks they trigger.
+- A check that cannot run (missing tool, timeout) is recorded as an
+  *error*, never a failure — ArchRev stays fail-open.
+- Three honesty tiers, all visible in the review: **verified** (check
+  rules, machine verdicts), **gated** (path/shell/tool rules), and
+  **attested** (prompt rules, agent self-reported).
+
 ### Prompt rules — policies the agent attests during planning
 
 ```yaml

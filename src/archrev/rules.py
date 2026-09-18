@@ -46,7 +46,17 @@ from archrev.config import archrev_dir
 ACTIONS = ("deny", "block", "flag")
 GLOB_KINDS = ("path", "read")
 PATTERN_KINDS = ("shell", "mcp", "tool")
-ALL_KINDS = (*GLOB_KINDS, *PATTERN_KINDS, "prompt")
+#: check rules run a quality-gate command (semgrep, eslint, pytest, an LLM
+#: judge script, ...) against the session's changed files. Post-hoc by
+#: nature, so deny is meaningless: block failures become final-review
+#: findings (and fail `archrev check diff` in CI); flag failures are
+#: recorded and highlighted only.
+CHECK_ACTIONS = ("block", "flag")
+ALL_KINDS = (*GLOB_KINDS, *PATTERN_KINDS, "check", "prompt")
+
+#: Default seconds a check command may run before it is abandoned
+#: (recorded as an error, never blocking - fail-open like every hook path).
+DEFAULT_CHECK_TIMEOUT = 60
 
 #: YAML key that carries the regex patterns, per pattern kind.
 _PATTERN_KEY = {"shell": "match_command", "mcp": "match_tool", "tool": "match_tool"}
@@ -63,6 +73,8 @@ class Rule:
     patterns: tuple[str, ...] = ()  # pattern kinds (shell, mcp, tool)
     message: str = ""  # shown to user/agent when the rule fires
     policy: str = ""  # prompt rules: the policy text to attest
+    command: str = ""  # check rules: quality-gate command ({files} placeholder)
+    timeout: int = DEFAULT_CHECK_TIMEOUT  # check rules: max runtime seconds
     applies_to: tuple[str, ...] = ()  # optional monorepo scoping globs
     enabled: bool = True
     source: str = ""  # rules file this came from, for diagnostics
@@ -107,6 +119,10 @@ class RuleSet:
     @property
     def tool_rules(self) -> list[Rule]:
         return self._enabled("tool")
+
+    @property
+    def check_rules(self) -> list[Rule]:
+        return self._enabled("check")
 
     @property
     def prompt_rules(self) -> list[Rule]:
@@ -207,6 +223,38 @@ def _parse_rule(raw: object, source: str, errors: list[str]) -> Rule | None:
             kind=kind,
             action=action,
             match=match,
+            message=message.strip(),
+            applies_to=applies_to,
+            enabled=enabled,
+            source=source,
+        )
+
+    if kind == "check":
+        if action not in CHECK_ACTIONS:
+            errors.append(
+                f"{source}: check rule '{rule_id}' has action {action!r}; "
+                f"check rules run post-hoc and support only {CHECK_ACTIONS}"
+            )
+            return None
+        match = _string_tuple(raw.get("match"))
+        if not match:
+            errors.append(f"{source}: check rule '{rule_id}' needs 'match' globs")
+            return None
+        command = raw.get("command")
+        if not isinstance(command, str) or not command.strip():
+            errors.append(f"{source}: check rule '{rule_id}' needs a 'command'")
+            return None
+        timeout = raw.get("timeout", DEFAULT_CHECK_TIMEOUT)
+        if not isinstance(timeout, int) or timeout <= 0:
+            errors.append(f"{source}: check rule '{rule_id}' has invalid 'timeout'")
+            timeout = DEFAULT_CHECK_TIMEOUT
+        return Rule(
+            id=rule_id,
+            kind="check",
+            action=action,
+            match=match,
+            command=command.strip(),
+            timeout=timeout,
             message=message.strip(),
             applies_to=applies_to,
             enabled=enabled,

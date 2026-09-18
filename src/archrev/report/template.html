@@ -305,6 +305,17 @@ function chipData(view) {
                  label: `protected changes bypassing gate <b>${bypass.length}</b>`,
                  title: "Protected paths changed without passing the edit gate (shell or manual writes). Click to list.",
                  items: bypass.map((f) => `${f.path}  (${f.rule_id})`) });
+  const quality = view.quality_checks || [];
+  if (quality.length) {
+    const latest = new Map();
+    for (const q of quality) latest.set(q.rule_id, q);
+    const failed = [...latest.values()].filter((q) => q.ok === false);
+    chips.push({ id: "quality", cls: failed.length ? "bad" : "good",
+                 label: `quality checks <b>${failed.length ? failed.length + " failed" : "passed"}</b>`,
+                 title: "Check rules (semgrep/eslint/custom commands) run against the session's changed files. Click for details.",
+                 items: [...latest.values()].map((q) =>
+                   `${q.rule_id}: ${q.ok === true ? "passed" : q.ok === false ? "FAILED — " + (q.message || "") : "error — " + (q.error || "")}`) });
+  }
   const acks = view.acks || [];
   if (acks.length)
     chips.push({ id: "acks", cls: "good", label: `acknowledged <b>${acks.length}</b>`,
@@ -357,6 +368,14 @@ function timelineItems(view) {
     items.push({ ts: a.ts, kind: "check", cat: "check",
                  what: `Finding acknowledged: ${a.target || ""}`,
                  detail: a.note || "" });
+  for (const q of view.quality_checks || []) {
+    const status = q.ok === true ? "passed" : q.ok === false ? "FAILED" : "could not run";
+    items.push({ ts: q.ts, kind: q.ok === false ? "final" : "check", cat: "check",
+                 what: `Quality check ${q.rule_id} — ${status}`,
+                 detail: q.ok === false
+                   ? (q.message || (q.output || "").split("\n").filter(Boolean).slice(-1)[0] || "")
+                   : `${(q.files || []).length} file(s) checked` });
+  }
   for (const h of view.human_changes || [])
     items.push({ ts: h.ts, kind: "human", cat: "human",
                  what: `Human changes recorded (${(h.files || []).length} file(s))`,

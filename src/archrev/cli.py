@@ -235,13 +235,18 @@ def check_plan_cmd(
 
 @check.command(name="diff")
 @click.option("--base", default=None, help="Git base ref (default: HEAD).")
-def check_diff_cmd(base: str | None) -> None:
-    """Scan current git changes against path rules (post-hoc / CI usage).
+@click.option(
+    "--no-quality", is_flag=True, help="Skip check-rule commands (path scan only)."
+)
+def check_diff_cmd(base: str | None, no_quality: bool) -> None:
+    """Scan current git changes against path and quality rules (CI usage).
 
-    Exits 1 when any changed file matches a block rule.
+    Exits 1 when any changed file matches a block path rule or any
+    block-level quality check fails.
     """
     from archrev.gate import rule_hits_for_paths
     from archrev.gitutil import Git
+    from archrev.quality import run_checks
     from archrev.rules import load_rules
 
     root = _require_root()
@@ -249,18 +254,50 @@ def check_diff_cmd(base: str | None) -> None:
     if not git.is_repo():
         raise click.ClickException("Not a git repository.")
     changed = [e.path for e in git.numstat(base)] + git.untracked_files()
-    hits = rule_hits_for_paths(load_rules(root), changed)
-    if not hits:
-        click.secho(f"OK: {len(changed)} changed file(s), no rule matches.", fg="green")
-        return
+    ruleset = load_rules(root)
+
     blocking = False
+    hits = rule_hits_for_paths(ruleset, changed)
     for hit in hits:
         color = "red" if hit.action == "block" else "yellow"
         blocking = blocking or hit.action == "block"
         click.secho(
             f"  [{hit.action}] {hit.path}  ({hit.rule_id}) {hit.message}", fg=color
         )
-    sys.exit(1 if blocking else 0)
+
+    quality_failed = False
+    if not no_quality and ruleset.check_rules:
+        for result in run_checks(root, ruleset, changed):
+            rule_id = result["rule_id"]
+            if result["ok"] is True:
+                click.secho(
+                    f"  [check] {rule_id}: passed "
+                    f"({len(result['files'])} file(s))",
+                    fg="green",
+                )
+            elif result["ok"] is False:
+                is_block = result["action"] == "block"
+                quality_failed = quality_failed or is_block
+                click.secho(
+                    f"  [check] {rule_id}: FAILED ({result['action']}) - "
+                    f"{result['message'] or 'see output below'}",
+                    fg="red" if is_block else "yellow",
+                )
+                if result["output"].strip():
+                    for line in result["output"].strip().splitlines()[-20:]:
+                        click.echo(f"          {line}")
+            else:
+                click.secho(
+                    f"  [check] {rule_id}: could not run - {result['error']}",
+                    fg="yellow",
+                )
+
+    if not hits and not quality_failed:
+        click.secho(
+            f"OK: {len(changed)} changed file(s), no blocking findings.",
+            fg="green",
+        )
+    sys.exit(1 if (blocking or quality_failed) else 0)
 
 
 # ---------------------------------------------------------------------------
@@ -286,6 +323,7 @@ def rules() -> None:
         ("Shell rules", ruleset.shell_rules),
         ("MCP rules", ruleset.mcp_rules),
         ("Tool rules", ruleset.tool_rules),
+        ("Check rules (quality gates)", ruleset.check_rules),
     )
     for title, group in sections:
         if not group and title != "Path rules (edits)":
@@ -295,6 +333,8 @@ def rules() -> None:
             scope = f"  applies_to={list(rule.applies_to)}" if rule.applies_to else ""
             targets = list(rule.match) if rule.match else list(rule.patterns)
             click.echo(f"  [{rule.action:5}] {rule.id}: {targets}{scope}")
+            if rule.command:
+                click.echo(f"          run: {rule.command}")
             if rule.message:
                 click.echo(f"          {rule.message}")
     click.echo(f"\nPrompt rules ({len(ruleset.prompt_rules)}):")

@@ -2,8 +2,8 @@
 
 - **Started:** 2026-09-18T10:41:40Z
 - **State:** finalized
-- **Areas:** .archrev, C:, E:, README.md, pyproject.toml, src, tests
-- **Drift:** planned 27 file(s), touched 31, 7 out-of-plan, 3 unrealized
+- **Areas:** .archrev, README.md, pyproject.toml, src, tests
+- **Drift:** planned 27 file(s), touched 24, 0 out-of-plan, 3 unrealized
 
 ## Prompts
 **2026-09-18T10:52:16Z**
@@ -50,6 +50,18 @@
 > Or is it even possible to have the logs to see how the plan processed during development? Review this feature very carefully. 
 > c. The rule veredict - what does the pass or flag truly mean here? What action can be deduced from this information? Also as a general note, make the time stamp more human readable. 
 > d. The timeline should lazy load not sure how we should do this, so that it loads more if I have the mouse in the container and otherwise it scrolls the entire website? Also, we also should make this expandable each edit f
+
+**2026-09-18T12:35:13Z**
+
+> ArchRev final review found issues in this session:
+> - 6 file(s) touched but not declared in the plan: C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png
+> Review them with the user: confirm legitimate ones with `archrev ack <path|plan-check> --note "<reason>"` (audited, stops re-raising); revert unintended ones. See `archrev show` for the full record.
+
+**2026-09-18T12:43:47Z**
+
+> As a single developer, I think i would not care to much about archrev itself. Not sure if I would use it... 
+> If the rules could be implemented that way, that it does true quality checks as well / not sure if that truly works today. So for example, we said the a endpoint need some validation. Or that error handling needs to be in place in every function. Could this be implemented? 
+> How would the review process work for highly contextual rules? Would this make sense?
 
 ## Plan
 Registered. Declared files:
@@ -133,11 +145,10 @@ Registered. Declared files:
 | `src/archrev/rules.py` | +124/-39 | - |
 | `src/archrev/gate.py` | +135/-38 | flag:flag-enforcement-core |
 | `src/archrev/scaffold.py` | +78/-17 | - |
-| `src/archrev/report/template.html` | +439/-88 | - |
+| `src/archrev/report/template.html` | +445/-88 | - |
 | `README.md` | +165/-16 | - |
 | `tests/test_boundaries.py` | +144/-0 | - |
 | `.archrev/rules/20-agent-boundaries.yaml` | +27/-0 | block:archrev-self-protection |
-| `E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml` | +?/-? | out-of-plan |
 | `src/archrev/planning.py` | +30/-3 | - |
 | `tests/test_planning.py` | +39/-0 | - |
 | `pyproject.toml` | +1/-1 | block:block-packaging |
@@ -146,29 +157,30 @@ Registered. Declared files:
 | `src/archrev/storage.py` | +85/-3 | flag:flag-audit-format |
 | `src/archrev/gitutil.py` | +27/-0 | flag:flag-audit-format |
 | `src/archrev/trailer.py` | +60/-8 | - |
-| `src/archrev/drift.py` | +45/-10 | - |
+| `src/archrev/drift.py` | +68/-12 | - |
 | `src/archrev/report/server.py` | +58/-3 | - |
-| `src/archrev/report/render.py` | +60/-0 | - |
+| `src/archrev/report/render.py` | +67/-0 | - |
 | `tests/test_trailer.py` | +45/-2 | - |
 | `tests/test_storage.py` | +49/-1 | - |
 | `tests/test_report.py` | +48/-0 | - |
-| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png` | +?/-? | out-of-plan |
-| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png` | +?/-? | out-of-plan |
-| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png` | +?/-? | out-of-plan |
-| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png` | +?/-? | out-of-plan |
-| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png` | +?/-? | out-of-plan |
-| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png` | +?/-? | out-of-plan |
-| `tests/test_finalize.py` | +18/-0 | - |
-| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/events.jsonl` | +161/-0 | changed outside tracked edits |
-| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/manifest.json` | +1696/-0 | changed outside tracked edits |
+| `tests/test_finalize.py` | +42/-0 | - |
+| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/events.jsonl` | +175/-0 | changed outside tracked edits |
+| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/manifest.json` | +2094/-0 | changed outside tracked edits |
 | `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/meta.json` | +5/-0 | changed outside tracked edits |
 | `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/plan.md` | +1/-0 | changed outside tracked edits |
-| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/report.md` | +167/-0 | changed outside tracked edits |
+| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/report.md` | +209/-0 | changed outside tracked edits |
 | `.archrev/sessions/unknown/events.jsonl` | +7/-0 | changed outside tracked edits |
 | `.archrev/sessions/unknown/manifest.json` | +162/-0 | changed outside tracked edits |
 | `.archrev/sessions/unknown/report.md` | +48/-0 | changed outside tracked edits |
 | `.cursor/hooks.json` | +23/-3 | changed outside tracked edits |
 | `src/archrev/__init__.py` | +1/-1 | changed outside tracked edits |
+| `E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml` | — | written outside this repository |
+| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png` | — | written outside this repository |
+| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png` | — | written outside this repository |
+| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png` | — | written outside this repository |
+| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png` | — | written outside this repository |
+| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png` | — | written outside this repository |
+| `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png` | — | written outside this repository |
 
 ## Protected paths changed
 - **block** `.archrev/rules/20-agent-boundaries.yaml` (archrev-self-protection, via gate)
@@ -181,16 +193,16 @@ Registered. Declared files:
 - **flag** `src/archrev/storage.py` (flag-audit-format, via gate)
 
 ## Final review
-- 1 protected path(s) changed OUTSIDE the edit gate (shell/manual): .cursor/hooks.json
-- 1 file(s) touched but not declared in the plan: E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml
+Clean - no material findings at session end.
 
 ## Acknowledged findings
 - 2026-09-18T12:16:14Z: `.cursor/hooks.json` — Rewired by archrev init (afterTabFileEdit + stop loop_limit); shell write, explicitly user-approved via approval card
 - 2026-09-18T12:16:14Z: `E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml` — Cross-repo rule file for CodeDD dogfooding; user-requested, cannot be declared in this repo's plan
 
-*Event log hash chain: intact, 99 event(s) verified.*
+*Event log hash chain: intact, 113 event(s) verified.*
 
 ## Commits
+- `2a8108a880` fix(drift): segregate paths outside the repository from plan drift
 - `0eac6386d2` feat(ui): review usability - plan revisions and progress, clickable drill-down chips, timeline paging, inline edit diffs, branch, human timestamps
 - `4c924612b6` feat(review): archrev ack - audited acknowledgment of final-review findings
 - `0bb8b37d0d` fix(planning): extract bare top-level filenames that exist in the repo
@@ -200,4 +212,4 @@ Registered. Declared files:
 - `867fe8f774` fix(planning): keep leading dot of dotfile paths in plan extraction
 - `447b72dbef` feat(rules): shell, read, mcp, and tool rule kinds with deny action
 
-*Generated by ArchRev at 2026-09-18T12:35:13Z*
+*Generated by ArchRev at 2026-09-18T12:44:52Z*

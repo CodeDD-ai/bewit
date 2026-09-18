@@ -124,6 +124,28 @@ _STARTER_RULES = """\
   kind: prompt
   policy: "Every new API endpoint must specify rate limiting and authorization."
   enabled: false
+
+# Check rules: quality gates run against the session's changed files at
+# session end and by `archrev check diff` (CI). The command's exit code is
+# the verdict; {files} is replaced with the matched changed files.
+# action: block - failures become final-review findings and fail CI
+#         flag  - failures are recorded and highlighted only
+
+- id: example-endpoint-validation
+  kind: check
+  match: ["api/**/*.py"]
+  command: "semgrep scan --config .archrev/checks/endpoints.yaml --error --quiet {files}"
+  action: block
+  message: "New/changed endpoints must validate input (semgrep)."
+  enabled: false
+
+- id: example-eslint
+  kind: check
+  match: ["src/**/*.{js,jsx,ts,tsx}"]
+  command: "npx eslint --max-warnings 0 {files}"
+  action: flag
+  message: "Lint findings in changed frontend files."
+  enabled: false
 """
 
 _AGENT_RULE = """\

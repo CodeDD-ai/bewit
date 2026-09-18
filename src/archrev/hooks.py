@@ -349,6 +349,16 @@ def _final_findings(view: dict) -> list[str]:
             f"{len(out_of_plan)} file(s) touched but not declared in the "
             f"plan: {listed}"
         )
+    # Quality gates: the latest result per rule counts; block failures are
+    # findings (flag failures are recorded and highlighted, not raised).
+    latest: dict[str, dict] = {}
+    for q in view.get("quality_checks", []):
+        latest[str(q.get("rule_id"))] = q
+    for rule_id, q in latest.items():
+        if q.get("ok") is False and q.get("action") == "block" and rule_id.lower() not in acked:
+            findings.append(
+                f"quality check '{rule_id}' FAILED: {q.get('message') or 'see recorded output'}"
+            )
     return findings
 
 
@@ -366,6 +376,19 @@ def handle_finalize(root: Path, config: Config, payload: dict) -> dict:
         "session_stop", status=str(payload.get("status") or "")
     )
     ruleset = load_rules(root)
+
+    # Quality gates run before the view is computed so their verdicts land
+    # in this finalization's manifest/report, not the next one's.
+    if ruleset.check_rules:
+        from archrev.drift import _is_outside_repo
+        from archrev.quality import run_checks
+
+        in_repo = [
+            p for p in session.touched_files() if not _is_outside_repo(p)
+        ]
+        for result in run_checks(root, ruleset, in_repo):
+            session.append_event("quality_check", **result)
+
     view = compute_view(root, config, ruleset, session, finalize=True)
     # Local import keeps hot hooks (gate/edit) free of report imports.
     from archrev.report.render import render_markdown

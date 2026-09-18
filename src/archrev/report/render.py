@@ -120,6 +120,18 @@ def render_text(view: dict) -> str:
         for issue in issues:
             add(f"  - {issue}")
 
+    quality = view.get("quality_checks", [])
+    if quality:
+        add(f"Quality checks ({len(quality)} run(s))")
+        for q in quality:
+            status = (
+                "passed" if q.get("ok") is True
+                else "FAILED" if q.get("ok") is False
+                else f"error: {q.get('error')}"
+            )
+            add(f"  [{q.get('ts')}] {q.get('rule_id')}: {status}"
+                f" ({len(q.get('files', []))} file(s))")
+
     acks = view.get("acks", [])
     if acks:
         add(f"Acknowledged findings ({len(acks)})")
@@ -229,6 +241,21 @@ def render_markdown(view: dict) -> str:
                 add(f"- {issue}")
         else:
             add("Clean - no material findings at session end.")
+        add("")
+
+    quality = view.get("quality_checks", [])
+    if quality:
+        add("## Quality checks")
+        for q in quality:
+            status = (
+                "passed" if q.get("ok") is True
+                else "**FAILED**" if q.get("ok") is False
+                else f"error: {q.get('error')}"
+            )
+            add(f"- {q.get('ts')}: `{q.get('rule_id')}` {status}"
+                f" ({len(q.get('files', []))} file(s))")
+            if q.get("ok") is False and q.get("message"):
+                add(f"  - {q['message']}")
         add("")
 
     acks = view.get("acks", [])

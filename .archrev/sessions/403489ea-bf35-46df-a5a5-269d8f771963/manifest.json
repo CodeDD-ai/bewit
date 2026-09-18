@@ -3,7 +3,7 @@
   "started_at": "2026-09-18T10:41:40Z",
   "head_sha": "a976f5ee52629021afed37bd7247409bbe750589",
   "finalized": true,
-  "generated_at": "2026-09-18T12:35:13Z",
+  "generated_at": "2026-09-18T12:44:52Z",
   "prompts": [
     {
       "ts": "2026-09-18T10:52:16Z",
@@ -24,6 +24,14 @@
     {
       "ts": "2026-09-18T12:27:20Z",
       "text": "OK - now your veredict. Also I want to hold this in evidence: \nImprovements by audience\nFor a CTO (making this adoptable across an org): central, versioned rule packs shared across repos rather than per-repo YAML; tamper-evident event logs (hash-chained JSONL) so the audit record is defensible, not just present; a cross-repo index with the metrics that matter â€” drift rate, gate-override rate, failed-attestation trends per team; CI enforcement (archrev check diff as a required GitLab job, MR descriptions auto-populated from session reports); and a documented containment story (ArchRev policy + network-isolated containers) for the security review that any rollout triggers.\n\nFor an engineer (daily quality of life): an MCP server so agents query rules and session history natively instead of shelling out; a faster hook runtime (a small compiled shim or python -S trimming) to make gating cost invisible; structured plans (frontmatter file lists) instead of regex extraction; session labels (archrev annotate) so the sessions list reads like a changelog; and an IDE panel so the timeline lives next to the code instead of a browser tab.\n\nI am not fully sure of these things: \n1. Our reporting tool: \na. It only shows my prompt. Not sure if we should also collect agentic prompts? \nb. I cant do much with the plan section. It just shows a path but nothing more. I guess it would make more sense to make the plans openable? So I can review them directly there? \nOr is it even possible to have the logs to see how the plan processed during development? Review this feature very carefully. \nc. The rule veredict - what does the pass or flag truly mean here? What action can be deduced from this information? Also as a general note, make the time stamp more human readable. \nd. The timeline should lazy load not sure how we should do this, so that it loads more if I have the mouse in the container and otherwise it scrolls the entire website? Also, we also should make this expandable each edit f"
+    },
+    {
+      "ts": "2026-09-18T12:35:13Z",
+      "text": "ArchRev final review found issues in this session:\n- 6 file(s) touched but not declared in the plan: C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png\nReview them with the user: confirm legitimate ones with `archrev ack <path|plan-check> --note \"<reason>\"` (audited, stops re-raising); revert unintended ones. See `archrev show` for the full record."
+    },
+    {
+      "ts": "2026-09-18T12:43:47Z",
+      "text": "As a single developer, I think i would not care to much about archrev itself. Not sure if I would use it... \nIf the rules could be implemented that way, that it does true quality checks as well / not sure if that truly works today. So for example, we said the a endpoint need some validation. Or that error handling needs to be in place in every function. Could this be implemented? \nHow would the review process work for highly contextual rules? Would this make sense? \n"
     }
   ],
   "branch": "master",
@@ -381,6 +389,26 @@
       "notified": true,
       "prev": "79b90a3ce2e5794bf44fa4f3307c5f247905196bbd56c8aa25014b26fb96251b",
       "hash": "bff4142b8aec5848cd2f8611212c7685e5314b7f885199532094734448b265d7"
+    },
+    {
+      "ts": "2026-09-18T12:35:13Z",
+      "type": "final_check",
+      "findings": [
+        "6 file(s) touched but not declared in the plan: C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png, C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png"
+      ],
+      "fingerprint": "752f42943a7d6491",
+      "notified": true,
+      "prev": "6ac5190fbaad886f0abdd2eeb9d718353e567be9b35ea5f1983c3d8c7bcc8718",
+      "hash": "fa09ed166c3ef2d5011182f73082c90b62fff7844427d462ecce2a729b8dc2cf"
+    },
+    {
+      "ts": "2026-09-18T12:40:48Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "prev": "dc9940790cde0b21d4e7f32af7f07707003346bde1c3b852be01ccb46d166199",
+      "hash": "32cb04f928608629173e0c6066f650efa427c423b31b090756df967947f9aec5"
     }
   ],
   "human_changes": [],
@@ -1569,6 +1597,54 @@
       "path": "tests/test_planning.py",
       "tool": "",
       "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:35:59Z",
+      "path": "src/archrev/drift.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:36:01Z",
+      "path": "src/archrev/drift.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:36:02Z",
+      "path": "src/archrev/drift.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:36:10Z",
+      "path": "src/archrev/drift.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:36:14Z",
+      "path": "src/archrev/report/template.html",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:36:17Z",
+      "path": "src/archrev/report/render.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:36:18Z",
+      "path": "src/archrev/report/render.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T12:36:30Z",
+      "path": "tests/test_finalize.py",
+      "tool": "",
+      "origin": "agent"
     }
   ],
   "files": [
@@ -1626,7 +1702,7 @@
     },
     {
       "path": "src/archrev/report/template.html",
-      "added": 439,
+      "added": 445,
       "removed": 88,
       "untracked": false,
       "in_plan": true,
@@ -1661,14 +1737,6 @@
           "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
         }
       ]
-    },
-    {
-      "path": "E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml",
-      "added": null,
-      "removed": null,
-      "untracked": false,
-      "in_plan": false,
-      "rules": []
     },
     {
       "path": "src/archrev/planning.py",
@@ -1760,8 +1828,8 @@
     },
     {
       "path": "src/archrev/drift.py",
-      "added": 45,
-      "removed": 10,
+      "added": 68,
+      "removed": 12,
       "untracked": false,
       "in_plan": true,
       "rules": []
@@ -1776,7 +1844,7 @@
     },
     {
       "path": "src/archrev/report/render.py",
-      "added": 60,
+      "added": 67,
       "removed": 0,
       "untracked": false,
       "in_plan": true,
@@ -1807,71 +1875,32 @@
       "rules": []
     },
     {
-      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png",
-      "added": null,
-      "removed": null,
-      "untracked": false,
-      "in_plan": false,
-      "rules": []
-    },
-    {
-      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png",
-      "added": null,
-      "removed": null,
-      "untracked": false,
-      "in_plan": false,
-      "rules": []
-    },
-    {
-      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png",
-      "added": null,
-      "removed": null,
-      "untracked": false,
-      "in_plan": false,
-      "rules": []
-    },
-    {
-      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png",
-      "added": null,
-      "removed": null,
-      "untracked": false,
-      "in_plan": false,
-      "rules": []
-    },
-    {
-      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png",
-      "added": null,
-      "removed": null,
-      "untracked": false,
-      "in_plan": false,
-      "rules": []
-    },
-    {
-      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png",
-      "added": null,
-      "removed": null,
-      "untracked": false,
-      "in_plan": false,
-      "rules": []
-    },
-    {
       "path": "tests/test_finalize.py",
-      "added": 18,
+      "added": 42,
       "removed": 0,
       "untracked": false,
       "in_plan": true,
       "rules": []
     }
   ],
+  "outside_repo": [
+    "E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png"
+  ],
   "other_changes": [
     {
       "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/events.jsonl",
-      "added": 161,
+      "added": 175,
       "removed": 0
     },
     {
       "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/manifest.json",
-      "added": 1696,
+      "added": 2094,
       "removed": 0
     },
     {
@@ -1886,7 +1915,7 @@
     },
     {
       "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/report.md",
-      "added": 167,
+      "added": 209,
       "removed": 0
     },
     {
@@ -1916,15 +1945,7 @@
     }
   ],
   "drift": {
-    "out_of_plan": [
-      "E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml",
-      "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-b3674e14-86b2-4d7b-ba7c-9423f6a1aa49.png",
-      "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-aacfe1f8-ef8c-41e4-9b25-ca19a4485784.png",
-      "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png",
-      "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png",
-      "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png",
-      "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png"
-    ],
+    "out_of_plan": [],
     "unrealized": [
       "tests/test_gate.py",
       "src/archrev/__init__.py",
@@ -1991,6 +2012,11 @@
   ],
   "commits": [
     {
+      "sha": "2a8108a8803a6f283a3cde73b11152ae27406497",
+      "date": "2026-09-18 14:40:35 +0200",
+      "subject": "fix(drift): segregate paths outside the repository from plan drift"
+    },
+    {
       "sha": "0eac6386d290b7ffdd89fd384d629f61e6906230",
       "date": "2026-09-18 14:34:47 +0200",
       "subject": "feat(ui): review usability - plan revisions and progress, clickable drill-down chips, timeline paging, inline edit diffs, branch, human timestamps"
@@ -2033,17 +2059,15 @@
   ],
   "areas": [
     ".archrev",
-    "C:",
-    "E:",
     "README.md",
     "pyproject.toml",
     "src",
     "tests"
   ],
-  "event_count": 161,
+  "event_count": 175,
   "chain": {
     "ok": true,
-    "checked": 99,
+    "checked": 113,
     "legacy": 62,
     "break_at": null
   },
@@ -2079,5 +2103,5 @@
       "pyproject.toml"
     ]
   },
-  "finalized_at": "2026-09-18T12:35:13Z"
+  "finalized_at": "2026-09-18T12:44:52Z"
 }

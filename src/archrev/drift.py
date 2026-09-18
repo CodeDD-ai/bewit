@@ -104,6 +104,7 @@ def compute_view(
     # (`archrev ack`). The final review skips acknowledged targets; the
     # record of who acknowledged what, when, and why stays in the log.
     acks = [e for e in events if e.get("type") == "ack"]
+    quality_checks = [e for e in events if e.get("type") == "quality_check"]
 
     all_touched = session.touched_files()
     # Paths outside the repository root (other repos, Cursor's own chat
@@ -211,6 +212,7 @@ def compute_view(
         "final_checks": final_checks,
         "human_changes": human_changes,
         "acks": acks,
+        "quality_checks": quality_checks,
         "gate_events": gate_events,
         "edits": edits,
         "files": files,
