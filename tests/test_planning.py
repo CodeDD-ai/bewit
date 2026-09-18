@@ -60,6 +60,7 @@ def test_register_and_check_plan(repo: Path):
     assert session.plan_text() is not None
     assert session.has_event("plan_registered")
 
+
     report = check_plan(
         Config(), load_rules(repo), session, {"api-rate-limit": "pass"}
     )
@@ -70,6 +71,21 @@ def test_register_and_check_plan(repo: Path):
         f["rule_id"] == "protect-migrations" and f["action"] == "block"
         for f in report["path_findings"]
     )
+
+
+def test_plan_revisions_keep_their_text(repo: Path):
+    """Re-registering amends the plan; every revision's text must survive
+    in the event log so plan evolution stays reviewable."""
+    session = SessionStore(repo).session("s-rev")
+    session.ensure_meta(None)
+    register_plan(session, "v1: touch `app/main.py`", repo)
+    register_plan(session, "v2: touch `app/main.py` and `app/api/views.py`", repo)
+    events = [e for e in session.events() if e["type"] == "plan_registered"]
+    assert len(events) == 2
+    assert events[0]["text"].startswith("v1:")
+    assert events[1]["text"].startswith("v2:")
+    # plan.md holds the latest text.
+    assert session.plan_text().startswith("v2:")
 
 
 def test_check_plan_fails_on_unattested_rules(repo: Path):

@@ -86,7 +86,8 @@ def record_human_changes(root: Path, unattributed: list[str]) -> None:
     if not others:
         return
     session = store.session(HUMAN_SESSION_ID)
-    session.ensure_meta(Git(root).head_sha())
+    git = Git(root)
+    session.ensure_meta(git.head_sha(), branch=git.branch())
     session.append_event(
         "human_changes",
         files=unattributed,

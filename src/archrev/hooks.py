@@ -99,7 +99,8 @@ def _trim_payload(value: object, depth: int = 0) -> object:
 def _ensure_session(root: Path, payload: dict, hook_event: str) -> Session:
     store = SessionStore(root)
     session = store.session(_session_id(payload))
-    session.ensure_meta(Git(root).head_sha())
+    git = Git(root)
+    session.ensure_meta(git.head_sha(), branch=git.branch())
     if session.id == "unknown" and payload:
         # Field-name drift diagnostics: Cursor's payload schema is not under
         # our control. When the conversation id cannot be found, record what

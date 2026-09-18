@@ -102,7 +102,7 @@ class Session:
             self.dir / META_FILENAME
         ).exists()
 
-    def ensure_meta(self, head_sha: str | None) -> dict:
+    def ensure_meta(self, head_sha: str | None, branch: str | None = None) -> dict:
         """Write ``meta.json`` exactly once; return the (existing) meta."""
         existing = self.meta()
         if existing is not None:
@@ -111,6 +111,7 @@ class Session:
             "id": self.id,
             "started_at": utc_now_iso(),
             "head_sha": head_sha,
+            "branch": branch,
         }
         _write_json(self.dir / META_FILENAME, meta)
         return meta

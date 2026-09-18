@@ -57,6 +57,12 @@ class Git:
         out = self._run("rev-parse", "HEAD")
         return out.strip() if out else None
 
+    def branch(self) -> str | None:
+        """Current branch name, or None for detached HEAD / non-repos."""
+        out = self._run("rev-parse", "--abbrev-ref", "HEAD")
+        name = out.strip() if out else None
+        return None if not name or name == "HEAD" else name
+
     # -- diffs -----------------------------------------------------------
 
     @staticmethod

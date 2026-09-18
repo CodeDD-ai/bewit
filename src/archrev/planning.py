@@ -89,10 +89,20 @@ def extract_declared_files(text: str, root: Path) -> list[str]:
     return list(seen)
 
 
+#: Plan text stored per revision inside the event log (full text lives in
+#: plan.md for the latest revision; earlier revisions survive here).
+_PLAN_EVENT_TEXT_CAP = 20_000
+
+
 def register_plan(
     session: Session, text: str, root: Path, origin: str | None = None
 ) -> list[str]:
-    """Snapshot ``text`` as the session plan; returns declared files."""
+    """Snapshot ``text`` as the session plan; returns declared files.
+
+    Re-registering is how plans are *amended*; each registration event
+    carries its own text, so the full revision history (how the plan
+    evolved during development) is reviewable, not just the final state.
+    """
     declared = extract_declared_files(text, root)
     session.write_plan(text)
     session.append_event(
@@ -100,6 +110,7 @@ def register_plan(
         origin=origin or "inline",
         declared_files=declared,
         chars=len(text),
+        text=text[:_PLAN_EVENT_TEXT_CAP],
     )
     return declared
 

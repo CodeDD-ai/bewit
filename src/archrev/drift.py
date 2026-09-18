@@ -56,14 +56,22 @@ def compute_view(
         if e.get("type") == "prompt"
     ]
 
-    plan_registered = False
-    declared: list[str] = []
-    for event in reversed(events):
-        if event.get("type") == "plan_registered":
-            plan_registered = True
-            raw = event.get("declared_files")
-            declared = [p for p in raw if isinstance(p, str)] if isinstance(raw, list) else []
-            break
+    # Plan revisions: every registration is kept (re-registering amends the
+    # plan), so how the plan evolved during development stays reviewable.
+    plan_revisions = [
+        {
+            "ts": e.get("ts"),
+            "origin": e.get("origin"),
+            "declared_files": [
+                p for p in (e.get("declared_files") or []) if isinstance(p, str)
+            ],
+            "text": e.get("text"),  # None for pre-v0.2 events
+        }
+        for e in events
+        if e.get("type") == "plan_registered"
+    ]
+    plan_registered = bool(plan_revisions)
+    declared = plan_revisions[-1]["declared_files"] if plan_revisions else []
 
     checks = [e for e in events if e.get("type") == "plan_check"]
     gate_events = [e for e in events if e.get("type") == "gate"]
@@ -118,7 +126,11 @@ def compute_view(
                 "untracked": path in untracked,
                 "in_plan": path.lower() in declared_set,
                 "rules": [
-                    {"rule_id": h.rule_id, "action": h.action}
+                    {
+                        "rule_id": h.rule_id,
+                        "action": h.action,
+                        "message": h.message,
+                    }
                     for h in rule_hits_for_paths(ruleset, [path])
                 ],
             }
@@ -163,9 +175,16 @@ def compute_view(
         "finalized": finalize or session.manifest() is not None,
         "generated_at": utc_now_iso(),
         "prompts": prompts,
+        "branch": meta.get("branch") or (git.branch() if git.is_repo() else None),
         "plan": {
             "registered": plan_registered,
             "declared_files": declared,
+            # Progress: which declared files have actually been touched.
+            "progress": [
+                {"path": d, "touched": d.lower() in touched_set}
+                for d in declared
+            ],
+            "revisions": plan_revisions,
             "text": session.plan_text(),
         },
         "checks": checks,

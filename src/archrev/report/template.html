@@ -51,13 +51,25 @@
   #main { padding: 20px 26px 60px; overflow-y: auto; max-width: 1120px; }
   h2.session-title { margin: 0 0 2px; font-size: 18px; }
   .meta-line { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 16px; }
+  .meta-line b { color: var(--text); font-weight: 600; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
   .chip { background: var(--chip); border: 1px solid var(--border); border-radius: 8px;
     padding: 5px 11px; font-size: 12px; }
   .chip b { font-weight: 600; }
   .chip.warn { border-color: var(--flag); }
   .chip.bad { border-color: var(--block); }
   .chip.good { border-color: var(--pass); }
+  .chip.clickable { cursor: pointer; }
+  .chip.clickable:hover { background: var(--panel-2); }
+  .chip.selected { outline: 1px solid var(--accent); }
+  #chip-detail {
+    display: none; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; margin: 0 0 14px; font-size: 12.5px;
+  }
+  #chip-detail h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .6px; }
+  #chip-detail ul { margin: 0; padding-left: 18px; }
+  #chip-detail .hint { color: var(--muted); font-style: italic; }
   /* Toolbar: search + event filters */
   .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
   .toolbar input[type="search"] {
@@ -76,15 +88,24 @@
   }
   section.card h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase;
     letter-spacing: .8px; color: var(--muted); }
+  section.card h3 .badge { text-transform: none; letter-spacing: 0; }
+  .section-hint { color: var(--muted); font-size: 12px; margin: -6px 0 10px; }
   .prompt-text { white-space: pre-wrap; background: var(--panel-2); border-radius: 8px;
     padding: 10px 12px; margin: 6px 0; max-height: 240px; overflow-y: auto; }
   details summary { cursor: pointer; color: var(--accent); font-size: 12.5px; }
   .plan-text { white-space: pre-wrap; background: var(--panel-2); border-radius: 8px;
     padding: 10px 12px; margin-top: 8px; max-height: 420px; overflow-y: auto; font-size: 12.5px; }
+  .plan-progress { list-style: none; margin: 6px 0 0; padding: 0; columns: 2; column-gap: 24px; }
+  .plan-progress li { padding: 2px 0; break-inside: avoid; font-size: 12.5px; }
+  .plan-progress .tick { display: inline-block; width: 16px; }
+  .plan-progress .done .tick { color: var(--pass); }
+  .plan-progress .pending { color: var(--muted); }
+  .plan-progress .pending .tick { color: var(--flag); }
+  .revision { border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 8px; }
   .timeline { list-style: none; margin: 0; padding: 0; }
-  .timeline li { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
-  .timeline li:last-child { border-bottom: none; }
-  .timeline .ts { color: var(--muted); font-size: 11px; white-space: nowrap; padding-top: 2px; width: 130px; }
+  .timeline > li { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--border); flex-wrap: wrap; }
+  .timeline > li:last-child { border-bottom: none; }
+  .timeline .ts { color: var(--muted); font-size: 11px; white-space: nowrap; padding-top: 2px; width: 118px; }
   .timeline .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; }
   .dot.prompt { background: var(--accent); }
   .dot.edit { background: #5c6b8a; }
@@ -96,7 +117,15 @@
   .dot.human { background: var(--human); }
   .timeline .body { flex: 1; min-width: 0; }
   .timeline .body .what { font-size: 13px; }
+  .timeline .body .what.expandable { cursor: pointer; color: var(--accent); }
   .timeline .body .detail { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  .timeline .inline-diff { flex-basis: 100%; margin-left: 152px; }
+  .show-more {
+    display: block; width: 100%; margin-top: 10px; padding: 8px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--accent); font-size: 12.5px; cursor: pointer;
+  }
+  .show-more:hover { background: var(--chip); }
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
@@ -142,13 +171,17 @@
 const EXPORT = window.__ARCHREV_DATA__ || null;
 const POLL_MS = 2500;
 const FILTER_KINDS = ["prompt", "plan", "check", "gate", "edit", "human"];
+const TIMELINE_BATCH = 80;
 
 let selectedId = null;
 let currentView = null;
 let lastRenderKey = "";
-// UI state survives re-renders: search text, active kind filters,
-// expanded diff rows, and fetched diffs.
-const ui = { q: "", kinds: new Set(), expanded: new Set(), diffs: new Map() };
+// UI state survives re-renders: search text, active kind filters, selected
+// summary chip, expanded diff rows, timeline page count, fetched diffs.
+const ui = {
+  q: "", kinds: new Set(), chip: null, expanded: new Set(),
+  timelineShown: TIMELINE_BATCH, diffs: new Map(),
+};
 
 const $ = (id) => document.getElementById(id);
 
@@ -160,13 +193,25 @@ function esc(value) {
 
 function shortId(id) { return id.length > 14 ? id.slice(0, 8) + "…" + id.slice(-4) : id; }
 
+/** ISO UTC timestamp -> readable local time ("18 Sep 14:47:32"). */
+function fmtTs(iso) {
+  if (!iso) return "?";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getDate()} ${months[d.getMonth()]} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 function locHtml(added, removed) {
   const a = Number.isInteger(added) ? `+${added}` : "+?";
   const r = Number.isInteger(removed) ? `-${removed}` : "-?";
   return `<span class="add">${a}</span>/<span class="del">${r}</span>`;
 }
 
-function badge(text, cls) { return `<span class="badge ${cls}">${esc(text)}</span>`; }
+function badge(text, cls, title) {
+  return `<span class="badge ${cls}" ${title ? `title="${esc(title)}"` : ""}>${esc(text)}</span>`;
+}
 
 function matchesSearch(...fields) {
   if (!ui.q) return true;
@@ -195,7 +240,7 @@ function renderSidebar(state) {
     return `
       <div class="session-card ${s.id === selectedId ? "active" : ""}" data-id="${esc(s.id)}">
         <div><span class="sid mono">${esc(shortId(s.id))}</span>
-             <span class="when"> · ${esc(s.started_at || "")}</span></div>
+             <span class="when"> · ${esc(fmtTs(s.started_at))}</span></div>
         <div class="excerpt">${esc(excerpt)}</div>
         <div class="badges">${badges.join("")}</div>
       </div>`;
@@ -208,11 +253,78 @@ function renderSidebar(state) {
         selectedId = el.dataset.id;
         ui.expanded.clear();
         ui.diffs.clear();
+        ui.chip = null;
+        ui.timelineShown = TIMELINE_BATCH;
         lastRenderKey = "";
         refreshSession();
       }
     });
   }
+}
+
+/* ---------------- summary chips (clickable drill-down) ---------------- */
+
+function chipData(view) {
+  // Each chip: id, label html, class, and the underlying items shown on click.
+  const plan = view.plan || {};
+  const drift = view.drift || {};
+  const chips = [];
+  if (view.id === "human") {
+    chips.push({ id: "human-info", cls: "", label: "<b>Human changes ledger</b> — files committed without agent attribution", items: null });
+    return chips;
+  }
+  if (!plan.registered) {
+    chips.push({ id: "no-plan", cls: "warn", label: "<b>No plan registered</b> — drift not measurable", items: null });
+  } else {
+    chips.push({ id: "planned", cls: "", label: `planned <b>${(plan.declared_files || []).length}</b>`,
+                 title: "Files the plan declares. Click to list them.",
+                 items: plan.declared_files || [] });
+    chips.push({ id: "touched", cls: "", label: `touched <b>${(view.files || []).length}</b>`,
+                 title: "Files with recorded edit events. Click to list them.",
+                 items: (view.files || []).map((f) => f.path) });
+    const out = drift.out_of_plan || [];
+    chips.push({ id: "out-of-plan", cls: out.length ? "warn" : "good",
+                 label: `out-of-plan <b>${out.length}</b>`,
+                 title: "Files touched but never declared in the plan - review whether they were intended.",
+                 items: out });
+    const unrealized = drift.unrealized || [];
+    chips.push({ id: "unrealized", cls: unrealized.length ? "warn" : "good",
+                 label: `unrealized <b>${unrealized.length}</b>`,
+                 title: "Files the plan declared but no edit event touched (dropped scope, or changed via shell).",
+                 items: unrealized });
+  }
+  const bypass = (view.protected_findings || []).filter((f) => !f.via_gate);
+  if (bypass.length)
+    chips.push({ id: "bypass", cls: "bad",
+                 label: `protected changes bypassing gate <b>${bypass.length}</b>`,
+                 title: "Protected paths changed without passing the edit gate (shell or manual writes). Click to list.",
+                 items: bypass.map((f) => `${f.path}  (${f.rule_id})`) });
+  const acks = view.acks || [];
+  if (acks.length)
+    chips.push({ id: "acks", cls: "good", label: `acknowledged <b>${acks.length}</b>`,
+                 title: "Findings resolved via archrev ack. Click to see who/why.",
+                 items: acks.map((a) => `${a.target} — ${a.note || ""}`) });
+  const chain = view.chain || null;
+  if (chain)
+    chips.push({ id: "chain", cls: chain.ok ? "good" : "bad",
+                 label: `event chain <b>${chain.ok ? "intact" : "BROKEN"}</b>`,
+                 title: "Hash-chain verification of the event log (tamper evidence). Run `archrev verify` in CI for the same check.",
+                 items: [chain.ok
+                   ? `${chain.checked} event(s) verified${chain.legacy ? `, ${chain.legacy} pre-chain legacy event(s)` : ""}`
+                   : `Chain breaks at event #${chain.break_at} — the log was modified after the fact.`] });
+  return chips;
+}
+
+function renderChipDetail(view) {
+  const panel = $("chip-detail");
+  const chip = chipData(view).find((c) => c.id === ui.chip);
+  if (!chip || chip.items === null) { panel.style.display = "none"; return; }
+  const title = chip.title ? `<div class="hint">${esc(chip.title)}</div>` : "";
+  const list = chip.items.length
+    ? `<ul>${chip.items.map((i) => `<li class="mono">${esc(i)}</li>`).join("")}</ul>`
+    : `<div class="hint">nothing here — that is the good outcome</div>`;
+  panel.innerHTML = `<h4>${chip.id.replace(/-/g, " ")}</h4>${title}${list}`;
+  panel.style.display = "block";
 }
 
 /* ---------------- timeline ---------------- */
@@ -222,10 +334,9 @@ function timelineItems(view) {
   for (const p of view.prompts || [])
     items.push({ ts: p.ts, kind: "prompt", cat: "prompt", what: "Prompt submitted",
                  detail: (p.text || "").split("\n")[0].slice(0, 160) });
-  if (view.plan && view.plan.registered)
-    items.push({ ts: ((view.checks || [])[0] || {}).ts || view.started_at, kind: "plan",
-                 cat: "plan", what: "Plan registered",
-                 detail: `${(view.plan.declared_files || []).length} file(s) declared` });
+  for (const r of (view.plan || {}).revisions || [])
+    items.push({ ts: r.ts, kind: "plan", cat: "plan", what: "Plan registered",
+                 detail: `${(r.declared_files || []).length} file(s) declared (${r.origin || "inline"})` });
   for (const c of view.checks || [])
     items.push({ ts: c.ts, kind: "check", cat: "check",
                  what: `Plan check — ${c.ok ? "OK" : "NOT OK"}`,
@@ -236,14 +347,14 @@ function timelineItems(view) {
                    ? `Final review — ${f.findings.length} finding(s)${f.notified ? ", agent notified" : ""}`
                    : "Final review — clean",
                  detail: (f.findings || []).join(" | ") });
-  for (const h of view.human_changes || [])
-    items.push({ ts: h.ts, kind: "human", cat: "human",
-                 what: `Human changes recorded (${(h.files || []).length} file(s))`,
-                 detail: (h.files || []).join(", ") });
   for (const a of view.acks || [])
     items.push({ ts: a.ts, kind: "check", cat: "check",
                  what: `Finding acknowledged: ${a.target || ""}`,
                  detail: a.note || "" });
+  for (const h of view.human_changes || [])
+    items.push({ ts: h.ts, kind: "human", cat: "human",
+                 what: `Human changes recorded (${(h.files || []).length} file(s))`,
+                 detail: (h.files || []).join(", ") });
   for (const g of view.gate_events || []) {
     const kind = g.permission === "allow" ? "gate-flag" : `gate-${g.permission}`;
     const subject = { edit: "Edit", shell: "Shell command", read: "File read",
@@ -259,36 +370,10 @@ function timelineItems(view) {
   for (const e of view.edits || [])
     items.push({ ts: e.ts, kind: "edit", cat: "edit",
                  what: e.origin === "tab" ? "File edited (tab / human-assisted)" : "File edited",
-                 detail: e.path });
+                 detail: e.path, diffPath: e.path });
   items.sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
   return items.filter((t) =>
     (ui.kinds.size === 0 || ui.kinds.has(t.cat)) && matchesSearch(t.what, t.detail));
-}
-
-function driftChips(view) {
-  const chips = [];
-  const plan = view.plan || {};
-  if (view.id === "human") {
-    chips.push(`<div class="chip"><b>Human changes ledger</b> — files committed without agent attribution</div>`);
-    return chips;
-  }
-  if (!plan.registered) {
-    chips.push(`<div class="chip warn"><b>No plan registered</b> — drift not measurable</div>`);
-  } else {
-    const out = (view.drift || {}).out_of_plan || [];
-    const unrealized = (view.drift || {}).unrealized || [];
-    chips.push(`<div class="chip">planned <b>${(plan.declared_files || []).length}</b></div>`);
-    chips.push(`<div class="chip">touched <b>${(view.files || []).length}</b></div>`);
-    chips.push(`<div class="chip ${out.length ? "warn" : "good"}">out-of-plan <b>${out.length}</b></div>`);
-    chips.push(`<div class="chip ${unrealized.length ? "warn" : "good"}">unrealized <b>${unrealized.length}</b></div>`);
-  }
-  const bypass = (view.protected_findings || []).filter((f) => !f.via_gate);
-  if (bypass.length)
-    chips.push(`<div class="chip bad">protected changes bypassing gate <b>${bypass.length}</b></div>`);
-  const chain = view.chain || null;
-  if (chain)
-    chips.push(`<div class="chip ${chain.ok ? "good" : "bad"}">event chain <b>${chain.ok ? "intact" : "BROKEN"}</b></div>`);
-  return chips;
 }
 
 /* ---------------- diffs ---------------- */
@@ -336,6 +421,17 @@ async function toggleDiff(row, path, forceOpen) {
   diffRow.querySelector("pre").innerHTML = renderDiffText(text);
 }
 
+async function toggleInlineDiff(li, path) {
+  const existing = li.querySelector(".inline-diff");
+  if (existing) { existing.remove(); return; }
+  const holder = document.createElement("div");
+  holder.className = "inline-diff";
+  holder.innerHTML = `<pre class="diff">loading…</pre>`;
+  li.appendChild(holder);
+  const text = await loadDiff(path);
+  holder.querySelector("pre").innerHTML = renderDiffText(text);
+}
+
 /* ---------------- session detail ---------------- */
 
 function filterChipHtml() {
@@ -344,49 +440,105 @@ function filterChipHtml() {
   ).join("");
 }
 
+function fileNotes(view, f) {
+  // Rule chips carry the rule message as tooltip, plus what actually
+  // happened at the gate for this file (paused / flagged / denied counts).
+  const notes = [];
+  if (f.untracked) notes.push(badge("new", "neutral", "New file (untracked at session start)."));
+  if (view.plan && view.plan.registered && !f.in_plan)
+    notes.push(badge("out-of-plan", "flag", "Touched but not declared in the plan."));
+  for (const r of f.rules || []) {
+    const explain = { block: "will pause for approval when edited",
+                      flag: "recorded and highlighted when edited",
+                      deny: "edit refused outright" }[r.action] || "";
+    notes.push(badge(`${r.action}: ${r.rule_id}`, r.action === "flag" ? "flag" : "block",
+                     `${r.message || ""} (${explain})`));
+  }
+  const lower = (f.path || "").toLowerCase();
+  let paused = 0, flagged = 0, denied = 0;
+  for (const g of view.gate_events || []) {
+    if (!(g.paths || []).some((p) => String(p).toLowerCase() === lower)) continue;
+    if (g.permission === "ask") paused += 1;
+    else if (g.permission === "deny") denied += 1;
+    else if ((g.hits || []).length) flagged += 1;
+  }
+  if (denied) notes.push(badge(`denied ×${denied}`, "block", "The gate refused edit attempts on this file."));
+  if (paused) notes.push(badge(`paused ×${paused}`, "block",
+    "The gate answered 'ask'; whether it was shown depends on your Cursor approval settings."));
+  if (flagged) notes.push(badge(`flagged ×${flagged}`, "flag", "Edits allowed but recorded for review."));
+  return notes;
+}
+
 function renderSession(view) {
   currentView = view;
   const searchable = (path) => matchesSearch(path);
 
-  const fileRows = (view.files || []).filter((f) => searchable(f.path)).map((f) => {
-    const notes = [];
-    if (f.untracked) notes.push(badge("new", "neutral"));
-    if (view.plan && view.plan.registered && !f.in_plan) notes.push(badge("out-of-plan", "flag"));
-    for (const r of f.rules || []) notes.push(badge(`${r.action}: ${r.rule_id}`, r.action === "flag" ? "flag" : "block"));
-    return `<tr class="file-row" data-path="${esc(f.path)}"><td class="mono">${esc(f.path)}</td>
-      <td class="loc">${locHtml(f.added, f.removed)}</td><td>${notes.join(" ") || "—"}</td></tr>`;
-  });
+  const fileRows = (view.files || []).filter((f) => searchable(f.path)).map((f) =>
+    `<tr class="file-row" data-path="${esc(f.path)}"><td class="mono">${esc(f.path)}</td>
+     <td class="loc">${locHtml(f.added, f.removed)}</td><td>${fileNotes(view, f).join(" ") || "—"}</td></tr>`);
   const otherRows = (view.other_changes || []).filter((f) => searchable(f.path)).map((f) =>
     `<tr class="file-row" data-path="${esc(f.path)}"><td class="mono">${esc(f.path)}</td>
      <td class="loc">${locHtml(f.added, f.removed)}</td>
-     <td>${badge("outside tracked edits", "neutral")}</td></tr>`);
+     <td>${badge("outside tracked edits", "neutral", "Changed in the working tree with no edit event: shell command, hand edit, or another session.")}</td></tr>`);
 
   const checkBlocks = (view.checks || []).map((c) => {
-    const rows = [];
-    for (const f of c.path_findings || [])
-      rows.push(`<li>${badge(f.action, f.action === "flag" ? "flag" : "block")}
-                 <span class="mono">${esc(f.path)}</span> <span class="badge neutral">${esc(f.rule_id)}</span></li>`);
-    for (const r of c.prompt_rules || []) {
+    const preview = (c.path_findings || []).map((f) =>
+      `<li>${badge(f.action, f.action === "flag" ? "flag" : "block")}
+       <span class="mono">${esc(f.path)}</span> <span class="badge neutral">${esc(f.rule_id)}</span></li>`);
+    const attests = (c.prompt_rules || []).map((r) => {
       const cls = r.verdict === "pass" ? "pass" : r.verdict === "fail" ? "block" : "flag";
-      rows.push(`<li>${badge(r.verdict, cls)} <b>${esc(r.rule_id)}</b> — ${esc(r.policy)}</li>`);
-    }
-    return `<p><b>${esc(c.ts)}</b> — ${c.ok ? badge("OK", "pass") : badge("NOT OK", "block")}</p>
-            <ul>${rows.join("") || "<li class='empty'>no rules evaluated</li>"}</ul>`;
+      return `<li>${badge(r.verdict, cls)} <b>${esc(r.rule_id)}</b> — ${esc(r.policy)}</li>`;
+    });
+    return `<p><b>${esc(fmtTs(c.ts))}</b> — ${c.ok ? badge("OK", "pass") : badge("NOT OK", "block")}</p>
+      ${preview.length ? `<div class="section-hint">Gate preview — declared files that WILL trigger rules when edited (nothing has happened yet):</div>
+      <ul>${preview.join("")}</ul>` : ""}
+      ${attests.length ? `<div class="section-hint">Policy attestations — the agent's self-reported verdicts against prompt rules (evidence, not proof):</div>
+      <ul>${attests.join("")}</ul>` : ""}
+      ${!preview.length && !attests.length ? "<p class='empty'>no rules evaluated</p>" : ""}`;
   });
+
+  const progress = (view.plan || {}).progress || [];
+  const revisions = ((view.plan || {}).revisions || []);
+  const planHtml = view.plan && view.plan.registered ? `
+    <div class="section-hint">
+      ${progress.filter((p) => p.touched).length}/${progress.length} declared files touched so far
+      · ${revisions.length} revision(s)</div>
+    <ul class="plan-progress">
+      ${progress.map((p) => `<li class="${p.touched ? "done" : "pending"}">
+        <span class="tick">${p.touched ? "✓" : "○"}</span><span class="mono">${esc(p.path)}</span></li>`).join("")}
+    </ul>
+    ${revisions.map((r, i) => `
+      <div class="revision">
+        <details ${i === revisions.length - 1 ? "open" : ""}>
+          <summary>revision ${i + 1} of ${revisions.length} — ${esc(fmtTs(r.ts))}
+            (${(r.declared_files || []).length} files, ${esc(r.origin || "inline")})</summary>
+          <div class="plan-text">${esc(r.text || "(text not captured — registered before v0.2)")}</div>
+        </details>
+      </div>`).join("")}`
+    : "<p class='empty'>Not registered — drift against the plan cannot be measured.</p>";
 
   const commits = (view.commits || []).map((c) =>
     `<li><span class="mono">${esc(c.sha.slice(0, 10))}</span> ${esc(c.subject)}
      <span class="when">(${esc(c.date || "")})</span></li>`);
 
+  const allTimeline = timelineItems(view);
+  const shown = allTimeline.slice(0, ui.timelineShown);
+  const remaining = allTimeline.length - shown.length;
+
   $("main").innerHTML = `
     <h2 class="session-title mono">${esc(view.id)}</h2>
     <div class="meta-line">
-      started ${esc(view.started_at || "?")} ·
-      ${view.finalized ? "finalized" : "live"} ·
-      areas: ${esc((view.areas || []).join(", ") || "—")} ·
-      base ${esc((view.head_sha || "").slice(0, 10) || "—")}
+      started <b>${esc(fmtTs(view.started_at))}</b> ·
+      ${view.finalized ? "finalized" : "live"}
+      ${view.branch ? ` · branch <b class="mono">${esc(view.branch)}</b>` : ""} ·
+      base <span class="mono">${esc((view.head_sha || "").slice(0, 10) || "—")}</span> ·
+      areas: ${esc((view.areas || []).join(", ") || "—")}
     </div>
-    <div class="chips">${driftChips(view).join("")}</div>
+    <div class="chips">${chipData(view).map((c) => `
+      <div class="chip ${c.cls} ${c.items !== null ? "clickable" : ""} ${ui.chip === c.id ? "selected" : ""}"
+           data-chip="${c.id}" ${c.title ? `title="${esc(c.title)}"` : ""}>${c.label}</div>`).join("")}
+    </div>
+    <div id="chip-detail"></div>
     <div class="toolbar">
       <input type="search" id="search-box" placeholder="Search events and files…" value="${esc(ui.q)}">
       ${filterChipHtml()}
@@ -394,34 +546,34 @@ function renderSession(view) {
 
     <section class="card"><h3>Prompts</h3>
       ${(view.prompts || []).map((p) =>
-        `<div class="when">${esc(p.ts)}</div><div class="prompt-text">${esc(p.text)}</div>`).join("")
+        `<div class="when">${esc(fmtTs(p.ts))}</div><div class="prompt-text">${esc(p.text)}</div>`).join("")
         || "<p class='empty'>No prompt captured.</p>"}
     </section>
 
-    <section class="card"><h3>Plan</h3>
-      ${view.plan && view.plan.registered ? `
-        <p>${(view.plan.declared_files || []).map((d) => `<code>${esc(d)}</code>`).join(" ") || "no files declared"}</p>
-        ${view.plan.text ? `<details><summary>show plan text</summary>
-          <div class="plan-text">${esc(view.plan.text)}</div></details>` : ""}`
-        : "<p class='empty'>Not registered — drift against the plan cannot be measured.</p>"}
+    <section class="card"><h3>Plan
+      <span class="badge neutral">every registration kept as a revision</span></h3>
+      ${planHtml}
     </section>
 
     <section class="card"><h3>Rule verdicts</h3>
       ${checkBlocks.join("<hr style='border-color:var(--border)'>") || "<p class='empty'>No plan check recorded.</p>"}
     </section>
 
-    <section class="card"><h3>Timeline</h3>
+    <section class="card"><h3>Timeline
+      <span class="badge neutral">click an edit to see its diff</span></h3>
       <ul class="timeline">
-        ${timelineItems(view).map((t) => `
-          <li><span class="ts mono">${esc((t.ts || "").replace("T", " ").replace("Z", ""))}</span>
+        ${shown.map((t, i) => `
+          <li data-idx="${i}"><span class="ts mono">${esc(fmtTs(t.ts))}</span>
               <span class="dot ${t.kind}"></span>
-              <span class="body"><span class="what">${esc(t.what)}</span>
+              <span class="body"><span class="what ${t.diffPath ? "expandable" : ""}"
+                ${t.diffPath ? `data-diff-path="${esc(t.diffPath)}"` : ""}>${esc(t.what)}</span>
               <div class="detail mono">${esc(t.detail || "")}</div></span></li>`).join("")
           || "<li class='empty'>No matching events.</li>"}
       </ul>
+      ${remaining > 0 ? `<button class="show-more" id="timeline-more">Show ${Math.min(remaining, TIMELINE_BATCH)} more (${remaining} hidden)</button>` : ""}
     </section>
 
-    <section class="card"><h3>Files <span class="badge neutral">click a row for the diff</span></h3>
+    <section class="card"><h3>Files <span class="badge neutral">click a row for the diff · hover chips for rule details</span></h3>
       <table><thead><tr><th>File</th><th>LOC</th><th>Notes</th></tr></thead>
       <tbody>${fileRows.join("") + otherRows.join("") ||
         "<tr><td colspan='3' class='empty'>No matching changes.</td></tr>"}</tbody></table>
@@ -431,10 +583,20 @@ function renderSession(view) {
       <ul>${commits.join("") || "<li class='empty'>No linked commits (yet). Commit with the ArchRev git hook installed to link.</li>"}</ul>
     </section>`;
 
-  // Wire toolbar: search re-renders locally (no server round-trip needed).
+  // Summary chips: click to drill into the underlying items.
+  for (const chip of document.querySelectorAll(".chip.clickable")) {
+    chip.addEventListener("click", () => {
+      ui.chip = ui.chip === chip.dataset.chip ? null : chip.dataset.chip;
+      renderSession(currentView);
+    });
+  }
+  renderChipDetail(view);
+
+  // Toolbar: search re-renders locally (no server round-trip needed).
   const search = $("search-box");
   search.addEventListener("input", () => {
     ui.q = search.value;
+    ui.timelineShown = TIMELINE_BATCH;
     const pos = search.selectionStart;
     renderSession(currentView);
     const again = $("search-box");
@@ -445,10 +607,21 @@ function renderSession(view) {
     chip.addEventListener("click", () => {
       const kind = chip.dataset.kind;
       if (ui.kinds.has(kind)) ui.kinds.delete(kind); else ui.kinds.add(kind);
+      ui.timelineShown = TIMELINE_BATCH;
       renderSession(currentView);
     });
   }
-  // Wire diff expansion and restore previously expanded rows.
+  // Timeline: paged rendering + expandable edit diffs.
+  const more = $("timeline-more");
+  if (more) more.addEventListener("click", () => {
+    ui.timelineShown += TIMELINE_BATCH;
+    renderSession(currentView);
+  });
+  for (const what of document.querySelectorAll(".timeline .what.expandable")) {
+    what.addEventListener("click", () =>
+      toggleInlineDiff(what.closest("li"), what.dataset.diffPath));
+  }
+  // Files: diff expansion; restore previously expanded rows.
   for (const row of document.querySelectorAll("tr.file-row")) {
     const path = row.dataset.path;
     row.addEventListener("click", () => toggleDiff(row, path, false));

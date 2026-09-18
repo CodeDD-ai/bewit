@@ -327,6 +327,35 @@ itself: even without the tool, the record is plain text in your history.
 - If hooks are disabled or the CLI leaves PATH, capture stops silently by
   design (fail-open); `archrev sessions` shows the gap.
 
+## Roadmap — improvements by audience
+
+Held in evidence from dogfooding sessions (2026-09-18); strikethrough as
+they land.
+
+**For a CTO (making this adoptable across an org):**
+
+- Central, versioned rule packs shared across repos rather than per-repo YAML.
+- ~~Tamper-evident event logs (hash-chained JSONL)~~ — shipped in v0.2
+  (`archrev verify`).
+- A cross-repo index with the metrics that matter: drift rate,
+  gate-override rate, failed-attestation trends per team.
+- CI enforcement: `archrev check diff` as a required GitLab job; MR
+  descriptions auto-populated from session reports.
+- A documented containment story (ArchRev policy + network-isolated
+  containers) for the security review any rollout triggers.
+
+**For an engineer (daily quality of life):**
+
+- An MCP server so agents query rules and session history natively instead
+  of shelling out.
+- A faster hook runtime (small compiled shim or `python -S` trimming) to
+  make gating cost invisible.
+- Structured plans (frontmatter file lists) instead of regex extraction.
+- Session labels (`archrev annotate`) so the sessions list reads like a
+  changelog.
+- An IDE panel so the timeline lives next to the code instead of a browser
+  tab.
+
 ## Development
 
 ```powershell

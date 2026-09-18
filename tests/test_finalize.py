@@ -8,6 +8,24 @@ from archrev.rules import load_rules
 from archrev.storage import SessionStore
 
 
+def test_view_carries_branch_and_plan_progress(repo: Path):
+    """The review header needs the working branch; the plan section needs
+    per-file progress (touched vs pending)."""
+    from archrev.config import Config
+
+    session = SessionStore(repo).session("s-branch")
+    git = Git(repo)
+    session.ensure_meta(git.head_sha(), branch=git.branch())
+    register_plan(session, "touch `app/main.py` and `db/migrations/0002_x.sql`", repo)
+    session.append_event("edit", path="app/main.py")
+
+    view = compute_view(repo, Config(), load_rules(repo), session)
+    assert view["branch"]  # e.g. master/main, depending on git defaults
+    progress = {p["path"]: p["touched"] for p in view["plan"]["progress"]}
+    assert progress == {"app/main.py": True, "db/migrations/0002_x.sql": False}
+    assert len(view["plan"]["revisions"]) == 1
+
+
 def _start_session(repo: Path, sid: str = "s1"):
     session = SessionStore(repo).session(sid)
     session.ensure_meta(Git(repo).head_sha())
