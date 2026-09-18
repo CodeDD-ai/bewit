@@ -43,7 +43,11 @@ def _clean_candidate(raw: str) -> str | None:
     if not token or "://" in token or " " in token:
         return None
     token = _LINE_SUFFIX_RE.sub("", token)  # drop trailing :line(:col)
-    token = token.replace("\\", "/").lstrip("./")
+    token = token.replace("\\", "/")
+    # Strip only './' prefixes; str.lstrip("./") would eat the leading dot
+    # of dotfile paths like '.archrev/rules/x.yaml' (real dogfooding bug).
+    while token.startswith("./"):
+        token = token[2:]
     # Windows absolute paths inside plans are kept as-is; relativization
     # happens against the repo root below.
     return token or None

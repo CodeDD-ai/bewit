@@ -29,6 +29,15 @@ def test_extract_declared_files(repo: Path):
     assert not any(d in ("3.14", "v1.2.3") for d in declared)
 
 
+def test_dotfile_paths_keep_their_leading_dot(repo: Path):
+    """Regression: lstrip('./') ate the dot of '.archrev/...' paths."""
+    text = "Touch `.archrev/rules/20-x.yaml` and `./app/main.py` and `.env.example`."
+    declared = extract_declared_files(text, repo)
+    assert ".archrev/rules/20-x.yaml" in declared
+    assert "app/main.py" in declared
+    assert not any(d.startswith("archrev/") for d in declared)
+
+
 def test_register_and_check_plan(repo: Path):
     session = SessionStore(repo).session("s1")
     session.ensure_meta(None)
