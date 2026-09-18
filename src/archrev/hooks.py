@@ -65,10 +65,36 @@ def _payload_root(payload: dict) -> Path | None:
     return None
 
 
-def _ensure_session(root: Path, payload: dict) -> Session:
+def _trim_payload(value: object, depth: int = 0) -> object:
+    """Bounded copy of a payload for diagnostics (no huge file contents)."""
+    if depth > 3:
+        return "..."
+    if isinstance(value, str):
+        return value[:200]
+    if isinstance(value, (int, float, bool)) or value is None:
+        return value
+    if isinstance(value, list):
+        return [_trim_payload(v, depth + 1) for v in value[:10]]
+    if isinstance(value, dict):
+        return {
+            str(k): _trim_payload(v, depth + 1)
+            for k, v in list(value.items())[:30]
+        }
+    return repr(value)[:200]
+
+
+def _ensure_session(root: Path, payload: dict, hook_event: str) -> Session:
     store = SessionStore(root)
     session = store.session(_session_id(payload))
     session.ensure_meta(Git(root).head_sha())
+    if session.id == "unknown" and payload:
+        # Field-name drift diagnostics: Cursor's payload schema is not under
+        # our control. When the conversation id cannot be found, record what
+        # actually arrived so the adapter can be fixed from evidence instead
+        # of guesses (`archrev show unknown` reveals the real field names).
+        session.append_event(
+            "payload_debug", hook=hook_event, payload=_trim_payload(payload)
+        )
     return session
 
 
@@ -99,7 +125,7 @@ def _paths_from_tool_input(tool_input: object) -> list[str]:
 
 def handle_prompt(root: Path, config: Config, payload: dict) -> dict:
     """``beforeSubmitPrompt``: open the session and record the prompt."""
-    session = _ensure_session(root, payload)
+    session = _ensure_session(root, payload, "prompt")
     text = ""
     for key in ("prompt", "text", "user_prompt"):
         value = payload.get(key)
@@ -112,7 +138,7 @@ def handle_prompt(root: Path, config: Config, payload: dict) -> dict:
 
 def handle_edit(root: Path, config: Config, payload: dict) -> dict:
     """``afterFileEdit``: record one tracked agent edit."""
-    session = _ensure_session(root, payload)
+    session = _ensure_session(root, payload, "edit")
     raw_path = ""
     for key in _PATH_KEYS:
         value = payload.get(key)
@@ -120,6 +146,11 @@ def handle_edit(root: Path, config: Config, payload: dict) -> dict:
             raw_path = value
             break
     if not raw_path:
+        # An edit we could not attribute to a file is a capture gap; keep
+        # the evidence so the parser can be fixed from real payloads.
+        session.append_event(
+            "payload_debug", hook="edit", payload=_trim_payload(payload)
+        )
         return {}
     edits = payload.get("edits")
     session.append_event(
@@ -133,13 +164,18 @@ def handle_edit(root: Path, config: Config, payload: dict) -> dict:
 
 def handle_gate(root: Path, config: Config, payload: dict) -> dict:
     """``preToolUse`` (edit tools): decide allow / ask / deny."""
-    session = _ensure_session(root, payload)
+    session = _ensure_session(root, payload, "gate")
     tool_name = str(payload.get("tool_name") or payload.get("tool") or "")
     paths = _paths_from_tool_input(
         payload.get("tool_input") or payload.get("toolInput")
     )
     if not paths:
-        # Not a file edit we can reason about — never obstruct.
+        # Not a file edit we can reason about — never obstruct. The gate's
+        # matcher targets edit tools only, so a missing path here usually
+        # means field-name drift: keep the evidence.
+        session.append_event(
+            "payload_debug", hook="gate", payload=_trim_payload(payload)
+        )
         return {"permission": "allow"}
 
     ruleset = load_rules(root)
@@ -160,7 +196,7 @@ def handle_gate(root: Path, config: Config, payload: dict) -> dict:
 
 def handle_finalize(root: Path, config: Config, payload: dict) -> dict:
     """``stop``: write the manifest and regenerate the session report."""
-    session = _ensure_session(root, payload)
+    session = _ensure_session(root, payload, "finalize")
     session.append_event(
         "session_stop", status=str(payload.get("status") or "")
     )

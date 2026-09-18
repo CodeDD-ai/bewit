@@ -1,0 +1,11 @@
+{"ts": "2026-09-18T10:35:05Z", "type": "hook_error", "event": "edit", "error": "TypeError(\"_ensure_session() missing 1 required positional argument: 'hook_event'\")"}
+{"ts": "2026-09-18T10:35:10Z", "type": "hook_error", "event": "gate", "error": "TypeError(\"_ensure_session() missing 1 required positional argument: 'hook_event'\")"}
+{"ts": "2026-09-18T10:35:11Z", "type": "hook_error", "event": "edit", "error": "TypeError(\"_ensure_session() missing 1 required positional argument: 'hook_event'\")"}
+{"ts": "2026-09-18T10:35:14Z", "type": "hook_error", "event": "gate", "error": "TypeError(\"_ensure_session() missing 1 required positional argument: 'hook_event'\")"}
+{"ts": "2026-09-18T10:35:15Z", "type": "payload_debug", "hook": "edit", "payload": {}}
+{"ts": "2026-09-18T10:35:18Z", "type": "hook_error", "event": "gate", "error": "TypeError(\"_ensure_session() missing 1 required positional argument: 'hook_event'\")"}
+{"ts": "2026-09-18T10:35:18Z", "type": "payload_debug", "hook": "edit", "payload": {}}
+{"ts": "2026-09-18T10:35:20Z", "type": "payload_debug", "hook": "gate", "payload": {}}
+{"ts": "2026-09-18T10:35:20Z", "type": "payload_debug", "hook": "edit", "payload": {}}
+{"ts": "2026-09-18T10:35:30Z", "type": "payload_debug", "hook": "gate", "payload": {}}
+{"ts": "2026-09-18T10:35:30Z", "type": "payload_debug", "hook": "edit", "payload": {}}

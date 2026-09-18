@@ -64,6 +64,23 @@ def test_hooks_never_raise_on_garbage(in_repo: Path):
     assert run_hook("finalize", "") == {}
 
 
+def test_unrecognized_payloads_leave_debug_evidence(in_repo: Path):
+    """Field-name drift must be diagnosable from the session record."""
+    # Edit payload without any known path key.
+    run_hook("edit", _payload(some_new_field="x.py"))
+    session = SessionStore(in_repo).session("conv-42")
+    debug = [e for e in session.events() if e.get("type") == "payload_debug"]
+    assert debug and debug[0]["hook"] == "edit"
+    assert debug[0]["payload"]["some_new_field"] == "x.py"
+
+    # Payload without a recognizable conversation id lands in 'unknown'
+    # together with a trimmed copy of what actually arrived.
+    run_hook("prompt", json.dumps({"chatId": "c9", "prompt": "hi"}))
+    unknown = SessionStore(in_repo).session("unknown")
+    debug = [e for e in unknown.events() if e.get("type") == "payload_debug"]
+    assert debug and debug[0]["payload"]["chatId"] == "c9"
+
+
 def test_edit_paths_from_nested_edits(in_repo: Path):
     out = run_hook(
         "gate",
