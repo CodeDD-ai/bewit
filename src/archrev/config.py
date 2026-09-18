@@ -44,12 +44,17 @@ class Config:
         protected_scan: When true, session finalization scans the full git
             diff against path rules, catching files changed outside the edit
             gate (e.g. written by shell commands).
+        final_check: When true, session finalization sends the agent a
+            follow-up message when material findings exist (gate bypasses,
+            failed plan checks, out-of-plan drift), so every implementation
+            ends with an explicit rule review instead of a silent manifest.
         exempt: Glob patterns for paths the gate never blocks.
     """
 
     enforcement: str = "on"
     strict_plan_check: bool = False
     protected_scan: bool = True
+    final_check: bool = True
     exempt: tuple[str, ...] = DEFAULT_EXEMPT
 
 
@@ -99,6 +104,10 @@ def load_config(root: Path) -> Config:
     if not isinstance(scan, bool):
         scan = defaults.protected_scan
 
+    final_check = raw.get("final_check", defaults.final_check)
+    if not isinstance(final_check, bool):
+        final_check = defaults.final_check
+
     exempt_raw = raw.get("exempt", None)
     if isinstance(exempt_raw, list) and all(isinstance(x, str) for x in exempt_raw):
         # User-provided exemptions extend (not replace) the built-in ones so
@@ -111,5 +120,6 @@ def load_config(root: Path) -> Config:
         enforcement=enforcement,
         strict_plan_check=strict,
         protected_scan=scan,
+        final_check=final_check,
         exempt=exempt,
     )

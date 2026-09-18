@@ -68,10 +68,17 @@ def compute_view(
     checks = [e for e in events if e.get("type") == "plan_check"]
     gate_events = [e for e in events if e.get("type") == "gate"]
     edits = [
-        {"ts": e.get("ts"), "path": e.get("path"), "tool": e.get("tool")}
+        {
+            "ts": e.get("ts"),
+            "path": e.get("path"),
+            "tool": e.get("tool"),
+            "origin": e.get("origin", "agent"),
+        }
         for e in events
         if e.get("type") == "edit"
     ]
+    final_checks = [e for e in events if e.get("type") == "final_check"]
+    human_changes = [e for e in events if e.get("type") == "human_changes"]
 
     touched = session.touched_files()
 
@@ -158,6 +165,8 @@ def compute_view(
             "text": session.plan_text(),
         },
         "checks": checks,
+        "final_checks": final_checks,
+        "human_changes": human_changes,
         "gate_events": gate_events,
         "edits": edits,
         "files": files,
@@ -167,6 +176,8 @@ def compute_view(
         "commits": commits,
         "areas": _areas(touched),
         "event_count": len(events),
+        # Tamper evidence: hash-chain verification over the event log.
+        "chain": session.verify_chain(),
     }
 
     if finalize:

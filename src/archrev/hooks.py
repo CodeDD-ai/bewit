@@ -17,6 +17,7 @@ Robustness contract:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import traceback
@@ -165,10 +166,18 @@ def handle_edit(root: Path, config: Config, payload: dict) -> dict:
         )
         return {}
     edits = payload.get("edits")
+    # Tab completions are human-driven edits assisted by the editor; tag
+    # the origin so the review distinguishes them from agent edits.
+    event_name = str(
+        payload.get("hook_event_name") or payload.get("hookEventName") or ""
+    )
+    tool = str(payload.get("tool_name") or payload.get("tool") or "")
+    origin = "tab" if "tab" in (event_name + tool).lower() else "agent"
     session.append_event(
         "edit",
         path=relativize(raw_path, root),
-        tool=str(payload.get("tool_name") or payload.get("tool") or ""),
+        tool=tool,
+        origin=origin,
         edit_count=len(edits) if isinstance(edits, list) else None,
     )
     return {}
@@ -298,8 +307,43 @@ def handle_mcp(root: Path, config: Config, payload: dict) -> dict:
     return decision.to_hook_output()
 
 
+def _final_findings(view: dict) -> list[str]:
+    """Material findings worth confronting the agent with at session end."""
+    findings: list[str] = []
+    bypassed = [
+        f for f in view.get("protected_findings", []) if not f.get("via_gate")
+    ]
+    if bypassed:
+        listed = ", ".join(f["path"] for f in bypassed[:5])
+        findings.append(
+            f"{len(bypassed)} protected path(s) changed OUTSIDE the edit "
+            f"gate (shell/manual): {listed}"
+        )
+    checks = view.get("checks", [])
+    if checks and not checks[-1].get("ok"):
+        findings.append(
+            "the latest plan check did NOT pass (failed or unattested "
+            "prompt rules)"
+        )
+    out_of_plan = view.get("drift", {}).get("out_of_plan", [])
+    if view.get("plan", {}).get("registered") and out_of_plan:
+        listed = ", ".join(out_of_plan[:5])
+        findings.append(
+            f"{len(out_of_plan)} file(s) touched but not declared in the "
+            f"plan: {listed}"
+        )
+    return findings
+
+
 def handle_finalize(root: Path, config: Config, payload: dict) -> dict:
-    """``stop``: write the manifest and regenerate the session report."""
+    """``stop``: write manifest + report, then run the final rule review.
+
+    When material findings exist (gate bypasses, failed checks, drift) and
+    ``final_check`` is enabled, the agent receives a follow-up message so
+    every implementation ends with an explicit review instead of a silent
+    manifest. A findings fingerprint prevents follow-up loops: the same
+    findings are raised at most once.
+    """
     session = _ensure_session(root, payload, "finalize")
     session.append_event(
         "session_stop", status=str(payload.get("status") or "")
@@ -310,6 +354,31 @@ def handle_finalize(root: Path, config: Config, payload: dict) -> dict:
     from archrev.report.render import render_markdown
 
     session.write_report(render_markdown(view))
+
+    findings = _final_findings(view)
+    fingerprint = hashlib.sha256(
+        json.dumps(findings, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
+    previous = session.last_event("final_check")
+    already_raised = bool(previous) and previous.get("fingerprint") == fingerprint
+    notify = bool(findings) and config.final_check and not already_raised
+    session.append_event(
+        "final_check",
+        findings=findings,
+        fingerprint=fingerprint,
+        notified=notify,
+    )
+    if notify:
+        return {
+            "followup_message": (
+                "ArchRev final review found issues in this session:\n- "
+                + "\n- ".join(findings)
+                + "\nReview them with the user: legitimate changes should be "
+                "acknowledged (and the plan/rules updated if needed); "
+                "unintended ones should be reverted. See `archrev show` for "
+                "the full record."
+            )
+        }
     return {}
 
 

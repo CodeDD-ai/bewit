@@ -121,6 +121,13 @@ All machine-enforced kinds support three actions:
 - **`block`** — pause; *you* approve or decline in Cursor's dialog.
 - **`flag`** — allow, record, and highlight in the session review.
 
+> **Approval caveat:** `block` translates to Cursor's *ask* permission. If
+> your Cursor settings auto-approve that category of action (e.g. edits are
+> set to auto-accept), the pause is resolved silently — the event is still
+> recorded and highlighted in the review, but the agent is not visibly
+> interrupted. When you need a stop that no editor setting can wave
+> through, use **`deny`**.
+
 **Enforcement honesty:** these rules gate the agent's *attempts* at the
 tool layer and record every attempt, allowed or denied — they are policy
 plus audit, not a sandbox. An allowed process can still do whatever the
@@ -166,12 +173,17 @@ prompt ──> plan ──> check ──> edits ──> stop ──> commit
    `deny` refuses, `block` pauses for your approval, `flag` records. With
    `strict_plan_check: true`, the *first* edit of a session is denied until
    a **passing** plan check exists: **no validated plan, no code.**
-4. **Finalization** (automatic, `stop` hook): writes `manifest.json` and
-   `report.md` with per-file line counts (`git diff --numstat` since session
-   start), **drift** (files touched but not planned, files planned but never
-   touched), and a **protected-path scan** of the full diff — which catches
-   protected files changed *around* the gate, e.g. by shell commands like
-   `manage.py makemigrations`.
+4. **Finalization + final review** (automatic, `stop` hook): writes
+   `manifest.json` and `report.md` with per-file line counts (`git diff
+   --numstat` since session start), **drift** (files touched but not
+   planned, files planned but never touched), and a **protected-path scan**
+   of the full diff — which catches protected files changed *around* the
+   gate, e.g. by shell commands like `manage.py makemigrations`. When
+   material findings exist (gate bypasses, a failed plan check, out-of-plan
+   drift), the **agent receives a follow-up message** listing them, so every
+   implementation ends with an explicit rule review instead of a silent
+   manifest. The same findings are raised at most once (fingerprint guard +
+   hook loop limit), and `final_check: false` turns the notification off.
 5. **Commit linking** (automatic, git hook): staged files are matched against
    recent sessions and `ArchRev-Session: <id>` trailers are appended, even
    when you commit hours after the session ended.
@@ -182,6 +194,7 @@ Enforcement is configurable in `.archrev/config.yaml`:
 enforcement: on      # on | monitor (record, never stop) | off
 strict_plan_check: false
 protected_scan: true
+final_check: true    # notify the agent of open findings at session end
 ```
 
 With strict mode on, only a **passing** plan check unlocks edits — a check
@@ -195,6 +208,37 @@ deliberately *not* exempt: `archrev init` ships an enabled
 `archrev-self-protection` rule that pauses any agent edit to them, so an
 agent cannot silently switch enforcement off.
 
+## Human changes are part of the record
+
+Agent edits are captured live by hooks; human edits are captured at their
+natural checkpoints, so the audit log stays complete:
+
+- **Tab completions** (human-driven, editor-assisted) are captured via the
+  `afterTabFileEdit` hook and tagged `origin: tab` in the session — the
+  timeline shows them distinctly from agent edits.
+- **Hand edits** never pass through hooks, so they are recorded at **commit
+  time**: the git hook attributes every staged file to recent agent
+  sessions; files no session touched are appended to a reserved `human`
+  session ledger (`.archrev/sessions/human/`). Every committed change is
+  therefore either linked to an agent session or explicitly marked human —
+  nothing is silently unattributed. (Only active once agent sessions exist,
+  so purely manual repositories generate no noise.)
+
+## Tamper-evident audit log
+
+Every event carries a hash over its content plus the previous event's hash.
+Editing, reordering, or deleting any event breaks the chain:
+
+```powershell
+archrev verify           # latest session
+archrev verify --all     # every session; exits 1 on any break
+```
+
+The timeline shows an *event chain: intact / BROKEN* chip per session. This
+is tamper-*evidence*, not tamper-*proofing* — a determined attacker can
+rewrite the whole chain, but cannot quietly alter history that exported
+reports or reviewed MRs already reference.
+
 ## How to review — at any point in time
 
 **Live, while the agent works** (the second-monitor view):
@@ -205,8 +249,11 @@ archrev serve        # http://127.0.0.1:4177
 
 A local, auto-refreshing timeline per session: prompt, plan, rule verdicts,
 every edit with line counts, gate pauses and flags highlighted inline, drift
-chips ("planned 6, touched 9, 3 out-of-plan"), and linked commits. It is a
-pure viewer — stopping it never affects capture.
+chips ("planned 6, touched 9, 3 out-of-plan"), and linked commits. **Click
+any file row to expand its full diff** (new files included), **filter the
+timeline by event type** (prompt / plan / check / gate / edit / human), and
+**search** across events and files. It is a pure viewer — stopping it never
+affects capture.
 
 **From the terminal:**
 
@@ -226,6 +273,9 @@ archrev check diff               # scan current git changes against rules (CI-re
 archrev export <session>         # one self-contained HTML file
 ```
 
+Exports embed the per-file diffs (size-capped), so the expandable diff view
+works offline too.
+
 Every session directory also contains a durable `report.md`, regenerated at
 finalization — readable in any git UI, forever.
 
@@ -244,17 +294,21 @@ finalization — readable in any git UI, forever.
 ```
 
 The JSONL event log is the source of truth; everything else is derived and
-can be regenerated. Because it all lives in git, provenance survives ArchRev
+can be regenerated. Since v0.2 every event carries `prev`/`hash` fields
+forming the tamper-evidence chain (`archrev verify`); records from earlier
+versions remain readable and are reported as pre-chain legacy events. Because it all lives in git, provenance survives ArchRev
 itself: even without the tool, the record is plain text in your history.
 
-## Honest limitations (v0.1)
+## Honest limitations (v0.2)
 
 - Cursor-only capture (the hook adapters are thin; other agent runtimes with
   hook systems are a planned extension).
 - Prompt-rule verdicts are agent self-attestations — recorded and surfaced,
   not independently verified.
-- Human hand-edits between agent turns appear in the finalize diff
-  (`other changes`), not in the per-edit stream.
+- `block` rules depend on Cursor's approval settings being visible (see the
+  approval caveat above); `deny` is the setting-independent hard stop.
+- Human hand-edits are captured at commit time (the `human` ledger), not
+  live; between commits they appear in the finalize diff as `other changes`.
 - `plan register` / `check plan` bind to the most recently active session;
   with several agents in one repo simultaneously, pass `--session` explicitly.
 - If hooks are disabled or the CLI leaves PATH, capture stops silently by

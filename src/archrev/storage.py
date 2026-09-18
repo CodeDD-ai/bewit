@@ -27,6 +27,24 @@ from archrev.config import archrev_dir
 
 _SAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
 
+#: Chain anchor for the first event of a session log.
+GENESIS = "genesis"
+
+#: Reserved session id that accumulates human changes with no agent session
+#: attribution (recorded at commit time by the git hook).
+HUMAN_SESSION_ID = "human"
+
+
+def event_hash(event: dict) -> str:
+    """Deterministic hash over an event's content including ``prev``.
+
+    The ``hash`` field itself is excluded; key order is canonicalized so
+    the value survives JSON round-trips.
+    """
+    content = {k: v for k, v in event.items() if k != "hash"}
+    canonical = json.dumps(content, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
 EVENTS_FILENAME = "events.jsonl"
 META_FILENAME = "meta.json"
 MANIFEST_FILENAME = "manifest.json"
@@ -99,16 +117,79 @@ class Session:
 
     # -- events ---------------------------------------------------------
 
+    def _last_hash(self) -> str:
+        """Hash of the most recent event, or GENESIS for an empty log."""
+        path = self.dir / EVENTS_FILENAME
+        try:
+            with open(path, "rb") as fh:
+                fh.seek(0, 2)
+                size = fh.tell()
+                fh.seek(max(0, size - 16384))
+                tail = fh.read().decode("utf-8", "replace")
+        except OSError:
+            return GENESIS
+        for line in reversed(tail.strip().splitlines()):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(event, dict):
+                return str(event.get("hash") or GENESIS)
+        return GENESIS
+
     def append_event(self, event_type: str, **data: object) -> dict:
-        """Append one event line; returns the stored event."""
-        event: dict = {"ts": utc_now_iso(), "type": event_type, **data}
+        """Append one hash-chained event line; returns the stored event.
+
+        Each event carries ``prev`` (the previous event's hash) and ``hash``
+        (over the event content plus ``prev``), making the log append-only
+        in a verifiable sense: any later modification or deletion breaks the
+        chain, detectable via ``archrev verify``. Tamper-*evident*, not
+        tamper-*proof* — an attacker can rewrite the whole chain, but cannot
+        alter history quietly while commits/exports referencing earlier
+        hashes exist.
+        """
         self.dir.mkdir(parents=True, exist_ok=True)
+        prev = self._last_hash()
+        event: dict = {"ts": utc_now_iso(), "type": event_type, **data, "prev": prev}
+        event["hash"] = event_hash(event)
         line = json.dumps(event, ensure_ascii=False)
         with open(
             self.dir / EVENTS_FILENAME, "a", encoding="utf-8", newline="\n"
         ) as fh:
             fh.write(line + "\n")
         return event
+
+    def verify_chain(self) -> dict:
+        """Validate the event hash chain.
+
+        Returns ``{"ok": bool, "checked": int, "legacy": int, "break_at": int | None}``.
+        Events written before hashing existed count as ``legacy`` and reset
+        the chain start; they are reported, not failed.
+        """
+        checked = legacy = 0
+        break_at: int | None = None
+        prev: str | None = None
+        for index, event in enumerate(self.events(), start=1):
+            if "hash" not in event:
+                legacy += 1
+                prev = None  # chain restarts after legacy prefix
+                continue
+            expected = event_hash(event)
+            prev_ok = prev is None or event.get("prev") == prev
+            if event.get("hash") != expected or not prev_ok:
+                break_at = index
+                break
+            prev = str(event["hash"])
+            checked += 1
+        return {
+            "ok": break_at is None,
+            "checked": checked,
+            "legacy": legacy,
+            "break_at": break_at,
+        }
 
     def events(self) -> list[dict]:
         """All events in append order; corrupt lines are skipped."""

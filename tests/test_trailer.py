@@ -2,8 +2,8 @@ from pathlib import Path
 
 from archrev.gitutil import Git
 from archrev.storage import SessionStore
-from archrev.trailer import add_trailers, sessions_for_staged
-from tests.conftest import git
+from archrev.trailer import add_trailers, attribute_staged, sessions_for_staged
+from conftest import git  # pytest puts the tests dir on sys.path (no __init__.py)
 
 
 def _session_with_edit(repo: Path, sid: str, path: str):
@@ -57,3 +57,36 @@ def test_no_staged_files_no_trailer(repo: Path):
     msg = repo / "COMMIT_EDITMSG"
     msg.write_text("chore: empty\n", encoding="utf-8")
     assert add_trailers(msg, repo) is False
+
+
+def test_unattributed_staged_files_recorded_as_human(repo: Path):
+    """Files committed without any agent session land in the human ledger."""
+    _session_with_edit(repo, "sess-one", "app/main.py")
+    (repo / "app" / "main.py").write_text("print('agent')\n", encoding="utf-8")
+    (repo / "app" / "manual.py").write_text("print('human')\n", encoding="utf-8")
+    git(repo, "add", "app/main.py", "app/manual.py")
+
+    session_ids, unattributed = attribute_staged(repo)
+    assert session_ids == ["sess-one"]
+    assert unattributed == ["app/manual.py"]
+
+    msg = repo / "COMMIT_EDITMSG"
+    msg.write_text("feat: mixed commit\n", encoding="utf-8")
+    add_trailers(msg, repo)
+
+    human = SessionStore(repo).session("human")
+    events = [e for e in human.events() if e["type"] == "human_changes"]
+    assert len(events) == 1
+    assert events[0]["files"] == ["app/manual.py"]
+    # The human ledger never attracts commit trailers itself.
+    assert "human" not in sessions_for_staged(repo)
+
+
+def test_no_human_record_without_agent_sessions(repo: Path):
+    """Purely manual repositories must not accumulate human-change noise."""
+    (repo / "app" / "manual.py").write_text("print('human')\n", encoding="utf-8")
+    git(repo, "add", "app/manual.py")
+    msg = repo / "COMMIT_EDITMSG"
+    msg.write_text("feat: manual\n", encoding="utf-8")
+    add_trailers(msg, repo)
+    assert SessionStore(repo).session("human").events() == []

@@ -18,7 +18,8 @@
     ],
     "stop": [
       {
-        "command": "archrev hook finalize"
+        "command": "archrev hook finalize",
+        "loop_limit": 2
       }
     ],
     "beforeShellExecution": [
@@ -34,6 +35,11 @@
     "beforeMCPExecution": [
       {
         "command": "archrev hook mcp"
+      }
+    ],
+    "afterTabFileEdit": [
+      {
+        "command": "archrev hook edit"
       }
     ]
   }

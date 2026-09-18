@@ -9,6 +9,7 @@
     --bg: #0f1115; --panel: #171a21; --panel-2: #1d212b; --border: #2a2f3a;
     --text: #e6e9ef; --muted: #8b93a3; --accent: #6ea8fe;
     --pass: #4cc38a; --flag: #f0b429; --block: #ef5350; --chip: #232936;
+    --human: #b085f5;
   }
   * { box-sizing: border-box; }
   body {
@@ -34,14 +35,12 @@
   .badge.pass { color: var(--pass); }
   .badge.flag { color: var(--flag); }
   .badge.block { color: var(--block); }
+  .badge.human { color: var(--human); }
   .badge.neutral { color: var(--muted); }
   .layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 49px); }
   .layout.single { grid-template-columns: 1fr; }
-  /* Sessions list */
   #sidebar { border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
-  .session-card {
-    padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
-  }
+  .session-card { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
   .session-card:hover { background: var(--panel-2); }
   .session-card.active { background: var(--panel-2); border-left: 3px solid var(--accent); padding-left: 11px; }
   .session-card .sid { color: var(--accent); }
@@ -49,17 +48,28 @@
   .session-card .excerpt { color: var(--text); font-size: 12.5px; margin: 4px 0; overflow: hidden;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .session-card .badges { display: flex; gap: 6px; flex-wrap: wrap; }
-  /* Main */
-  #main { padding: 20px 26px 60px; overflow-y: auto; max-width: 1060px; }
+  #main { padding: 20px 26px 60px; overflow-y: auto; max-width: 1120px; }
   h2.session-title { margin: 0 0 2px; font-size: 18px; }
   .meta-line { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 22px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 16px; }
   .chip { background: var(--chip); border: 1px solid var(--border); border-radius: 8px;
     padding: 5px 11px; font-size: 12px; }
   .chip b { font-weight: 600; }
   .chip.warn { border-color: var(--flag); }
   .chip.bad { border-color: var(--block); }
   .chip.good { border-color: var(--pass); }
+  /* Toolbar: search + event filters */
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .toolbar input[type="search"] {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 7px 12px; font-size: 13px; width: 260px; outline: none;
+  }
+  .toolbar input[type="search"]:focus { border-color: var(--accent); }
+  .filter-chip {
+    background: var(--chip); border: 1px solid var(--border); border-radius: 14px;
+    color: var(--muted); padding: 4px 12px; font-size: 12px; cursor: pointer; user-select: none;
+  }
+  .filter-chip.on { color: var(--text); border-color: var(--accent); background: #1d2a44; }
   section.card {
     background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
     padding: 14px 18px; margin-bottom: 16px;
@@ -71,7 +81,6 @@
   details summary { cursor: pointer; color: var(--accent); font-size: 12.5px; }
   .plan-text { white-space: pre-wrap; background: var(--panel-2); border-radius: 8px;
     padding: 10px 12px; margin-top: 8px; max-height: 420px; overflow-y: auto; font-size: 12.5px; }
-  /* Timeline */
   .timeline { list-style: none; margin: 0; padding: 0; }
   .timeline li { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
   .timeline li:last-child { border-bottom: none; }
@@ -82,16 +91,30 @@
   .dot.gate-ask, .dot.gate-deny { background: var(--block); }
   .dot.gate-flag { background: var(--flag); }
   .dot.check { background: var(--pass); }
-  .dot.plan { background: #b085f5; }
+  .dot.final { background: var(--flag); }
+  .dot.plan { background: var(--human); }
+  .dot.human { background: var(--human); }
   .timeline .body { flex: 1; min-width: 0; }
   .timeline .body .what { font-size: 13px; }
   .timeline .body .detail { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-  /* Tables */
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
   td.loc { white-space: nowrap; }
   .add { color: var(--pass); } .del { color: var(--block); }
+  tr.file-row { cursor: pointer; }
+  tr.file-row:hover td { background: var(--panel-2); }
+  tr.file-row td:first-child::before { content: "▸ "; color: var(--muted); }
+  tr.file-row.open td:first-child::before { content: "▾ "; }
+  tr.diff-row td { padding: 0; background: #12151b; }
+  pre.diff {
+    margin: 0; padding: 10px 14px; overflow-x: auto; max-height: 420px; overflow-y: auto;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.45;
+  }
+  pre.diff .dl-add { color: var(--pass); }
+  pre.diff .dl-del { color: var(--block); }
+  pre.diff .dl-hunk { color: var(--accent); }
+  pre.diff .dl-meta { color: var(--muted); }
   .empty { color: var(--muted); font-style: italic; }
   #error-banner {
     display: none; background: #3a1f22; color: #ffb4ab; padding: 8px 18px;
@@ -118,7 +141,14 @@
 
 const EXPORT = window.__ARCHREV_DATA__ || null;
 const POLL_MS = 2500;
+const FILTER_KINDS = ["prompt", "plan", "check", "gate", "edit", "human"];
+
 let selectedId = null;
+let currentView = null;
+let lastRenderKey = "";
+// UI state survives re-renders: search text, active kind filters,
+// expanded diff rows, and fetched diffs.
+const ui = { q: "", kinds: new Set(), expanded: new Set(), diffs: new Map() };
 
 const $ = (id) => document.getElementById(id);
 
@@ -138,48 +168,78 @@ function locHtml(added, removed) {
 
 function badge(text, cls) { return `<span class="badge ${cls}">${esc(text)}</span>`; }
 
+function matchesSearch(...fields) {
+  if (!ui.q) return true;
+  const q = ui.q.toLowerCase();
+  return fields.some((f) => String(f || "").toLowerCase().includes(q));
+}
+
 /* ---------------- sessions sidebar (live mode only) ---------------- */
 
 function renderSidebar(state) {
   $("root-path").textContent = state.root || "";
   const items = state.sessions.map((s) => {
+    const isHuman = s.id === "human";
     const badges = [];
-    if (s.finalized) badges.push(badge("finalized", "neutral")); else badges.push(badge("live", "live"));
+    if (isHuman) badges.push(badge("human", "human"));
+    else if (s.finalized) badges.push(badge("finalized", "neutral"));
+    else badges.push(badge("live", "live"));
     if (s.plan_registered) badges.push(badge("plan", "pass"));
     if (s.checked) badges.push(badge("checked", "pass"));
     if (s.blocks) badges.push(badge(`${s.blocks} gated`, "block"));
     if (s.flags) badges.push(badge(`${s.flags} flagged`, "flag"));
-    badges.push(badge(`${s.edits} edits`, "neutral"));
+    if (!isHuman) badges.push(badge(`${s.edits} edits`, "neutral"));
+    const excerpt = isHuman
+      ? "Human changes (committed without agent session attribution)"
+      : (s.prompt_excerpt || "(no prompt captured)");
     return `
       <div class="session-card ${s.id === selectedId ? "active" : ""}" data-id="${esc(s.id)}">
         <div><span class="sid mono">${esc(shortId(s.id))}</span>
              <span class="when"> · ${esc(s.started_at || "")}</span></div>
-        <div class="excerpt">${esc(s.prompt_excerpt || "(no prompt captured)")}</div>
+        <div class="excerpt">${esc(excerpt)}</div>
         <div class="badges">${badges.join("")}</div>
       </div>`;
   });
   $("sidebar").innerHTML = items.join("") ||
     `<div id="placeholder">No sessions yet.<br>Start an agent conversation.</div>`;
   for (const el of document.querySelectorAll(".session-card")) {
-    el.addEventListener("click", () => { selectedId = el.dataset.id; refreshSession(); });
+    el.addEventListener("click", () => {
+      if (selectedId !== el.dataset.id) {
+        selectedId = el.dataset.id;
+        ui.expanded.clear();
+        ui.diffs.clear();
+        lastRenderKey = "";
+        refreshSession();
+      }
+    });
   }
 }
 
-/* ---------------- session detail ---------------- */
+/* ---------------- timeline ---------------- */
 
 function timelineItems(view) {
   const items = [];
   for (const p of view.prompts || [])
-    items.push({ ts: p.ts, kind: "prompt", what: "Prompt submitted",
+    items.push({ ts: p.ts, kind: "prompt", cat: "prompt", what: "Prompt submitted",
                  detail: (p.text || "").split("\n")[0].slice(0, 160) });
   if (view.plan && view.plan.registered)
-    items.push({ ts: (view.checks[0] || {}).ts || view.started_at, kind: "plan",
-                 what: "Plan registered",
+    items.push({ ts: ((view.checks || [])[0] || {}).ts || view.started_at, kind: "plan",
+                 cat: "plan", what: "Plan registered",
                  detail: `${(view.plan.declared_files || []).length} file(s) declared` });
   for (const c of view.checks || [])
-    items.push({ ts: c.ts, kind: "check",
+    items.push({ ts: c.ts, kind: "check", cat: "check",
                  what: `Plan check — ${c.ok ? "OK" : "NOT OK"}`,
                  detail: (c.prompt_rules || []).map((r) => `${r.rule_id}: ${r.verdict}`).join(", ") });
+  for (const f of view.final_checks || [])
+    items.push({ ts: f.ts, kind: (f.findings || []).length ? "final" : "check", cat: "check",
+                 what: (f.findings || []).length
+                   ? `Final review — ${f.findings.length} finding(s)${f.notified ? ", agent notified" : ""}`
+                   : "Final review — clean",
+                 detail: (f.findings || []).join(" | ") });
+  for (const h of view.human_changes || [])
+    items.push({ ts: h.ts, kind: "human", cat: "human",
+                 what: `Human changes recorded (${(h.files || []).length} file(s))`,
+                 detail: (h.files || []).join(", ") });
   for (const g of view.gate_events || []) {
     const kind = g.permission === "allow" ? "gate-flag" : `gate-${g.permission}`;
     const subject = { edit: "Edit", shell: "Shell command", read: "File read",
@@ -188,52 +248,119 @@ function timelineItems(view) {
                  g.permission === "ask" ? `${subject} paused for approval` :
                  `${subject} denied`;
     const where = (g.paths && g.paths.length) ? g.paths.join(", ") : (g.target || "");
-    items.push({ ts: g.ts, kind, what,
+    items.push({ ts: g.ts, kind, cat: "gate", what,
                  detail: where + "  [" +
                          (g.hits || []).map((h) => `${h.action}:${h.rule_id}`).join(", ") + "]" });
   }
   for (const e of view.edits || [])
-    items.push({ ts: e.ts, kind: "edit", what: "File edited", detail: e.path });
+    items.push({ ts: e.ts, kind: "edit", cat: "edit",
+                 what: e.origin === "tab" ? "File edited (tab / human-assisted)" : "File edited",
+                 detail: e.path });
   items.sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
-  return items;
+  return items.filter((t) =>
+    (ui.kinds.size === 0 || ui.kinds.has(t.cat)) && matchesSearch(t.what, t.detail));
 }
 
 function driftChips(view) {
   const chips = [];
   const plan = view.plan || {};
-  if (!plan.registered) {
-    chips.push(`<div class="chip warn"><b>No plan registered</b> — drift not measurable</div>`);
+  if (view.id === "human") {
+    chips.push(`<div class="chip"><b>Human changes ledger</b> — files committed without agent attribution</div>`);
     return chips;
   }
-  const out = (view.drift || {}).out_of_plan || [];
-  const unrealized = (view.drift || {}).unrealized || [];
-  chips.push(`<div class="chip">planned <b>${(plan.declared_files || []).length}</b></div>`);
-  chips.push(`<div class="chip">touched <b>${(view.files || []).length}</b></div>`);
-  chips.push(`<div class="chip ${out.length ? "warn" : "good"}">out-of-plan <b>${out.length}</b></div>`);
-  chips.push(`<div class="chip ${unrealized.length ? "warn" : "good"}">unrealized <b>${unrealized.length}</b></div>`);
+  if (!plan.registered) {
+    chips.push(`<div class="chip warn"><b>No plan registered</b> — drift not measurable</div>`);
+  } else {
+    const out = (view.drift || {}).out_of_plan || [];
+    const unrealized = (view.drift || {}).unrealized || [];
+    chips.push(`<div class="chip">planned <b>${(plan.declared_files || []).length}</b></div>`);
+    chips.push(`<div class="chip">touched <b>${(view.files || []).length}</b></div>`);
+    chips.push(`<div class="chip ${out.length ? "warn" : "good"}">out-of-plan <b>${out.length}</b></div>`);
+    chips.push(`<div class="chip ${unrealized.length ? "warn" : "good"}">unrealized <b>${unrealized.length}</b></div>`);
+  }
   const bypass = (view.protected_findings || []).filter((f) => !f.via_gate);
   if (bypass.length)
     chips.push(`<div class="chip bad">protected changes bypassing gate <b>${bypass.length}</b></div>`);
+  const chain = view.chain || null;
+  if (chain)
+    chips.push(`<div class="chip ${chain.ok ? "good" : "bad"}">event chain <b>${chain.ok ? "intact" : "BROKEN"}</b></div>`);
   return chips;
 }
 
+/* ---------------- diffs ---------------- */
+
+function renderDiffText(text) {
+  return text.split("\n").map((line) => {
+    const cls = line.startsWith("+") ? "dl-add" : line.startsWith("-") ? "dl-del" :
+                line.startsWith("@@") ? "dl-hunk" : line.startsWith("diff ") || line.startsWith("index ") ? "dl-meta" : "";
+    return `<span class="${cls}">${esc(line)}</span>`;
+  }).join("\n");
+}
+
+async function loadDiff(path) {
+  if (ui.diffs.has(path)) return ui.diffs.get(path);
+  let text;
+  if (EXPORT) {
+    text = (EXPORT.diffs || {})[path] || "(diff not embedded in this export)";
+  } else {
+    try {
+      const res = await fetch(`/api/diff?session=${encodeURIComponent(selectedId)}&path=${encodeURIComponent(path)}`);
+      text = (await res.json()).diff || "(no diff available)";
+    } catch { text = "(viewer unreachable)"; }
+  }
+  ui.diffs.set(path, text);
+  return text;
+}
+
+async function toggleDiff(row, path, forceOpen) {
+  const open = row.classList.contains("open");
+  if (open && !forceOpen) {
+    row.classList.remove("open");
+    ui.expanded.delete(path);
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains("diff-row")) next.remove();
+    return;
+  }
+  if (open) return;
+  row.classList.add("open");
+  ui.expanded.add(path);
+  const diffRow = document.createElement("tr");
+  diffRow.className = "diff-row";
+  diffRow.innerHTML = `<td colspan="3"><pre class="diff">loading…</pre></td>`;
+  row.after(diffRow);
+  const text = await loadDiff(path);
+  diffRow.querySelector("pre").innerHTML = renderDiffText(text);
+}
+
+/* ---------------- session detail ---------------- */
+
+function filterChipHtml() {
+  return FILTER_KINDS.map((k) =>
+    `<span class="filter-chip ${ui.kinds.has(k) ? "on" : ""}" data-kind="${k}">${k}</span>`
+  ).join("");
+}
+
 function renderSession(view) {
-  const fileRows = (view.files || []).map((f) => {
+  currentView = view;
+  const searchable = (path) => matchesSearch(path);
+
+  const fileRows = (view.files || []).filter((f) => searchable(f.path)).map((f) => {
     const notes = [];
     if (f.untracked) notes.push(badge("new", "neutral"));
     if (view.plan && view.plan.registered && !f.in_plan) notes.push(badge("out-of-plan", "flag"));
-    for (const r of f.rules || []) notes.push(badge(`${r.action}: ${r.rule_id}`, r.action === "block" ? "block" : "flag"));
-    return `<tr><td class="mono">${esc(f.path)}</td>
+    for (const r of f.rules || []) notes.push(badge(`${r.action}: ${r.rule_id}`, r.action === "flag" ? "flag" : "block"));
+    return `<tr class="file-row" data-path="${esc(f.path)}"><td class="mono">${esc(f.path)}</td>
       <td class="loc">${locHtml(f.added, f.removed)}</td><td>${notes.join(" ") || "—"}</td></tr>`;
   });
-  const otherRows = (view.other_changes || []).map((f) =>
-    `<tr><td class="mono">${esc(f.path)}</td><td class="loc">${locHtml(f.added, f.removed)}</td>
+  const otherRows = (view.other_changes || []).filter((f) => searchable(f.path)).map((f) =>
+    `<tr class="file-row" data-path="${esc(f.path)}"><td class="mono">${esc(f.path)}</td>
+     <td class="loc">${locHtml(f.added, f.removed)}</td>
      <td>${badge("outside tracked edits", "neutral")}</td></tr>`);
 
   const checkBlocks = (view.checks || []).map((c) => {
     const rows = [];
     for (const f of c.path_findings || [])
-      rows.push(`<li>${badge(f.action, f.action === "block" ? "block" : "flag")}
+      rows.push(`<li>${badge(f.action, f.action === "flag" ? "flag" : "block")}
                  <span class="mono">${esc(f.path)}</span> <span class="badge neutral">${esc(f.rule_id)}</span></li>`);
     for (const r of c.prompt_rules || []) {
       const cls = r.verdict === "pass" ? "pass" : r.verdict === "fail" ? "block" : "flag";
@@ -256,6 +383,10 @@ function renderSession(view) {
       base ${esc((view.head_sha || "").slice(0, 10) || "—")}
     </div>
     <div class="chips">${driftChips(view).join("")}</div>
+    <div class="toolbar">
+      <input type="search" id="search-box" placeholder="Search events and files…" value="${esc(ui.q)}">
+      ${filterChipHtml()}
+    </div>
 
     <section class="card"><h3>Prompts</h3>
       ${(view.prompts || []).map((p) =>
@@ -282,19 +413,43 @@ function renderSession(view) {
               <span class="dot ${t.kind}"></span>
               <span class="body"><span class="what">${esc(t.what)}</span>
               <div class="detail mono">${esc(t.detail || "")}</div></span></li>`).join("")
-          || "<li class='empty'>No events yet.</li>"}
+          || "<li class='empty'>No matching events.</li>"}
       </ul>
     </section>
 
-    <section class="card"><h3>Files</h3>
+    <section class="card"><h3>Files <span class="badge neutral">click a row for the diff</span></h3>
       <table><thead><tr><th>File</th><th>LOC</th><th>Notes</th></tr></thead>
       <tbody>${fileRows.join("") + otherRows.join("") ||
-        "<tr><td colspan='3' class='empty'>No changes recorded.</td></tr>"}</tbody></table>
+        "<tr><td colspan='3' class='empty'>No matching changes.</td></tr>"}</tbody></table>
     </section>
 
     <section class="card"><h3>Commits</h3>
       <ul>${commits.join("") || "<li class='empty'>No linked commits (yet). Commit with the ArchRev git hook installed to link.</li>"}</ul>
     </section>`;
+
+  // Wire toolbar: search re-renders locally (no server round-trip needed).
+  const search = $("search-box");
+  search.addEventListener("input", () => {
+    ui.q = search.value;
+    const pos = search.selectionStart;
+    renderSession(currentView);
+    const again = $("search-box");
+    again.focus();
+    again.setSelectionRange(pos, pos);
+  });
+  for (const chip of document.querySelectorAll(".filter-chip")) {
+    chip.addEventListener("click", () => {
+      const kind = chip.dataset.kind;
+      if (ui.kinds.has(kind)) ui.kinds.delete(kind); else ui.kinds.add(kind);
+      renderSession(currentView);
+    });
+  }
+  // Wire diff expansion and restore previously expanded rows.
+  for (const row of document.querySelectorAll("tr.file-row")) {
+    const path = row.dataset.path;
+    row.addEventListener("click", () => toggleDiff(row, path, false));
+    if (ui.expanded.has(path)) toggleDiff(row, path, true);
+  }
 }
 
 /* ---------------- data flow ---------------- */
@@ -303,6 +458,14 @@ function showError(message) {
   const banner = $("error-banner");
   banner.style.display = message ? "block" : "none";
   banner.textContent = message || "";
+}
+
+function viewRenderKey(view) {
+  // Re-render only when the underlying data changed, so typing in the
+  // search box is never interrupted by the poll cycle.
+  const loc = (view.files || []).reduce((n, f) => n + (f.added || 0) + (f.removed || 0), 0);
+  return [view.id, view.event_count, view.finalized, loc,
+          (view.commits || []).length, (view.other_changes || []).length].join("|");
 }
 
 async function refreshState() {
@@ -324,7 +487,14 @@ async function refreshSession() {
   if (!selectedId) return;
   try {
     const res = await fetch("/api/session/" + encodeURIComponent(selectedId));
-    if (res.ok) renderSession(await res.json());
+    if (!res.ok) return;
+    const view = await res.json();
+    const key = viewRenderKey(view);
+    if (key !== lastRenderKey) {
+      lastRenderKey = key;
+      ui.diffs.clear(); // data changed; cached diffs may be stale
+      renderSession(view);
+    }
   } catch { /* transient; state poll reports connectivity */ }
 }
 

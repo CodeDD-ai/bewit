@@ -278,7 +278,7 @@ def rules() -> None:
     config = load_config(root)
     click.echo(
         f"enforcement={config.enforcement}  strict_plan_check={config.strict_plan_check}  "
-        f"protected_scan={config.protected_scan}"
+        f"protected_scan={config.protected_scan}  final_check={config.final_check}"
     )
     sections = (
         ("Path rules (edits)", ruleset.path_rules),
@@ -403,6 +403,45 @@ def trace(target: str) -> None:
         click.echo(f"  started: {meta.get('started_at', '?')}")
         click.echo(f"  prompt:  {excerpt}")
         click.echo(f"  review:  archrev show {session.id}")
+
+
+@main.command()
+@click.argument("session_ref", default=None, required=False)
+@click.option("--all", "verify_all", is_flag=True, help="Verify every session.")
+def verify(session_ref: str | None, verify_all: bool) -> None:
+    """Verify the tamper-evident hash chain of session event logs.
+
+    Every event carries a hash over its content plus the previous event's
+    hash. Any edit, reorder, or deletion inside the log breaks the chain.
+    Exits 1 when any chain is broken.
+    """
+    root = _require_root()
+    store = SessionStore(root)
+    if verify_all:
+        targets = store.list_sessions()
+    else:
+        targets = [_resolve_session(root, session_ref or "latest")]
+    if not targets:
+        click.echo("No sessions recorded yet.")
+        return
+    broken = 0
+    for session in targets:
+        result = session.verify_chain()
+        if result["ok"]:
+            note = f" ({result['legacy']} legacy pre-chain event(s))" if result["legacy"] else ""
+            click.secho(
+                f"  ok      {session.id}: {result['checked']} event(s) verified{note}",
+                fg="green",
+            )
+        else:
+            broken += 1
+            click.secho(
+                f"  BROKEN  {session.id}: chain breaks at event #{result['break_at']} "
+                "- the log was modified after the fact",
+                fg="red",
+            )
+    if broken:
+        sys.exit(1)
 
 
 @main.command()

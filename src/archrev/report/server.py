@@ -14,10 +14,11 @@ attaching to a merge request or archiving.
 from __future__ import annotations
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from archrev import __version__
 from archrev.config import load_config
@@ -86,12 +87,51 @@ def build_session_view(root: Path, ref: str) -> dict | None:
     return compute_view(root, config, ruleset, session)
 
 
+def build_file_diff(root: Path, ref: str, path: str) -> str | None:
+    """Unified diff of one session file vs the session-start base."""
+    session = SessionStore(root).resolve(ref)
+    if session is None:
+        return None
+    meta = session.meta() or {}
+    from archrev.gitutil import Git
+
+    return Git(root).file_diff(meta.get("head_sha"), path)
+
+
+#: Caps for diffs embedded into exported HTML (bytes of diff text).
+_EXPORT_DIFF_FILE_CAP = 100_000
+_EXPORT_DIFF_TOTAL_CAP = 1_000_000
+
+
+def _export_diffs(root: Path, view: dict) -> dict[str, str]:
+    """Collect per-file diffs for export, respecting size caps."""
+    diffs: dict[str, str] = {}
+    total = 0
+    paths = [f["path"] for f in view.get("files", [])] + [
+        f["path"] for f in view.get("other_changes", [])
+    ]
+    for path in paths:
+        diff = build_file_diff(root, view["id"], path)
+        if not diff or len(diff) > _EXPORT_DIFF_FILE_CAP:
+            continue
+        if total + len(diff) > _EXPORT_DIFF_TOTAL_CAP:
+            break
+        diffs[path] = diff
+        total += len(diff)
+    return diffs
+
+
 def export_html(root: Path, ref: str) -> str | None:
     """Self-contained HTML for one session; None when the session is unknown."""
     view = build_session_view(root, ref)
     if view is None:
         return None
-    payload = {"session": view, "root": str(root), "version": __version__}
+    payload = {
+        "session": view,
+        "root": str(root),
+        "version": __version__,
+        "diffs": _export_diffs(root, view),
+    }
     embed = "window.__ARCHREV_DATA__ = " + json.dumps(payload, ensure_ascii=False).replace(
         "</", "<\\/"  # keep embedded JSON from terminating the script tag
     ) + ";"
@@ -135,6 +175,14 @@ class _Handler(BaseHTTPRequestHandler):
                     self._send_json(404, {"error": f"unknown session '{ref}'"})
                 else:
                     self._send_json(200, view)
+            elif path == "/api/diff":
+                params = parse_qs(urlparse(self.path).query)
+                ref = (params.get("session") or [""])[0]
+                file_path = (params.get("path") or [""])[0]
+                diff = build_file_diff(root, ref, file_path)
+                self._send_json(
+                    200, {"path": file_path, "diff": diff or "(no diff available)"}
+                )
             else:
                 self._send_json(404, {"error": "not found"})
         except BrokenPipeError:
@@ -146,9 +194,16 @@ class _Handler(BaseHTTPRequestHandler):
         """Silence per-request logging; the CLI prints the URL once."""
 
 
+class _Server(ThreadingHTTPServer):
+    # On Windows, SO_REUSEADDR lets a second viewer bind an already-used
+    # port, silently splitting requests between old and new processes
+    # (observed live). Fail loudly instead; POSIX keeps reuse for TIME_WAIT.
+    allow_reuse_address = os.name != "nt"
+
+
 def serve(root: Path, host: str = "127.0.0.1", port: int = 4177) -> None:
     """Run the viewer until interrupted."""
-    httpd = ThreadingHTTPServer((host, port), _Handler)
+    httpd = _Server((host, port), _Handler)
     httpd.archrev_root = root  # type: ignore[attr-defined]
     try:
         httpd.serve_forever()

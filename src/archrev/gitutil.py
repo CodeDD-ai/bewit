@@ -91,6 +91,27 @@ class Git:
             out = self._run("diff", "--numstat", "--find-renames", "HEAD")
         return self._parse_numstat(out) if out else []
 
+    def file_diff(self, base: str | None, path: str) -> str | None:
+        """Unified diff for one file between ``base`` and the working tree.
+
+        Untracked files (invisible to ``git diff``) are synthesized as pure
+        additions so new files are inspectable like any other change.
+        """
+        out = self._run("diff", "--find-renames", base or "HEAD", "--", path)
+        if out and out.strip():
+            return out
+        if path in self.untracked_files():
+            try:
+                content = (self.root / path).read_text(
+                    encoding="utf-8", errors="replace"
+                )
+            except OSError:
+                return None
+            lines = content.splitlines()
+            header = f"--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{len(lines)} @@\n"
+            return header + "\n".join("+" + line for line in lines) + "\n"
+        return None
+
     def untracked_files(self) -> list[str]:
         out = self._run("ls-files", "--others", "--exclude-standard")
         return [ln.strip() for ln in out.splitlines() if ln.strip()] if out else []

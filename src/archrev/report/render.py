@@ -106,6 +106,25 @@ def render_text(view: dict) -> str:
         for fnd in findings:
             via = "via gate" if fnd.get("via_gate") else "BYPASSED GATE (shell/manual)"
             add(f"  [{fnd['action']}] {fnd['path']} ({fnd['rule_id']}, {via})")
+
+    final_checks = view.get("final_checks", [])
+    if final_checks:
+        last = final_checks[-1]
+        issues = last.get("findings", [])
+        add(f"Final review  {'CLEAN' if not issues else f'{len(issues)} finding(s)'}")
+        for issue in issues:
+            add(f"  - {issue}")
+
+    human = view.get("human_changes", [])
+    if human:
+        add(f"Human changes recorded ({len(human)} commit event(s))")
+        for h in human:
+            add(f"  [{h.get('ts')}] {', '.join(h.get('files', []))}")
+
+    chain = view.get("chain")
+    if chain:
+        status = "intact" if chain.get("ok") else f"BROKEN at event #{chain.get('break_at')}"
+        add(f"Event log chain  {status} ({chain.get('checked')} event(s) verified)")
     add("")
 
     commits = view.get("commits", [])
@@ -185,6 +204,34 @@ def render_markdown(view: dict) -> str:
         for fnd in findings:
             via = "via gate" if fnd.get("via_gate") else "**bypassed gate** (shell/manual)"
             add(f"- **{fnd['action']}** `{fnd['path']}` ({fnd['rule_id']}, {via})")
+        add("")
+
+    final_checks = view.get("final_checks", [])
+    if final_checks:
+        last = final_checks[-1]
+        issues = last.get("findings", [])
+        add("## Final review")
+        if issues:
+            for issue in issues:
+                add(f"- {issue}")
+        else:
+            add("Clean - no material findings at session end.")
+        add("")
+
+    human = view.get("human_changes", [])
+    if human:
+        add("## Human changes (no agent attribution)")
+        for h in human:
+            add(f"- {h.get('ts')}: " + ", ".join(f"`{p}`" for p in h.get("files", [])))
+        add("")
+
+    chain = view.get("chain")
+    if chain:
+        status = (
+            "intact" if chain.get("ok")
+            else f"**BROKEN at event #{chain.get('break_at')}**"
+        )
+        add(f"*Event log hash chain: {status}, {chain.get('checked')} event(s) verified.*")
         add("")
 
     add("## Commits")

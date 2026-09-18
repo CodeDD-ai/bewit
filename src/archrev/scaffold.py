@@ -34,6 +34,11 @@ strict_plan_check: false
 # catching protected files changed outside the edit gate (e.g. via shell).
 protected_scan: true
 
+# When true, the end-of-session review sends the agent a follow-up message
+# when material findings exist (gate bypasses, failed checks, out-of-plan
+# drift), so sessions never end silently with open rule violations.
+final_check: true
+
 # Additional glob patterns the gate never blocks (extends built-in exemptions
 # for .archrev/sessions/** and *.plan.md). Note: ArchRev governance files
 # (.archrev/config.yaml, rules, .cursor/hooks.json) are intentionally NOT
@@ -179,17 +184,21 @@ command -v archrev >/dev/null 2>&1 || exit 0
 archrev git-trailer "$1" 2>/dev/null || exit 0
 """
 
-#: Hook events wired by init: (event, archrev subcommand, matcher or None).
+#: Hook events wired by init: (event, archrev subcommand, extra entry keys).
 #: preToolUse runs unmatched so `tool` rules can gate any tool; the handler
-#: answers in milliseconds when nothing applies.
-_HOOK_SPECS: tuple[tuple[str, str, str | None], ...] = (
-    ("beforeSubmitPrompt", "prompt", None),
-    ("afterFileEdit", "edit", None),
-    ("preToolUse", "gate", None),
-    ("beforeShellExecution", "shell", None),
-    ("beforeReadFile", "read", None),
-    ("beforeMCPExecution", "mcp", None),
-    ("stop", "finalize", None),
+#: answers in milliseconds when nothing applies. afterTabFileEdit captures
+#: human Tab-completion edits (tagged origin=tab in the audit log). The stop
+#: hook carries loop_limit so the final rule review can send the agent one
+#: follow-up without any risk of a notification loop.
+_HOOK_SPECS: tuple[tuple[str, str, dict], ...] = (
+    ("beforeSubmitPrompt", "prompt", {}),
+    ("afterFileEdit", "edit", {}),
+    ("afterTabFileEdit", "edit", {}),
+    ("preToolUse", "gate", {}),
+    ("beforeShellExecution", "shell", {}),
+    ("beforeReadFile", "read", {}),
+    ("beforeMCPExecution", "mcp", {}),
+    ("stop", "finalize", {"loop_limit": 2}),
 )
 
 
@@ -227,15 +236,13 @@ def _merge_hooks_json(path: Path, result: InitResult) -> None:
     data.setdefault("version", 1)
     hooks = data.setdefault("hooks", {})
     changed = False
-    for event, subcommand, matcher in _HOOK_SPECS:
+    for event, subcommand, extras in _HOOK_SPECS:
         entries = hooks.setdefault(event, [])
         if not isinstance(entries, list):
             result.warnings.append(f"{path}: '{event}' is not a list; skipped.")
             continue
         command = f"archrev hook {subcommand}"
-        desired: dict = {"command": command}
-        if matcher:
-            desired["matcher"] = matcher
+        desired: dict = {"command": command, **extras}
         existing = next(
             (
                 e

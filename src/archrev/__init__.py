@@ -6,4 +6,4 @@ rules at edit time via Cursor hooks, and renders the full chain as a live
 timeline that can be reviewed at any point in time.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
