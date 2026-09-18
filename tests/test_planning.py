@@ -38,6 +38,20 @@ def test_dotfile_paths_keep_their_leading_dot(repo: Path):
     assert not any(d.startswith("archrev/") for d in declared)
 
 
+def test_bare_toplevel_filenames_extracted_when_they_exist(repo: Path):
+    """Regression: 'Update README.md and pyproject.toml' in prose was not
+    extracted (no path separator), producing false out-of-plan drift."""
+    (repo / "README.md").write_text("# x\n", encoding="utf-8")
+    (repo / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    text = "Update README.md and bump the version in pyproject.toml."
+    declared = extract_declared_files(text, repo)
+    assert "README.md" in declared
+    assert "pyproject.toml" in declared
+    # Bare names that do NOT exist in the repo stay excluded (precision).
+    declared = extract_declared_files("See CHANGES.md for details.", repo)
+    assert "CHANGES.md" not in declared
+
+
 def test_register_and_check_plan(repo: Path):
     session = SessionStore(repo).session("s1")
     session.ensure_meta(None)

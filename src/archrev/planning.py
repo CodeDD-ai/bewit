@@ -34,6 +34,12 @@ _FENCE_CITATION_RE = re.compile(r"^\s*```\s*\d+:\d+:(.+?)\s*$", re.MULTILINE)
 _BARE_PATH_RE = re.compile(
     r"(?<![\w`(/.])((?:\./)?(?:[\w.-]+[/\\])+[\w.-]+\.\w{1,10})"
 )
+# Bare top-level filenames (README.md, pyproject.toml) carry no separator,
+# so _BARE_PATH_RE never sees them. They are collected as candidates and
+# kept ONLY when they exist in the repository (the existence check below),
+# preserving precision. Found via dogfooding: a plan declaring README.md
+# in prose was reported as out-of-plan drift by the final review.
+_BARE_NAME_RE = re.compile(r"(?<![\w`(/.])([\w-][\w.-]*\.\w{1,10})")
 _LINE_SUFFIX_RE = re.compile(r":\d+(?::\d+)?$")
 
 
@@ -62,7 +68,13 @@ def extract_declared_files(text: str, root: Path) -> list[str]:
     plus a file extension (a strong signal it is a concrete file path).
     """
     candidates: list[str] = []
-    for regex in (_BACKTICK_RE, _MDLINK_RE, _FENCE_CITATION_RE, _BARE_PATH_RE):
+    for regex in (
+        _BACKTICK_RE,
+        _MDLINK_RE,
+        _FENCE_CITATION_RE,
+        _BARE_PATH_RE,
+        _BARE_NAME_RE,
+    ):
         candidates.extend(regex.findall(text))
 
     seen: dict[str, None] = {}
