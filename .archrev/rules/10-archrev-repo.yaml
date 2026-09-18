@@ -1,5 +1,7 @@
 # Rules for the ArchRev repository itself (dogfooding).
 
+# --- Path rules -----------------------------------------------------------
+
 - id: flag-audit-format
   kind: path
   match: ["src/archrev/storage.py", "src/archrev/gitutil.py"]
@@ -8,11 +10,28 @@
     This file defines the on-disk audit format / git linkage. Changes must
     stay backward-compatible with existing session records.
 
+- id: flag-enforcement-core
+  kind: path
+  match: ["src/archrev/gate.py", "src/archrev/hooks.py", "src/archrev/config.py"]
+  action: flag
+  message: >-
+    Enforcement-core change (gate semantics, hook fail-open behavior,
+    exemptions). Requires regression tests in tests/test_gate.py or
+    tests/test_hooks.py.
+
 - id: block-packaging
   kind: path
   match: ["pyproject.toml"]
   action: block
   message: "Packaging/dependency changes require explicit approval."
+
+- id: block-license
+  kind: path
+  match: ["LICENSE"]
+  action: block
+  message: "License changes require explicit approval."
+
+# --- Prompt rules (attested via `archrev check plan`) -----------------------
 
 - id: hooks-fail-open
   kind: prompt
@@ -20,3 +39,16 @@
     Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py
     hook command) must preserve fail-open behavior: hooks may never raise,
     block the editor on internal errors, or break git commits.
+
+- id: audit-format-compat
+  kind: prompt
+  policy: >-
+    Changes to session file formats (events.jsonl, meta.json, manifest.json)
+    must remain readable for existing records and be reflected in the
+    README storage section.
+
+- id: tests-required
+  kind: prompt
+  policy: >-
+    New or changed behavior in globmatch, rules, gate, storage, planning,
+    drift, or trailer is covered by pytest before the session ends.
