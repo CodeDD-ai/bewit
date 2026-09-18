@@ -34,7 +34,7 @@ uv tool install archrev        # or: pipx install archrev
 
 # 2. Install into your repository (idempotent, merge-safe)
 cd your-repo
-archrev init
+archrev init             # add --shim uvx for zero-install team wiring (below)
 ```
 
 `archrev init` creates:
@@ -237,6 +237,7 @@ enforcement: on      # on | monitor (record, never stop) | off
 strict_plan_check: false
 protected_scan: true
 final_check: true    # notify the agent of open findings at session end
+prompt_capture: full # full | excerpt | none (see "Prompt privacy" below)
 ```
 
 With strict mode on, only a **passing** plan check unlocks edits — a check
@@ -307,6 +308,7 @@ archrev trace src/api/views.py   # which sessions touched this file?
 archrev trace 1a2b3c4d           # which session produced this commit?
 archrev rules                    # active rules + config + loading problems
 archrev check diff               # scan current git changes against rules (CI-ready)
+archrev index <paths...>         # cross-repo oversight metrics (read-only)
 ```
 
 **As a shareable artifact:**
@@ -320,6 +322,86 @@ works offline too.
 
 Every session directory also contains a durable `report.md`, regenerated at
 finalization — readable in any git UI, forever.
+
+## Team rollout — making adoption a no-brainer
+
+The design goal: **one person wires a repo once; everyone else just pulls.**
+Nothing to install per developer, nothing to start each morning, and the
+enforcement backstop lives in CI where adoption is not optional.
+
+### Zero-install wiring (`--shim uvx`)
+
+```powershell
+archrev init --shim uvx
+```
+
+Hook commands are written as `uvx archrev ...` instead of `archrev ...`.
+[uv](https://docs.astral.sh/uv/)'s tool runner fetches and caches ArchRev
+on first invocation, so teammates need **no ArchRev installation at all**
+— uv itself is the only prerequisite. Commit `.cursor/hooks.json`,
+`.archrev/`, and the rules once; from then on, onboarding a developer is
+`git pull`. Re-running `init` with a different `--shim` upgrades the
+existing wiring in place (never duplicates entries), so switching modes
+later is safe.
+
+### CI enforcement (`archrev ci gitlab`)
+
+```powershell
+archrev ci gitlab        # writes .gitlab/archrev-ci.yml
+```
+
+Generates a GitLab CI template with two merge-request jobs, then prints
+the `include:` snippet for your `.gitlab-ci.yml`:
+
+- **`archrev:rules`** (required): runs `archrev check diff` against the MR
+  target branch — path rules *and* `check`-rule quality gates over the
+  changed files — plus `archrev verify --all` so committed session logs
+  arrive with intact tamper-evidence chains. Fails the pipeline on
+  block-level findings.
+- **`archrev:mr-report`** (best-effort, `allow_failure`): resolves the
+  session behind the MR's head commit via its `ArchRev-Session:` trailer
+  and renders the markdown session report. With `ARCHREV_GITLAB_TOKEN`
+  set (project access token, `api` scope, masked variable) the report is
+  posted as an MR comment; without it, it lands in the job artifacts.
+
+This is the layer that needs zero developer adoption: even a laptop with
+hooks disabled cannot merge changes that violate block-level rules, and
+reviewers see the session provenance next to the diff.
+
+### Prompt privacy (`prompt_capture`)
+
+Prompts are the most sensitive artifact ArchRev stores — they may contain
+secrets, credentials, or half-formed reasoning nobody intended to commit.
+Before a team rollout, decide consciously what enters the (git-versioned)
+record via `.archrev/config.yaml`:
+
+| Mode | What is stored |
+| --- | --- |
+| `full` (default) | the whole prompt text — best provenance |
+| `excerpt` | first 200 characters plus total length |
+| `none` | no text; only length and a SHA-256 content hash |
+
+Even `none` keeps sessions traceable: the hash proves *which* prompt
+started a session if the text is later disclosed, without ArchRev ever
+storing it.
+
+### Cross-repo oversight (`archrev index`)
+
+```powershell
+archrev index E:\checkouts          # or several repo roots
+archrev index --json                # machine-readable, for dashboards
+```
+
+Pull-based by design: session records already travel with git, so
+org-level visibility is a *read* over whatever is checked out — no agents
+streaming telemetry, no server to run, nothing developers can forget to
+start. Per repository and in total, it reports: sessions and plan
+discipline (registered plans, passing checks), **drift rate** (out-of-plan
+share of touched files), gate pressure (pauses / denials / flags),
+**gate bypasses**, quality-check failures, acknowledgments, human-change
+events, and broken event chains. Rows with bypasses or chain breaks are
+highlighted. A lead reviews a team's repos with one command; a platform
+team feeds `--json` into whatever dashboard already exists.
 
 ## Storage format
 
@@ -341,7 +423,7 @@ forming the tamper-evidence chain (`archrev verify`); records from earlier
 versions remain readable and are reported as pre-chain legacy events. Because it all lives in git, provenance survives ArchRev
 itself: even without the tool, the record is plain text in your history.
 
-## Honest limitations (v0.2)
+## Honest limitations (v0.3)
 
 - Cursor-only capture (the hook adapters are thin; other agent runtimes with
   hook systems are a planned extension).
@@ -366,12 +448,17 @@ they land.
 - Central, versioned rule packs shared across repos rather than per-repo YAML.
 - ~~Tamper-evident event logs (hash-chained JSONL)~~ — shipped in v0.2
   (`archrev verify`).
-- A cross-repo index with the metrics that matter: drift rate,
-  gate-override rate, failed-attestation trends per team.
-- CI enforcement: `archrev check diff` as a required GitLab job; MR
-  descriptions auto-populated from session reports.
+- ~~A cross-repo index with the metrics that matter: drift rate,
+  gate-override rate, failed-attestation trends per team~~ — shipped in
+  v0.3 (`archrev index`); per-team trend lines over time still open.
+- ~~CI enforcement: `archrev check diff` as a required GitLab job; MR
+  descriptions auto-populated from session reports~~ — shipped in v0.3
+  (`archrev ci gitlab`).
 - A documented containment story (ArchRev policy + network-isolated
   containers) for the security review any rollout triggers.
+  (Related, shipped in v0.3 though not on the original list: zero-install
+  team wiring via `archrev init --shim uvx` and prompt-privacy controls
+  via `prompt_capture`.)
 
 **For an engineer (daily quality of life):**
 

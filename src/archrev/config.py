@@ -48,6 +48,11 @@ class Config:
             follow-up message when material findings exist (gate bypasses,
             failed plan checks, out-of-plan drift), so every implementation
             ends with an explicit rule review instead of a silent manifest.
+        prompt_capture: How much prompt text enters the record:
+            ``full`` (default), ``excerpt`` (first 200 chars + length), or
+            ``none`` (length + content hash only). Team rollouts should
+            decide this consciously — prompts are the most sensitive
+            artifact ArchRev stores.
         exempt: Glob patterns for paths the gate never blocks.
     """
 
@@ -55,6 +60,7 @@ class Config:
     strict_plan_check: bool = False
     protected_scan: bool = True
     final_check: bool = True
+    prompt_capture: str = "full"
     exempt: tuple[str, ...] = DEFAULT_EXEMPT
 
 
@@ -108,6 +114,10 @@ def load_config(root: Path) -> Config:
     if not isinstance(final_check, bool):
         final_check = defaults.final_check
 
+    prompt_capture = str(raw.get("prompt_capture", defaults.prompt_capture)).lower()
+    if prompt_capture not in ("full", "excerpt", "none"):
+        prompt_capture = defaults.prompt_capture
+
     exempt_raw = raw.get("exempt", None)
     if isinstance(exempt_raw, list) and all(isinstance(x, str) for x in exempt_raw):
         # User-provided exemptions extend (not replace) the built-in ones so
@@ -121,5 +131,6 @@ def load_config(root: Path) -> Config:
         strict_plan_check=strict,
         protected_scan=scan,
         final_check=final_check,
+        prompt_capture=prompt_capture,
         exempt=exempt,
     )

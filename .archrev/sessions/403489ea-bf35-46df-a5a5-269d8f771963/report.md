@@ -3,7 +3,7 @@
 - **Started:** 2026-09-18T10:41:40Z
 - **State:** finalized
 - **Areas:** .archrev, README.md, pyproject.toml, src, tests
-- **Drift:** planned 27 file(s), touched 24, 0 out-of-plan, 3 unrealized
+- **Drift:** planned 30 file(s), touched 27, 0 out-of-plan, 3 unrealized
 
 ## Prompts
 **2026-09-18T10:52:16Z**
@@ -63,32 +63,48 @@
 > If the rules could be implemented that way, that it does true quality checks as well / not sure if that truly works today. So for example, we said the a endpoint need some validation. Or that error handling needs to be in place in every function. Could this be implemented? 
 > How would the review process work for highly contextual rules? Would this make sense?
 
+**2026-09-18T12:51:29Z**
+
+> yes implement with the semgrep or eslint or other quality gates. that is good. 
+> Then letÂ´s review more the CTOs perspective and how this could be integrated into a team. 
+> Currently, it requires installation for each developer. Then, for the team lead or cto to see, we would need to push / stream the data that we are acquiring always directly with either the PR or via api. Not sure what would make sense here, specially from an applicability point of view - it is hard to confince all developers to use it, to start the service before they start developing every day, etc... 
+> How would you define the development / applicability in a team setting? What would be required to make this a no-brainer?
+
+**2026-09-18T13:03:35Z**
+
+> ArchRev final review found issues in this session:
+> - 3 file(s) touched but not declared in the plan: src/archrev/quality.py, tests/test_quality.py, .archrev/rules/10-archrev-repo.yaml
+> Review them with the user: confirm legitimate ones with `archrev ack <path|plan-check> --note "<reason>"` (audited, stops re-raising); revert unintended ones. See `archrev show` for the full record.
+
 ## Plan
 Registered. Declared files:
 
+- `src/archrev/quality.py`
 - `src/archrev/rules.py`
-- `src/archrev/gate.py`
-- `src/archrev/hooks.py`
-- `src/archrev/scaffold.py`
 - `src/archrev/cli.py`
-- `tests/test_boundaries.py`
-- `.archrev/rules/20-agent-boundaries.yaml`
-- `src/archrev/planning.py`
-- `tests/test_planning.py`
+- `src/archrev/hooks.py`
 - `src/archrev/drift.py`
-- `tests/test_hooks.py`
+- `src/archrev/report/render.py`
+- `src/archrev/report/template.html`
+- `src/archrev/scaffold.py`
+- `tests/test_quality.py`
+- `.archrev/rules/10-archrev-repo.yaml`
+- `src/archrev/gate.py`
+- `src/archrev/planning.py`
 - `src/archrev/storage.py`
 - `src/archrev/gitutil.py`
 - `src/archrev/trailer.py`
 - `src/archrev/config.py`
 - `src/archrev/report/server.py`
-- `src/archrev/report/render.py`
-- `src/archrev/report/template.html`
+- `tests/test_boundaries.py`
+- `tests/test_planning.py`
+- `tests/test_hooks.py`
 - `tests/test_storage.py`
 - `tests/test_trailer.py`
 - `tests/test_report.py`
 - `tests/test_gate.py`
 - `tests/test_finalize.py`
+- `.archrev/rules/20-agent-boundaries.yaml`
 - `src/archrev/__init__.py`
 - `.cursor/hooks.json`
 - `README.md`
@@ -136,17 +152,31 @@ Registered. Declared files:
 - PASS `audit-format-compat`: Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage sectio
 - PASS `tests-required`: New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.
 
+### Check at 2026-09-18T13:03:57Z - OK
+- gate preview `src/archrev/hooks.py`: **flag** (flag-enforcement-core)
+- gate preview `.archrev/rules/10-archrev-repo.yaml`: **block** (archrev-self-protection)
+- gate preview `src/archrev/gate.py`: **flag** (flag-enforcement-core)
+- gate preview `src/archrev/storage.py`: **flag** (flag-audit-format)
+- gate preview `src/archrev/gitutil.py`: **flag** (flag-audit-format)
+- gate preview `src/archrev/config.py`: **flag** (flag-enforcement-core)
+- gate preview `.archrev/rules/20-agent-boundaries.yaml`: **block** (archrev-self-protection)
+- gate preview `.cursor/hooks.json`: **block** (archrev-self-protection)
+- gate preview `pyproject.toml`: **block** (block-packaging)
+- PASS `hooks-fail-open`: Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on
+- PASS `audit-format-compat`: Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage sectio
+- PASS `tests-required`: New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.
+
 ## Files
 
 | File | LOC | Notes |
 | --- | --- | --- |
-| `src/archrev/cli.py` | +95/-9 | - |
-| `src/archrev/hooks.py` | +239/-25 | flag:flag-enforcement-core |
-| `src/archrev/rules.py` | +124/-39 | - |
+| `src/archrev/cli.py` | +143/-17 | - |
+| `src/archrev/hooks.py` | +262/-25 | flag:flag-enforcement-core |
+| `src/archrev/rules.py` | +169/-36 | - |
 | `src/archrev/gate.py` | +135/-38 | flag:flag-enforcement-core |
-| `src/archrev/scaffold.py` | +78/-17 | - |
-| `src/archrev/report/template.html` | +445/-88 | - |
-| `README.md` | +165/-16 | - |
+| `src/archrev/scaffold.py` | +100/-17 | - |
+| `src/archrev/report/template.html` | +464/-88 | - |
+| `README.md` | +194/-16 | - |
 | `tests/test_boundaries.py` | +144/-0 | - |
 | `.archrev/rules/20-agent-boundaries.yaml` | +27/-0 | block:archrev-self-protection |
 | `src/archrev/planning.py` | +30/-3 | - |
@@ -157,18 +187,21 @@ Registered. Declared files:
 | `src/archrev/storage.py` | +85/-3 | flag:flag-audit-format |
 | `src/archrev/gitutil.py` | +27/-0 | flag:flag-audit-format |
 | `src/archrev/trailer.py` | +60/-8 | - |
-| `src/archrev/drift.py` | +68/-12 | - |
+| `src/archrev/drift.py` | +70/-12 | - |
 | `src/archrev/report/server.py` | +58/-3 | - |
-| `src/archrev/report/render.py` | +67/-0 | - |
+| `src/archrev/report/render.py` | +94/-0 | - |
 | `tests/test_trailer.py` | +45/-2 | - |
 | `tests/test_storage.py` | +49/-1 | - |
 | `tests/test_report.py` | +48/-0 | - |
 | `tests/test_finalize.py` | +42/-0 | - |
-| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/events.jsonl` | +175/-0 | changed outside tracked edits |
-| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/manifest.json` | +2094/-0 | changed outside tracked edits |
+| `src/archrev/quality.py` | +101/-0 | - |
+| `tests/test_quality.py` | +149/-0 | - |
+| `.archrev/rules/10-archrev-repo.yaml` | +9/-0 | block:archrev-self-protection |
+| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/events.jsonl` | +215/-0 | changed outside tracked edits |
+| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/manifest.json` | +2425/-0 | changed outside tracked edits |
 | `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/meta.json` | +5/-0 | changed outside tracked edits |
 | `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/plan.md` | +1/-0 | changed outside tracked edits |
-| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/report.md` | +209/-0 | changed outside tracked edits |
+| `.archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/report.md` | +230/-0 | changed outside tracked edits |
 | `.archrev/sessions/unknown/events.jsonl` | +7/-0 | changed outside tracked edits |
 | `.archrev/sessions/unknown/manifest.json` | +162/-0 | changed outside tracked edits |
 | `.archrev/sessions/unknown/report.md` | +48/-0 | changed outside tracked edits |
@@ -183,6 +216,7 @@ Registered. Declared files:
 | `C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png` | — | written outside this repository |
 
 ## Protected paths changed
+- **block** `.archrev/rules/10-archrev-repo.yaml` (archrev-self-protection, via gate)
 - **block** `.archrev/rules/20-agent-boundaries.yaml` (archrev-self-protection, via gate)
 - **block** `.cursor/hooks.json` (archrev-self-protection, **bypassed gate** (shell/manual))
 - **block** `pyproject.toml` (block-packaging, via gate)
@@ -193,15 +227,20 @@ Registered. Declared files:
 - **flag** `src/archrev/storage.py` (flag-audit-format, via gate)
 
 ## Final review
-Clean - no material findings at session end.
+- 3 file(s) touched but not declared in the plan: src/archrev/quality.py, tests/test_quality.py, .archrev/rules/10-archrev-repo.yaml
+
+## Quality checks
+- 2026-09-18T13:03:34Z: `check-python-syntax` passed (22 file(s))
+- 2026-09-18T13:04:21Z: `check-python-syntax` passed (22 file(s))
 
 ## Acknowledged findings
 - 2026-09-18T12:16:14Z: `.cursor/hooks.json` — Rewired by archrev init (afterTabFileEdit + stop loop_limit); shell write, explicitly user-approved via approval card
 - 2026-09-18T12:16:14Z: `E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml` — Cross-repo rule file for CodeDD dogfooding; user-requested, cannot be declared in this repo's plan
 
-*Event log hash chain: intact, 113 event(s) verified.*
+*Event log hash chain: intact, 153 event(s) verified.*
 
 ## Commits
+- `76a7fccb7a` feat(rules): check rule kind - real quality gates via external analyzers
 - `2a8108a880` fix(drift): segregate paths outside the repository from plan drift
 - `0eac6386d2` feat(ui): review usability - plan revisions and progress, clickable drill-down chips, timeline paging, inline edit diffs, branch, human timestamps
 - `4c924612b6` feat(review): archrev ack - audited acknowledgment of final-review findings
@@ -212,4 +251,4 @@ Clean - no material findings at session end.
 - `867fe8f774` fix(planning): keep leading dot of dotfile paths in plan extraction
 - `447b72dbef` feat(rules): shell, read, mcp, and tool rule kinds with deny action
 
-*Generated by ArchRev at 2026-09-18T12:44:52Z*
+*Generated by ArchRev at 2026-09-18T13:04:21Z*

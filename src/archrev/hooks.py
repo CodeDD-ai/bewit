@@ -137,8 +137,23 @@ def _paths_from_tool_input(tool_input: object) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+#: Characters kept when ``prompt_capture: excerpt`` is configured.
+_PROMPT_EXCERPT_CHARS = 200
+
+
 def handle_prompt(root: Path, config: Config, payload: dict) -> dict:
-    """``beforeSubmitPrompt``: open the session and record the prompt."""
+    """``beforeSubmitPrompt``: open the session and record the prompt.
+
+    Prompts are the most privacy-sensitive artifact ArchRev stores (they
+    may contain secrets or half-formed thinking). ``prompt_capture`` in
+    config.yaml controls what is kept:
+
+    - ``full``    — the whole prompt text (default).
+    - ``excerpt`` — the first 200 characters plus the total length.
+    - ``none``    — no text at all; only length and a content hash, so the
+      event still proves *a* prompt started the session and can be matched
+      against a disclosed prompt later without ArchRev storing it.
+    """
     session = _ensure_session(root, payload, "prompt")
     text = ""
     for key in ("prompt", "text", "user_prompt"):
@@ -146,7 +161,19 @@ def handle_prompt(root: Path, config: Config, payload: dict) -> dict:
         if isinstance(value, str) and value:
             text = value
             break
-    session.append_event("prompt", text=text)
+    if config.prompt_capture == "none":
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        session.append_event(
+            "prompt", text="", chars=len(text), content_hash=digest,
+            capture="none",
+        )
+    elif config.prompt_capture == "excerpt":
+        session.append_event(
+            "prompt", text=text[:_PROMPT_EXCERPT_CHARS], chars=len(text),
+            capture="excerpt",
+        )
+    else:
+        session.append_event("prompt", text=text)
     return {}
 
 

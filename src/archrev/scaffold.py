@@ -11,6 +11,7 @@ printed instead).
 from __future__ import annotations
 
 import json
+import re
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,6 +39,14 @@ protected_scan: true
 # when material findings exist (gate bypasses, failed checks, out-of-plan
 # drift), so sessions never end silently with open rule violations.
 final_check: true
+
+# Prompt privacy - how much of the user's prompt text enters the record:
+#   full    - the whole prompt (default; best provenance)
+#   excerpt - first 200 characters plus total length
+#   none    - no text; only length and a content hash
+# Prompts are the most sensitive artifact ArchRev stores. Decide this
+# consciously before a team rollout.
+prompt_capture: full
 
 # Additional glob patterns the gate never blocks (extends built-in exemptions
 # for .archrev/sessions/** and *.plan.md). Note: ArchRev governance files
@@ -202,9 +211,19 @@ _SELF_PROTECTION_RULES = """\
 _GIT_HOOK = """\
 #!/bin/sh
 # ArchRev: link commits to agent sessions via trailers. Fails open by design.
-command -v archrev >/dev/null 2>&1 || exit 0
-archrev git-trailer "$1" 2>/dev/null || exit 0
+command -v {launcher} >/dev/null 2>&1 || exit 0
+{prefix}git-trailer "$1" 2>/dev/null || exit 0
 """
+
+#: Command prefixes per shim mode. "uvx" runs ArchRev through uv's tool
+#: runner, which auto-installs it on first use: hooks committed to the
+#: repository then work on every teammate's machine with zero setup
+#: (uv itself being the only prerequisite).
+_SHIM_PREFIX = {"none": "archrev ", "uvx": "uvx archrev "}
+
+#: Recognizes our own entries in hooks.json regardless of shim mode, so
+#: re-running init can upgrade between modes without duplicating entries.
+_OURS_RE = re.compile(r"\barchrev\s+(hook|git-trailer)\b")
 
 #: Hook events wired by init: (event, archrev subcommand, extra entry keys).
 #: preToolUse runs unmatched so `tool` rules can gate any tool; the handler
@@ -241,7 +260,7 @@ def _write_if_absent(path: Path, content: str, result: InitResult) -> None:
     result.created.append(rel)
 
 
-def _merge_hooks_json(path: Path, result: InitResult) -> None:
+def _merge_hooks_json(path: Path, result: InitResult, shim: str) -> None:
     """Add ArchRev entries to hooks.json, preserving everything else."""
     data: dict = {"version": 1, "hooks": {}}
     if path.exists():
@@ -263,14 +282,14 @@ def _merge_hooks_json(path: Path, result: InitResult) -> None:
         if not isinstance(entries, list):
             result.warnings.append(f"{path}: '{event}' is not a list; skipped.")
             continue
-        command = f"archrev hook {subcommand}"
+        command = f"{_SHIM_PREFIX[shim]}hook {subcommand}"
         desired: dict = {"command": command, **extras}
         existing = next(
             (
                 e
                 for e in entries
                 if isinstance(e, dict)
-                and str(e.get("command", "")).startswith("archrev hook")
+                and _OURS_RE.search(str(e.get("command", "")))
             ),
             None,
         )
@@ -295,7 +314,7 @@ def _merge_hooks_json(path: Path, result: InitResult) -> None:
         result.skipped.append(str(path))
 
 
-def _install_git_hook(root: Path, result: InitResult) -> None:
+def _install_git_hook(root: Path, result: InitResult, shim: str) -> None:
     git_dir = root / ".git"
     if not git_dir.is_dir():
         result.warnings.append(
@@ -303,28 +322,42 @@ def _install_git_hook(root: Path, result: InitResult) -> None:
             "Run `archrev init` again after `git init`."
         )
         return
+    prefix = _SHIM_PREFIX[shim]
+    content_desired = _GIT_HOOK.format(
+        launcher=prefix.split()[0], prefix=prefix
+    )
     hook_path = git_dir / "hooks" / "prepare-commit-msg"
     if hook_path.exists():
         content = hook_path.read_text(encoding="utf-8", errors="replace")
-        if "archrev" in content:
-            result.skipped.append(str(hook_path))
-        else:
+        if "archrev" not in content:
             result.warnings.append(
                 f"{hook_path} already exists and is not ArchRev's. Append this "
                 "line manually to keep commit linking:\n"
-                '  archrev git-trailer "$1" 2>/dev/null || true'
+                f'  {prefix}git-trailer "$1" 2>/dev/null || true'
             )
-        return
+            return
+        if content == content_desired:
+            result.skipped.append(str(hook_path))
+            return
+        # Ours but stale (e.g. shim mode changed): upgrade in place.
     hook_path.parent.mkdir(parents=True, exist_ok=True)
-    hook_path.write_text(_GIT_HOOK, encoding="utf-8", newline="\n")
+    hook_path.write_text(content_desired, encoding="utf-8", newline="\n")
     # Git-for-Windows runs hooks through sh and ignores the execute bit, but
     # POSIX systems need it.
     hook_path.chmod(hook_path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
     result.created.append(str(hook_path))
 
 
-def init_repo(root: Path) -> InitResult:
-    """Install ArchRev into ``root``; returns what was created/skipped."""
+def init_repo(root: Path, shim: str = "none") -> InitResult:
+    """Install ArchRev into ``root``; returns what was created/skipped.
+
+    ``shim="uvx"`` writes hook commands as ``uvx archrev ...`` so teammates
+    need no ArchRev installation at all — uv auto-installs it on first hook
+    invocation. The wiring is committed with the repository, making team
+    onboarding a plain ``git pull``.
+    """
+    if shim not in _SHIM_PREFIX:
+        raise ValueError(f"unknown shim {shim!r} (expected one of {list(_SHIM_PREFIX)})")
     result = InitResult()
     base = root / ARCHREV_DIRNAME
     _write_if_absent(base / "config.yaml", _CONFIG_TEMPLATE, result)
@@ -340,7 +373,7 @@ def init_repo(root: Path) -> InitResult:
         sessions_dir.mkdir(parents=True)
         (sessions_dir / ".gitkeep").write_text("", encoding="utf-8")
         result.created.append(str(sessions_dir))
-    _merge_hooks_json(root / ".cursor" / "hooks.json", result)
+    _merge_hooks_json(root / ".cursor" / "hooks.json", result, shim)
     _write_if_absent(root / ".cursor" / "rules" / "archrev.mdc", _AGENT_RULE, result)
-    _install_git_hook(root, result)
+    _install_git_hook(root, result, shim)
     return result

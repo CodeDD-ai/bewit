@@ -63,12 +63,21 @@ def main() -> None:
     default=None,
     help="Repository root to install into (default: current directory).",
 )
-def init(target: Path | None) -> None:
+@click.option(
+    "--shim",
+    type=click.Choice(["none", "uvx"]),
+    default="none",
+    show_default=True,
+    help="Command shim for hooks. 'uvx' writes hooks as `uvx archrev ...`, "
+    "which auto-installs ArchRev on first use: commit the wiring once and "
+    "every teammate is captured with zero setup (only uv required).",
+)
+def init(target: Path | None, shim: str) -> None:
     """Install ArchRev into a repository (idempotent, merge-safe)."""
     from archrev.scaffold import init_repo
 
     root = (target or Path.cwd()).resolve()
-    result = init_repo(root)
+    result = init_repo(root, shim=shim)
     for item in result.created:
         click.echo(f"  created  {item}")
     for item in result.skipped:
@@ -443,6 +452,108 @@ def trace(target: str) -> None:
         click.echo(f"  started: {meta.get('started_at', '?')}")
         click.echo(f"  prompt:  {excerpt}")
         click.echo(f"  review:  archrev show {session.id}")
+
+
+@main.group()
+def ci() -> None:
+    """Generate CI enforcement templates."""
+
+
+@ci.command(name="gitlab")
+@click.option(
+    "-o", "--output", type=click.Path(path_type=Path), default=None,
+    help="Output file (default: .gitlab/archrev-ci.yml).",
+)
+def ci_gitlab(output: Path | None) -> None:
+    """Write a GitLab CI template: rule + quality gate, chain verification,
+    and an optional MR comment with the session report.
+
+    CI enforcement needs zero developer adoption - the jobs run against
+    every merge request regardless of what is installed locally.
+    """
+    from archrev.ci import write_gitlab_template
+
+    root = _require_root()
+    target = write_gitlab_template(root, output)
+    click.echo(f"Written {target}")
+    try:
+        include = target.relative_to(root).as_posix()
+    except ValueError:
+        include = str(target)
+    click.echo("\nAdd to your .gitlab-ci.yml:")
+    click.echo(f"  include:\n    - local: {include}")
+    click.echo(
+        "\nOptional: set ARCHREV_GITLAB_TOKEN (project access token, api "
+        "scope) to post session reports as MR comments."
+    )
+
+
+@main.command()
+@click.argument(
+    "paths",
+    nargs=-1,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+)
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output.")
+def index(paths: tuple[Path, ...], as_json: bool) -> None:
+    """Aggregate oversight metrics across repositories (read-only).
+
+    PATHS are repository roots or parent directories of checkouts
+    (default: current directory). Pull-based by design: the session
+    records already travel with git, so this reads what is checked out -
+    no streaming, no telemetry, no server.
+    """
+    from dataclasses import asdict
+
+    from archrev.metrics import collect
+
+    targets = list(paths) or [Path.cwd()]
+    per_repo, total = collect(targets)
+    if not per_repo:
+        raise click.ClickException(
+            "No ArchRev repositories found (looked for .archrev in the "
+            "given paths and their immediate children)."
+        )
+    if as_json:
+        payload = {
+            "repos": [
+                {**asdict(m), "drift_rate": m.drift_rate} for m in per_repo
+            ],
+            "total": {**asdict(total), "drift_rate": total.drift_rate},
+        }
+        click.echo(json.dumps(payload, indent=2))
+        return
+
+    rows = per_repo + ([total] if len(per_repo) > 1 else [])
+    header = (
+        f"{'repository':<40} {'sess':>5} {'plan':>5} {'chk':>4} {'drift':>6} "
+        f"{'ask':>4} {'deny':>4} {'flag':>4} {'bypass':>6} {'qfail':>5} "
+        f"{'ack':>4} {'human':>5} {'chain!':>6}"
+    )
+    click.echo(header)
+    click.echo("-" * len(header))
+    for m in rows:
+        name = Path(m.repo).name if m.repo != "TOTAL" else "TOTAL"
+        drift = f"{m.drift_rate:.0%}" if m.drift_rate is not None else "-"
+        line = (
+            f"{name:<40} {m.sessions:>5} {m.with_plan:>5} "
+            f"{m.with_passing_check:>4} {drift:>6} {m.gate_asks:>4} "
+            f"{m.gate_denies:>4} {m.gate_flags:>4} {m.bypasses:>6} "
+            f"{m.quality_failures:>5} {m.acks:>4} {m.human_change_events:>5} "
+            f"{m.chain_breaks:>6}"
+        )
+        if m.chain_breaks or m.bypasses:
+            click.secho(line, fg="red")
+        elif m.drift_rate and m.drift_rate > 0.3:
+            click.secho(line, fg="yellow")
+        else:
+            click.echo(line)
+    click.echo(
+        "\nplan/chk = sessions with a registered plan / a passing check; "
+        "drift = out-of-plan share of touched files;\nbypass = protected "
+        "changes outside the gate; qfail = failed quality checks; "
+        "chain! = sessions with broken event chains."
+    )
 
 
 @main.command()
