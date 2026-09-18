@@ -53,6 +53,34 @@ def test_full_hook_lifecycle(in_repo: Path):
     assert (session.dir / "report.md").exists()
 
 
+def test_read_tools_not_gated_by_edit_rules(in_repo: Path):
+    """Regression: a Read of a protected path must not trigger edit rules
+    (observed live: Cursor's StrReplace pipeline reads the file first)."""
+    out = run_hook(
+        "gate",
+        _payload(
+            tool_name="Read",
+            tool_input={"file_path": "db/migrations/0001_init.sql"},
+        ),
+    )
+    assert out == {"permission": "allow"}
+    # The same path via an edit tool still gates.
+    out = run_hook(
+        "gate",
+        _payload(
+            tool_name="StrReplace",
+            tool_input={"file_path": "db/migrations/0001_init.sql"},
+        ),
+    )
+    assert out["permission"] == "ask"
+    # Unknown/empty tool names err toward protection.
+    out = run_hook(
+        "gate",
+        _payload(tool_name="", tool_input={"file_path": "db/migrations/0001_init.sql"}),
+    )
+    assert out["permission"] == "ask"
+
+
 def test_gate_without_paths_allows(in_repo: Path):
     out = run_hook("gate", _payload(tool_name="Shell", tool_input={"command": "ls"}))
     assert out == {"permission": "allow"}

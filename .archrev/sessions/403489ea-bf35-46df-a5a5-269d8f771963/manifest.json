@@ -1,0 +1,552 @@
+{
+  "id": "403489ea-bf35-46df-a5a5-269d8f771963",
+  "started_at": "2026-09-18T10:41:40Z",
+  "head_sha": "a976f5ee52629021afed37bd7247409bbe750589",
+  "finalized": true,
+  "generated_at": "2026-09-18T10:49:22Z",
+  "prompts": [],
+  "checks": [
+    {
+      "ts": "2026-09-18T10:47:48Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        "src/archrev/rules.py",
+        "src/archrev/gate.py",
+        "src/archrev/hooks.py",
+        "src/archrev/cli.py",
+        "src/archrev/scaffold.py",
+        "src/archrev/report/template.html",
+        "tests/test_boundaries.py",
+        "archrev/rules/20-agent-boundaries.yaml"
+      ],
+      "path_findings": [
+        {
+          "path": "src/archrev/gate.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": "src/archrev/hooks.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "BOM transport fix verified by regression test; 57/57 passing",
+      "ok": true,
+      "strict_mode": false
+    }
+  ],
+  "gate_events": [
+    {
+      "ts": "2026-09-18T10:41:43Z",
+      "type": "gate",
+      "tool": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:42:58Z",
+      "type": "gate",
+      "tool": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/gate.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/gate.py"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:43:16Z",
+      "type": "gate",
+      "tool": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/gate.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/gate.py"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:43:24Z",
+      "type": "gate",
+      "tool": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:43:25Z",
+      "type": "gate",
+      "tool": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:43:42Z",
+      "type": "gate",
+      "tool": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:43:43Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:46:05Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Read",
+      "permission": "ask",
+      "paths": [
+        ".archrev/rules/20-agent-boundaries.yaml"
+      ],
+      "hits": [
+        {
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "path": ".archrev/rules/20-agent-boundaries.yaml"
+        }
+      ]
+    },
+    {
+      "ts": "2026-09-18T10:46:06Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        ".archrev/rules/20-agent-boundaries.yaml"
+      ],
+      "hits": [
+        {
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "path": ".archrev/rules/20-agent-boundaries.yaml"
+        }
+      ]
+    }
+  ],
+  "edits": [
+    {
+      "ts": "2026-09-18T10:41:40Z",
+      "path": "src/archrev/cli.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:41:44Z",
+      "path": "src/archrev/hooks.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:42:03Z",
+      "path": "src/archrev/rules.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:42:21Z",
+      "path": "src/archrev/rules.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:42:40Z",
+      "path": "src/archrev/rules.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:42:58Z",
+      "path": "src/archrev/gate.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:43:17Z",
+      "path": "src/archrev/gate.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:43:24Z",
+      "path": "src/archrev/hooks.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:43:26Z",
+      "path": "src/archrev/hooks.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:43:43Z",
+      "path": "src/archrev/hooks.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:43:44Z",
+      "path": "src/archrev/hooks.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:43:54Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:44:00Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:44:10Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:44:21Z",
+      "path": "src/archrev/report/template.html",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:44:25Z",
+      "path": "src/archrev/cli.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:44:39Z",
+      "path": "README.md",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:44:42Z",
+      "path": "README.md",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:45:09Z",
+      "path": "tests/test_boundaries.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:46:07Z",
+      "path": ".archrev/rules/20-agent-boundaries.yaml",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:46:47Z",
+      "path": "E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:48:18Z",
+      "path": "src/archrev/planning.py",
+      "tool": ""
+    },
+    {
+      "ts": "2026-09-18T10:48:21Z",
+      "path": "tests/test_planning.py",
+      "tool": ""
+    }
+  ],
+  "files": [
+    {
+      "path": "src/archrev/cli.py",
+      "added": 28,
+      "removed": 8,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/hooks.py",
+      "added": 137,
+      "removed": 22,
+      "untracked": false,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag"
+        }
+      ]
+    },
+    {
+      "path": "src/archrev/rules.py",
+      "added": 124,
+      "removed": 39,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/gate.py",
+      "added": 135,
+      "removed": 38,
+      "untracked": false,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag"
+        }
+      ]
+    },
+    {
+      "path": "src/archrev/scaffold.py",
+      "added": 64,
+      "removed": 10,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/report/template.html",
+      "added": 7,
+      "removed": 3,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "README.md",
+      "added": 57,
+      "removed": 4,
+      "untracked": false,
+      "in_plan": false,
+      "rules": []
+    },
+    {
+      "path": "tests/test_boundaries.py",
+      "added": 144,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": ".archrev/rules/20-agent-boundaries.yaml",
+      "added": 27,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": false,
+      "rules": [
+        {
+          "rule_id": "archrev-self-protection",
+          "action": "block"
+        }
+      ]
+    },
+    {
+      "path": "E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml",
+      "added": null,
+      "removed": null,
+      "untracked": false,
+      "in_plan": false,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/planning.py",
+      "added": 5,
+      "removed": 1,
+      "untracked": false,
+      "in_plan": false,
+      "rules": []
+    },
+    {
+      "path": "tests/test_planning.py",
+      "added": 9,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": false,
+      "rules": []
+    }
+  ],
+  "other_changes": [
+    {
+      "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/events.jsonl",
+      "added": 37,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/meta.json",
+      "added": 5,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/plan.md",
+      "added": 1,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/unknown/events.jsonl",
+      "added": 7,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/unknown/manifest.json",
+      "added": 162,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/unknown/report.md",
+      "added": 48,
+      "removed": 0
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "added": 16,
+      "removed": 2
+    }
+  ],
+  "drift": {
+    "out_of_plan": [
+      "README.md",
+      ".archrev/rules/20-agent-boundaries.yaml",
+      "E:/CodeDD/.archrev/rules/30-agent-boundaries.yaml",
+      "src/archrev/planning.py",
+      "tests/test_planning.py"
+    ],
+    "unrealized": [
+      "archrev/rules/20-agent-boundaries.yaml"
+    ]
+  },
+  "protected_findings": [
+    {
+      "path": ".archrev/rules/20-agent-boundaries.yaml",
+      "rule_id": "archrev-self-protection",
+      "action": "block",
+      "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "rule_id": "archrev-self-protection",
+      "action": "block",
+      "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": false
+    },
+    {
+      "path": "src/archrev/gate.py",
+      "rule_id": "flag-enforcement-core",
+      "action": "flag",
+      "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py.",
+      "via_gate": true
+    },
+    {
+      "path": "src/archrev/hooks.py",
+      "rule_id": "flag-enforcement-core",
+      "action": "flag",
+      "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py.",
+      "via_gate": true
+    }
+  ],
+  "commits": [
+    {
+      "sha": "867fe8f77424625f626260b31eb4d94e94015a07",
+      "date": "2026-09-18 12:48:48 +0200",
+      "subject": "fix(planning): keep leading dot of dotfile paths in plan extraction"
+    },
+    {
+      "sha": "447b72dbef75f66f6ca341708a3909438c810c7c",
+      "date": "2026-09-18 12:47:03 +0200",
+      "subject": "feat(rules): shell, read, mcp, and tool rule kinds with deny action"
+    }
+  ],
+  "areas": [
+    ".archrev",
+    "E:",
+    "README.md",
+    "src",
+    "tests"
+  ],
+  "event_count": 37,
+  "plan": {
+    "registered": true,
+    "declared_files": [
+      "src/archrev/rules.py",
+      "src/archrev/gate.py",
+      "src/archrev/hooks.py",
+      "src/archrev/cli.py",
+      "src/archrev/scaffold.py",
+      "src/archrev/report/template.html",
+      "tests/test_boundaries.py",
+      "archrev/rules/20-agent-boundaries.yaml"
+    ]
+  },
+  "finalized_at": "2026-09-18T10:49:22Z"
+}

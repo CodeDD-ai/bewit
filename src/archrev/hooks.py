@@ -18,6 +18,7 @@ Robustness contract:
 from __future__ import annotations
 
 import json
+import re
 import traceback
 from pathlib import Path
 
@@ -34,6 +35,10 @@ from archrev.gate import (
 from archrev.gitutil import Git
 from archrev.rules import load_rules
 from archrev.storage import Session, SessionStore, utc_now_iso
+
+#: Tool names whose calls modify files and are therefore subject to path
+#: (edit) rules in the preToolUse gate.
+_EDIT_TOOL_RE = re.compile(r"write|edit|replace|patch|notebook", re.IGNORECASE)
 
 #: Keys under which Cursor tool inputs may carry file paths.
 _PATH_KEYS = (
@@ -205,6 +210,14 @@ def handle_gate(root: Path, config: Config, payload: dict) -> dict:
             _record_gate(session, decision, "tool", tool_name)
             if decision.permission != "allow":
                 return decision.to_hook_output()
+
+    # Path (edit) rules apply only to tools that MODIFY files. Read-style
+    # tools also carry file paths through preToolUse, but gating them here
+    # produced false "ask" prompts on plain reads (observed live); reads
+    # are governed by `read` rules via beforeReadFile instead. An empty
+    # tool name is treated as an edit, erring toward protection.
+    if tool_name and not _EDIT_TOOL_RE.search(tool_name):
+        return {"permission": "allow"}
 
     paths = _paths_from_tool_input(
         payload.get("tool_input") or payload.get("toolInput")
