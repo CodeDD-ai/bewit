@@ -157,12 +157,7 @@ _STARTER_RULES = """\
   enabled: false
 """
 
-_AGENT_RULE = """\
----
-alwaysApply: true
-description: ArchRev session provenance and architecture-rule compliance
----
-
+_AGENT_PROTOCOL = """\
 # ArchRev workflow (mandatory in this repository)
 
 This repository records agent sessions with ArchRev. Follow this protocol:
@@ -188,6 +183,16 @@ This repository records agent sessions with ArchRev. Follow this protocol:
 4. Never modify files under `.archrev/sessions/` - they are the audit record.
 """
 
+_AGENT_RULE = (
+    "---\n"
+    "alwaysApply: true\n"
+    "description: ArchRev session provenance and architecture-rule compliance\n"
+    "---\n\n"
+    + _AGENT_PROTOCOL
+)
+
+_AGENTS_MD = "# Agent instructions\n\n" + _AGENT_PROTOCOL
+
 _SELF_PROTECTION_RULES = """\
 # ArchRev self-protection (enabled by default - think twice before removing).
 #
@@ -202,6 +207,10 @@ _SELF_PROTECTION_RULES = """\
     - ".archrev/rules/**"
     - ".cursor/hooks.json"
     - ".cursor/rules/archrev.mdc"
+    - ".claude/settings.json"
+    - ".claude/rules/archrev.md"
+    - ".codex/hooks.json"
+    - "AGENTS.md"
   action: block
   message: >-
     ArchRev governance file - changing capture or enforcement configuration
@@ -223,7 +232,19 @@ _SHIM_PREFIX = {"none": "archrev ", "uvx": "uvx archrev "}
 
 #: Recognizes our own entries in hooks.json regardless of shim mode, so
 #: re-running init can upgrade between modes without duplicating entries.
-_OURS_RE = re.compile(r"\barchrev\s+(hook|git-trailer)\b")
+_OURS_RE = re.compile(r"\barchrev(\.exe)?\s+(hook|git-trailer)\b")
+
+#: Claude Code / Codex lifecycle events. One bare ``archrev hook`` command;
+#: the payload's ``hook_event_name`` selects the handler.
+_NATIVE_HOOK_SPECS: tuple[tuple[str, str | None, dict], ...] = (
+    ("UserPromptSubmit", None, {}),
+    ("PreToolUse", None, {}),
+    ("PostToolUse", "Edit|Write|NotebookEdit|apply_patch", {}),
+    ("Stop", None, {}),
+    ("SessionEnd", None, {"timeout": 60}),
+)
+
+SUPPORTED_RUNTIMES = ("cursor", "claude", "codex")
 
 #: Hook events wired by init: (event, archrev subcommand, extra entry keys).
 #: preToolUse runs unmatched so `tool` rules can gate any tool; the handler
@@ -348,16 +369,123 @@ def _install_git_hook(root: Path, result: InitResult, shim: str) -> None:
     result.created.append(str(hook_path))
 
 
-def init_repo(root: Path, shim: str = "none") -> InitResult:
+def _merge_native_hooks(
+    path: Path, result: InitResult, shim: str, *, kind: str
+) -> None:
+    """Merge ArchRev entries into Claude ``settings.json`` or Codex ``hooks.json``."""
+    if kind == "codex":
+        data: dict = {
+            "description": "ArchRev lifecycle hooks (trust with /hooks).",
+            "hooks": {},
+        }
+    else:
+        data = {"hooks": {}}
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                data = loaded
+        except (OSError, json.JSONDecodeError):
+            result.warnings.append(
+                f"{path}: existing file is not valid JSON; left untouched. "
+                "Add the ArchRev hooks manually (see README)."
+            )
+            return
+    hooks = data.setdefault("hooks", {})
+    if not isinstance(hooks, dict):
+        result.warnings.append(f"{path}: 'hooks' is not an object; skipped.")
+        return
+    command = f"{_SHIM_PREFIX[shim]}hook"
+    changed = False
+    for event, matcher, extras in _NATIVE_HOOK_SPECS:
+        groups = hooks.setdefault(event, [])
+        if not isinstance(groups, list):
+            result.warnings.append(f"{path}: '{event}' is not a list; skipped.")
+            continue
+        desired_hook: dict = {"type": "command", "command": command, **extras}
+        existing_group: dict | None = None
+        existing_hook: dict | None = None
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            inner = group.get("hooks")
+            if not isinstance(inner, list):
+                continue
+            for entry in inner:
+                if isinstance(entry, dict) and _OURS_RE.search(
+                    str(entry.get("command", ""))
+                ):
+                    existing_group = group
+                    existing_hook = entry
+                    break
+            if existing_hook is not None:
+                break
+        if existing_hook is None:
+            group = {"hooks": [desired_hook]}
+            if matcher:
+                group["matcher"] = matcher
+            groups.append(group)
+            changed = True
+            continue
+        if existing_hook != desired_hook:
+            existing_hook.clear()
+            existing_hook.update(desired_hook)
+            changed = True
+        if matcher and existing_group is not None:
+            if existing_group.get("matcher") != matcher:
+                existing_group["matcher"] = matcher
+                changed = True
+    if changed:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+        result.created.append(str(path))
+    else:
+        result.skipped.append(str(path))
+
+
+def _ensure_agents_md(root: Path, result: InitResult) -> None:
+    """Write AGENTS.md, or append the ArchRev protocol if it is missing."""
+    path = root / "AGENTS.md"
+    if not path.exists():
+        _write_if_absent(path, _AGENTS_MD, result)
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        result.warnings.append(f"{path}: could not read ({exc})")
+        return
+    if "ArchRev" in text:
+        result.skipped.append(str(path))
+        return
+    path.write_text(text.rstrip() + "\n\n" + _AGENT_PROTOCOL, encoding="utf-8", newline="\n")
+    result.created.append(str(path))
+
+
+def init_repo(
+    root: Path,
+    shim: str = "none",
+    runtimes: tuple[str, ...] | None = None,
+) -> InitResult:
     """Install ArchRev into ``root``; returns what was created/skipped.
 
     ``shim="uvx"`` writes hook commands as ``uvx archrev ...`` so teammates
     need no ArchRev installation at all — uv auto-installs it on first hook
     invocation. The wiring is committed with the repository, making team
     onboarding a plain ``git pull``.
+
+    ``runtimes`` defaults to cursor + claude + codex. Repeat ``init`` with a
+    subset to add or upgrade one runtime's wiring without touching others.
     """
     if shim not in _SHIM_PREFIX:
         raise ValueError(f"unknown shim {shim!r} (expected one of {list(_SHIM_PREFIX)})")
+    selected = runtimes or SUPPORTED_RUNTIMES
+    unknown = [r for r in selected if r not in SUPPORTED_RUNTIMES]
+    if unknown:
+        raise ValueError(f"unknown runtime(s) {unknown!r}")
     result = InitResult()
     base = root / ARCHREV_DIRNAME
     _write_if_absent(base / "config.yaml", _CONFIG_TEMPLATE, result)
@@ -373,7 +501,20 @@ def init_repo(root: Path, shim: str = "none") -> InitResult:
         sessions_dir.mkdir(parents=True)
         (sessions_dir / ".gitkeep").write_text("", encoding="utf-8")
         result.created.append(str(sessions_dir))
-    _merge_hooks_json(root / ".cursor" / "hooks.json", result, shim)
-    _write_if_absent(root / ".cursor" / "rules" / "archrev.mdc", _AGENT_RULE, result)
+    if "cursor" in selected:
+        _merge_hooks_json(root / ".cursor" / "hooks.json", result, shim)
+        _write_if_absent(root / ".cursor" / "rules" / "archrev.mdc", _AGENT_RULE, result)
+    if "claude" in selected:
+        _merge_native_hooks(
+            root / ".claude" / "settings.json", result, shim, kind="claude"
+        )
+        _write_if_absent(
+            root / ".claude" / "rules" / "archrev.md", _AGENT_PROTOCOL, result
+        )
+    if "codex" in selected:
+        _merge_native_hooks(
+            root / ".codex" / "hooks.json", result, shim, kind="codex"
+        )
+        _ensure_agents_md(root, result)
     _install_git_hook(root, result, shim)
     return result

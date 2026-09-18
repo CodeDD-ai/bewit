@@ -46,6 +46,8 @@ def render_text(view: dict) -> str:
     add(f"Session   {view['id']}")
     add(f"Started   {view.get('started_at') or 'unknown'}")
     add(f"State     {'finalized' if view.get('finalized') else 'live'}")
+    if view.get("runtime"):
+        add(f"Runtime   {view['runtime']}")
     if view.get("areas"):
         add(f"Areas     {', '.join(view['areas'])}")
     add("")
@@ -166,6 +168,8 @@ def render_markdown(view: dict) -> str:
     state = "finalized" if view.get("finalized") else "live"
     add(f"- **Started:** {view.get('started_at') or 'unknown'}")
     add(f"- **State:** {state}")
+    if view.get("runtime"):
+        add(f"- **Runtime:** {view['runtime']}")
     add(f"- **Areas:** {', '.join(view.get('areas', [])) or '-'}")
     add(f"- **Drift:** {_drift_line(view)}")
     add("")

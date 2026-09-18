@@ -102,8 +102,17 @@ class Session:
             self.dir / META_FILENAME
         ).exists()
 
-    def ensure_meta(self, head_sha: str | None, branch: str | None = None) -> dict:
-        """Write ``meta.json`` exactly once; return the (existing) meta."""
+    def ensure_meta(
+        self,
+        head_sha: str | None,
+        branch: str | None = None,
+        runtime: str | None = None,
+    ) -> dict:
+        """Write ``meta.json`` exactly once; return the (existing) meta.
+
+        ``runtime`` is optional and additive (``cursor`` / ``claude`` /
+        ``codex``). Older records without it remain valid.
+        """
         existing = self.meta()
         if existing is not None:
             return existing
@@ -113,6 +122,8 @@ class Session:
             "head_sha": head_sha,
             "branch": branch,
         }
+        if runtime:
+            meta["runtime"] = runtime
         _write_json(self.dir / META_FILENAME, meta)
         return meta
 

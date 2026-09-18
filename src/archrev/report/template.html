@@ -555,6 +555,7 @@ function renderSession(view) {
     <div class="meta-line">
       started <b>${esc(fmtTs(view.started_at))}</b> ·
       ${view.finalized ? "finalized" : "live"}
+      ${view.runtime ? ` · ${esc(view.runtime)}` : ""}
       ${view.branch ? ` · branch <b class="mono">${esc(view.branch)}</b>` : ""} ·
       base <span class="mono">${esc((view.head_sha || "").slice(0, 10) || "—")}</span> ·
       areas: ${esc((view.areas || []).join(", ") || "—")}

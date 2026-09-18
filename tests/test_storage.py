@@ -24,11 +24,12 @@ def test_corrupt_lines_skipped(tmp_path: Path):
     assert [e["type"] for e in session.events()] == ["prompt", "edit"]
 
 
-def test_meta_written_once(tmp_path: Path):
+def test_meta_records_runtime_once(tmp_path: Path):
     session = SessionStore(tmp_path).session("s")
-    first = session.ensure_meta("sha1")
-    second = session.ensure_meta("sha2")
+    first = session.ensure_meta("sha1", runtime="claude")
+    second = session.ensure_meta("sha2", runtime="codex")
     assert first == second
+    assert session.meta()["runtime"] == "claude"
     assert session.meta()["head_sha"] == "sha1"
 
 

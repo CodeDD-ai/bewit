@@ -14,8 +14,9 @@ to the session — so weeks later you can still answer: *which prompt and plan
 produced this line, was the plan checked against our rules, and did the
 implementation drift from it?*
 
-- **No daemon.** Cursor invokes ArchRev per event via hooks; each invocation
-  appends to an event log and exits. Nothing runs in the background.
+- **No daemon.** The agent runtime invokes ArchRev per event via hooks;
+  each invocation appends to an event log and exits. Nothing runs in the
+  background.
 - **No database.** Everything is plain JSON/JSONL/markdown under `.archrev/`,
   versioned with your code and reviewable in merge requests.
 - **Fails open.** A broken ArchRev never blocks your editor or your commits.
@@ -25,7 +26,9 @@ implementation drift from it?*
 
 ## Setup
 
-Requirements: Python 3.11+, git, [Cursor](https://cursor.com) (hooks support).
+Requirements: Python 3.11+, git, and at least one supported agent runtime
+([Cursor](https://cursor.com), [Claude Code](https://code.claude.com), or
+[Codex](https://developers.openai.com/codex)).
 
 ```powershell
 # 1. Install the CLI so it is on PATH (hooks and git invoke plain `archrev`)
@@ -34,7 +37,9 @@ uv tool install archrev        # or: pipx install archrev
 
 # 2. Install into your repository (idempotent, merge-safe)
 cd your-repo
-archrev init             # add --shim uvx for zero-install team wiring (below)
+archrev init             # wires Cursor + Claude Code + Codex
+# archrev init --runtime cursor          # one runtime only
+# archrev init --shim uvx                # zero-install team wiring (below)
 ```
 
 `archrev init` creates:
@@ -44,13 +49,49 @@ archrev init             # add --shim uvx for zero-install team wiring (below)
 | `.archrev/config.yaml` | enforcement mode, strict mode, exemptions |
 | `.archrev/rules/00-starter-rules.yaml` | disabled example rules to copy from |
 | `.archrev/sessions/` | one directory per agent session (the record) |
-| `.cursor/hooks.json` | wires Cursor events to `archrev hook ...` (merged, never overwritten) |
+| `.cursor/hooks.json` | Cursor events → `archrev hook <event>` (merged, never overwritten) |
 | `.cursor/rules/archrev.mdc` | instructs the agent to register and check its plan |
+| `.claude/settings.json` | Claude Code lifecycle hooks → `archrev hook` |
+| `.claude/rules/archrev.md` | same protocol, loaded by Claude Code |
+| `.codex/hooks.json` | Codex lifecycle hooks → `archrev hook` (must be trusted, see below) |
+| `AGENTS.md` | same protocol for Codex and other AGENTS.md readers |
 | `.git/hooks/prepare-commit-msg` | adds `ArchRev-Session:` trailers to commits |
 
-Cursor reloads hooks automatically; start an agent conversation and you will
-see `.archrev/sessions/<conversation-id>/` appear. Commit the `.archrev`
-directory — it is the audit record and is designed to be reviewed in MRs.
+Start an agent conversation and you will see
+`.archrev/sessions/<session-id>/` appear. Commit the `.archrev` directory —
+it is the audit record and is designed to be reviewed in MRs.
+
+## Agent runtimes (Cursor, Claude Code, Codex)
+
+Rules, session logs, plan checks, quality gates, git trailers, CI, and
+`archrev index` are runtime-agnostic. What differs is the **adapter**: how
+events are wired, how payloads are parsed, and how deny/ask/follow-up is
+returned.
+
+| Need | Cursor | Claude Code | Codex |
+| --- | --- | --- | --- |
+| Prompt | `beforeSubmitPrompt` | `UserPromptSubmit` | `UserPromptSubmit` |
+| Gate (path/tool/shell/read/MCP) | split events | one `PreToolUse` (fan-out by tool) | one `PreToolUse` |
+| Edit capture | `afterFileEdit` | `PostToolUse` (`Edit`/`Write`) | `PostToolUse` (`apply_patch`) |
+| Final review nag | `stop` → `followup_message` | `Stop` → `decision: block` | `Stop` → `decision: block` |
+| Durable finalize | (same `stop`) | `SessionEnd` | `SessionEnd` |
+| `block` rule | pause (`ask`) | pause (`ask`) | **deny** (Codex cannot ask; returning `ask` would fail-open) |
+| Human tab edits | `afterTabFileEdit` | git trailer only | git trailer only |
+
+`archrev hook` with no event argument reads `hook_event_name` from stdin, so
+Claude and Codex share one command. Cursor still uses explicit
+`archrev hook prompt|gate|...` for stable stdout shape.
+
+**Codex trust:** project hooks are skipped until each developer reviews
+them with `/hooks`. Committed `.codex/hooks.json` is not enough on its
+own — this is a Codex requirement, not an ArchRev one. Claude Code and
+Cursor load project hooks without that extra step.
+
+**Claude/Codex Stop vs SessionEnd:** `Stop` fires every turn, so ArchRev
+debounces it (no duplicate `session_stop` flood) and uses it only to nag
+about findings after material work. `SessionEnd` always writes the
+manifest and runs quality checks, including protected-path changes made
+via shell that never produced an edit event.
 
 ## How rules work
 
@@ -246,8 +287,8 @@ resolves them with you and re-checks.
 
 The gate exempts only `.archrev/sessions/**` (ArchRev's own bookkeeping)
 and `*.plan.md`. ArchRev's governance files — `.archrev/config.yaml`, the
-rules directory, `.cursor/hooks.json`, `.cursor/rules/archrev.mdc` — are
-deliberately *not* exempt: `archrev init` ships an enabled
+rules directory, Cursor/Claude/Codex hook wiring, and agent protocol files
+— are deliberately *not* exempt: `archrev init` ships an enabled
 `archrev-self-protection` rule that pauses any agent edit to them, so an
 agent cannot silently switch enforcement off.
 
@@ -338,9 +379,10 @@ archrev init --shim uvx
 Hook commands are written as `uvx archrev ...` instead of `archrev ...`.
 [uv](https://docs.astral.sh/uv/)'s tool runner fetches and caches ArchRev
 on first invocation, so teammates need **no ArchRev installation at all**
-— uv itself is the only prerequisite. Commit `.cursor/hooks.json`,
-`.archrev/`, and the rules once; from then on, onboarding a developer is
-`git pull`. Re-running `init` with a different `--shim` upgrades the
+— uv itself is the only prerequisite. Commit the hook wiring
+(`.cursor/`, `.claude/`, `.codex/`), `.archrev/`, and the rules once;
+from then on, onboarding a developer is `git pull` (Codex still needs
+`/hooks` trust per machine). Re-running `init` with a different `--shim` upgrades the
 existing wiring in place (never duplicates entries), so switching modes
 later is safe.
 
@@ -410,7 +452,7 @@ team feeds `--json` into whatever dashboard already exists.
   config.yaml
   rules/*.yaml
   sessions/<conversation-id>/
-    meta.json        session start: id, timestamp, git HEAD at start
+    meta.json        session start: id, timestamp, git HEAD, optional runtime
     events.jsonl     append-only event stream (the audit truth)
     plan.md          registered plan snapshot
     manifest.json    finalized summary: files, LOC, drift, verdicts, commits
@@ -423,14 +465,22 @@ forming the tamper-evidence chain (`archrev verify`); records from earlier
 versions remain readable and are reported as pre-chain legacy events. Because it all lives in git, provenance survives ArchRev
 itself: even without the tool, the record is plain text in your history.
 
-## Honest limitations (v0.3)
+## Honest limitations (v0.4)
 
-- Cursor-only capture (the hook adapters are thin; other agent runtimes with
-  hook systems are a planned extension).
+- Live capture requires a runtime with lifecycle hooks. Cursor, Claude
+  Code, and Codex are wired; Aider/Cline/Copilot Chat get the protocol
+  file plus CI, not in-editor gates.
+- Codex `block` rules are enforced as `deny` because Codex does not honor
+  `permissionDecision: ask` (returning ask fails the hook and allows the
+  tool). Claude Code and Cursor can still pause for approval.
+- Codex project hooks are skipped until trusted via `/hooks`.
 - Prompt-rule verdicts are agent self-attestations — recorded and surfaced,
   not independently verified.
-- `block` rules depend on Cursor's approval settings being visible (see the
-  approval caveat above); `deny` is the setting-independent hard stop.
+- `block` rules on Cursor still depend on approval settings being visible
+  (see the approval caveat above); `deny` is the setting-independent hard
+  stop.
+- Human tab-completion capture (`afterTabFileEdit`) is Cursor-only; on
+  Claude/Codex, human edits land in the commit-time `human` ledger.
 - Human hand-edits are captured at commit time (the `human` ledger), not
   live; between commits they appear in the finalize diff as `other changes`.
 - `plan register` / `check plan` bind to the most recently active session;
@@ -458,7 +508,8 @@ they land.
   containers) for the security review any rollout triggers.
   (Related, shipped in v0.3 though not on the original list: zero-install
   team wiring via `archrev init --shim uvx` and prompt-privacy controls
-  via `prompt_capture`.)
+  via `prompt_capture`. Shipped in v0.4: Claude Code and Codex hook
+  adapters — `archrev init --runtime claude|codex`.)
 
 **For an engineer (daily quality of life):**
 

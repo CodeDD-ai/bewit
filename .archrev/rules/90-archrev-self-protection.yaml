@@ -11,6 +11,10 @@
     - ".archrev/rules/**"
     - ".cursor/hooks.json"
     - ".cursor/rules/archrev.mdc"
+    - ".claude/settings.json"
+    - ".claude/rules/archrev.md"
+    - ".codex/hooks.json"
+    - "AGENTS.md"
   action: block
   message: >-
     ArchRev governance file - changing capture or enforcement configuration

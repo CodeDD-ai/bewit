@@ -1,9 +1,10 @@
-"""Cursor hook adapters.
+"""Hook adapters (Cursor, Claude Code, Codex).
 
-Cursor invokes ``archrev hook <event>`` as a short-lived process with a
-JSON payload on stdin; the process appends to the session log and exits.
-There is no daemon: capture is event-driven and always on once
-``.cursor/hooks.json`` is in place.
+Each runtime invokes ``archrev hook`` (Cursor: ``archrev hook <event>``;
+Claude/Codex: ``archrev hook`` with ``hook_event_name`` on stdin) as a
+short-lived process. The process appends to the session log and exits.
+There is no daemon: capture is event-driven once the runtime's hook
+wiring is in place.
 
 Robustness contract:
 
@@ -23,6 +24,19 @@ import re
 import traceback
 from pathlib import Path
 
+from archrev.adapters import (
+    detect_runtime,
+    fail_open_response,
+    is_mcp_tool,
+    is_read_tool,
+    is_shell_tool,
+    map_event,
+    merge_hook_outputs,
+    patch_paths,
+    promote_payload,
+    render_response,
+    tool_name_of,
+)
 from archrev.config import Config, archrev_dir, find_root, load_config
 from archrev.drift import compute_view
 from archrev.gate import (
@@ -64,10 +78,15 @@ def _session_id(payload: dict) -> str:
 
 
 def _payload_root(payload: dict) -> Path | None:
-    """Resolve the repository root: cwd first, then workspace hints."""
+    """Resolve the repository root: process cwd, then payload hints."""
     root = find_root()
     if root is not None:
         return root
+    cwd = payload.get("cwd")
+    if isinstance(cwd, str) and cwd.strip():
+        found = find_root(Path(cwd.strip()))
+        if found is not None:
+            return found
     roots = payload.get("workspace_roots") or payload.get("workspaceRoots")
     if isinstance(roots, list):
         for candidate in roots:
@@ -96,11 +115,17 @@ def _trim_payload(value: object, depth: int = 0) -> object:
     return repr(value)[:200]
 
 
-def _ensure_session(root: Path, payload: dict, hook_event: str) -> Session:
+def _ensure_session(
+    root: Path, payload: dict, hook_event: str, runtime: str | None = None
+) -> Session:
     store = SessionStore(root)
     session = store.session(_session_id(payload))
     git = Git(root)
-    session.ensure_meta(git.head_sha(), branch=git.branch())
+    session.ensure_meta(
+        git.head_sha(),
+        branch=git.branch(),
+        runtime=runtime or detect_runtime(payload),
+    )
     if session.id == "unknown" and payload:
         # Field-name drift diagnostics: Cursor's payload schema is not under
         # our control. When the conversation id cannot be found, record what
@@ -129,6 +154,15 @@ def _paths_from_tool_input(tool_input: object) -> list[str]:
                     value = entry.get(key)
                     if isinstance(value, str) and value.strip():
                         found.setdefault(value.strip(), None)
+    extra = tool_input.get("paths")
+    if isinstance(extra, list):
+        for item in extra:
+            if isinstance(item, str) and item.strip():
+                found.setdefault(item.strip(), None)
+    command = tool_input.get("command")
+    if isinstance(command, str):
+        for path in patch_paths(command):
+            found.setdefault(path, None)
     return list(found)
 
 
@@ -178,15 +212,18 @@ def handle_prompt(root: Path, config: Config, payload: dict) -> dict:
 
 
 def handle_edit(root: Path, config: Config, payload: dict) -> dict:
-    """``afterFileEdit``: record one tracked agent edit."""
+    """``afterFileEdit`` / ``PostToolUse``: record tracked agent edits."""
     session = _ensure_session(root, payload, "edit")
-    raw_path = ""
+    paths: dict[str, None] = {}
     for key in _PATH_KEYS:
         value = payload.get(key)
         if isinstance(value, str) and value:
-            raw_path = value
-            break
-    if not raw_path:
+            paths.setdefault(value, None)
+    for item in _paths_from_tool_input(
+        payload.get("tool_input") or payload.get("toolInput")
+    ):
+        paths.setdefault(item, None)
+    if not paths:
         # An edit we could not attribute to a file is a capture gap; keep
         # the evidence so the parser can be fixed from real payloads.
         session.append_event(
@@ -201,13 +238,15 @@ def handle_edit(root: Path, config: Config, payload: dict) -> dict:
     )
     tool = str(payload.get("tool_name") or payload.get("tool") or "")
     origin = "tab" if "tab" in (event_name + tool).lower() else "agent"
-    session.append_event(
-        "edit",
-        path=relativize(raw_path, root),
-        tool=tool,
-        origin=origin,
-        edit_count=len(edits) if isinstance(edits, list) else None,
-    )
+    count = len(edits) if isinstance(edits, list) else None
+    for raw_path in paths:
+        session.append_event(
+            "edit",
+            path=relativize(raw_path, root),
+            tool=tool,
+            origin=origin,
+            edit_count=count,
+        )
     return {}
 
 
@@ -389,24 +428,72 @@ def _final_findings(view: dict) -> list[str]:
     return findings
 
 
-def handle_finalize(root: Path, config: Config, payload: dict) -> dict:
-    """``stop``: write manifest + report, then run the final rule review.
+def handle_finalize(
+    root: Path,
+    config: Config,
+    payload: dict,
+    *,
+    notify: bool = True,
+    quality: str = "always",
+) -> dict:
+    """Write manifest + report, then optionally run the final rule review.
 
-    When material findings exist (gate bypasses, failed checks, drift) and
-    ``final_check`` is enabled, the agent receives a follow-up message so
-    every implementation ends with an explicit review instead of a silent
-    manifest. A findings fingerprint prevents follow-up loops: the same
-    findings are raised at most once.
+    ``notify``: when false (Claude/Codex ``SessionEnd``), findings are
+    recorded but no follow-up is returned — those events cannot continue
+    the agent.
+
+    ``quality``: ``always`` runs check-rules every time (Cursor ``stop``);
+    ``if_new_edits`` skips them when nothing has been edited since the
+    last quality run (Claude/Codex ``Stop`` fires every turn).
     """
     session = _ensure_session(root, payload, "finalize")
+    if quality == "if_new_edits":
+        # Claude/Codex Stop fires every turn. Skip a full finalize when
+        # nothing material has happened since the last one, so the log is
+        # not flooded with session_stop events. SessionEnd still always
+        # runs (quality="always") and catches shell-only bypasses.
+        events = session.events()
+        last_final_i = max(
+            (i for i, e in enumerate(events) if e.get("type") == "final_check"),
+            default=-1,
+        )
+        last_material_i = max(
+            (
+                i
+                for i, e in enumerate(events)
+                if e.get("type")
+                in (
+                    "edit",
+                    "gate",
+                    "prompt",
+                    "ack",
+                    "plan_registered",
+                    "plan_check",
+                )
+            ),
+            default=-1,
+        )
+        if last_final_i > last_material_i:
+            return {}
     session.append_event(
-        "session_stop", status=str(payload.get("status") or "")
+        "session_stop", status=str(payload.get("status") or payload.get("reason") or "")
     )
     ruleset = load_rules(root)
 
-    # Quality gates run before the view is computed so their verdicts land
-    # in this finalization's manifest/report, not the next one's.
-    if ruleset.check_rules:
+    run_quality = bool(ruleset.check_rules)
+    if run_quality and quality == "if_new_edits":
+        events = session.events()
+        last_edit = max(
+            (i for i, e in enumerate(events) if e.get("type") == "edit"),
+            default=-1,
+        )
+        last_quality = max(
+            (i for i, e in enumerate(events) if e.get("type") == "quality_check"),
+            default=-1,
+        )
+        run_quality = last_edit > last_quality
+
+    if run_quality:
         from archrev.drift import _is_outside_repo
         from archrev.quality import run_checks
 
@@ -428,14 +515,14 @@ def handle_finalize(root: Path, config: Config, payload: dict) -> dict:
     ).hexdigest()[:16]
     previous = session.last_event("final_check")
     already_raised = bool(previous) and previous.get("fingerprint") == fingerprint
-    notify = bool(findings) and config.final_check and not already_raised
+    should_notify = bool(findings) and config.final_check and notify and not already_raised
     session.append_event(
         "final_check",
         findings=findings,
         fingerprint=fingerprint,
-        notified=notify,
+        notified=should_notify,
     )
-    if notify:
+    if should_notify:
         return {
             "followup_message": (
                 "ArchRev final review found issues in this session:\n- "
@@ -460,6 +547,44 @@ _HANDLERS = {
 }
 
 
+def handle_pretool(root: Path, config: Config, payload: dict) -> dict:
+    """Claude/Codex ``PreToolUse``: one event covers tool, path, shell, read, MCP."""
+    payload = promote_payload(payload)
+    outputs = [handle_gate(root, config, payload)]
+    name = tool_name_of(payload)
+    if is_shell_tool(name):
+        outputs.append(handle_shell(root, config, payload))
+    if is_read_tool(name):
+        outputs.append(handle_read(root, config, payload))
+    if is_mcp_tool(name):
+        outputs.append(handle_mcp(root, config, payload))
+    return merge_hook_outputs(outputs)
+
+
+def _dispatch(
+    action: str, root: Path, config: Config, payload: dict
+) -> dict:
+    """Run one canonical action. ``payload`` is already parsed."""
+    if action == "pretool":
+        return handle_pretool(root, config, payload)
+    if action == "stop":
+        return handle_finalize(
+            root, config, payload, notify=True, quality="if_new_edits"
+        )
+    if action == "session_end":
+        return handle_finalize(
+            root, config, payload, notify=False, quality="always"
+        )
+    if action == "edit":
+        return handle_edit(root, config, promote_payload(payload))
+    if action in ("gate", "shell", "read", "mcp"):
+        return _HANDLERS[action](root, config, promote_payload(payload))
+    handler = _HANDLERS.get(action)
+    if handler is None:
+        return {}
+    return handler(root, config, payload)
+
+
 def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
     """Best-effort error trail; failures here are swallowed by design."""
     try:
@@ -479,6 +604,10 @@ def _log_hook_error(root: Path | None, event: str, exc: BaseException) -> None:
 def run_hook(event: str, stdin_text: str) -> dict:
     """Dispatch one hook event; guaranteed not to raise.
 
+    ``event`` is a canonical name (``prompt``, ``gate``, ...) when Cursor
+    wires ``archrev hook <event>``, or ``auto`` when Claude/Codex wire a
+    bare ``archrev hook`` and the payload carries ``hook_event_name``.
+
     Returns the JSON-serializable response for stdout. The gate fails open
     (``allow``) on internal errors — protection degrading is preferable to
     an editor that cannot save files; the error log and timeline keep the
@@ -487,6 +616,8 @@ def run_hook(event: str, stdin_text: str) -> dict:
     root: Path | None = None
     payload: dict = {}
     parse_failed = False
+    runtime = "cursor"
+    action = event or "auto"
     text = stdin_text.strip()
     # Defense in depth against transport artifacts (BOMs, stray prefix
     # bytes): if direct parsing fails, retry from the first '{'.
@@ -505,32 +636,51 @@ def run_hook(event: str, stdin_text: str) -> dict:
         parse_failed = True
     try:
         root = _payload_root(payload)
+        auto = action in ("auto", "")
+        if payload:
+            runtime = detect_runtime(payload)
+        if auto:
+            mapped = map_event(
+                str(
+                    payload.get("hook_event_name")
+                    or payload.get("hookEventName")
+                    or ""
+                )
+            )
+            if mapped is None:
+                return {}
+            action = mapped
+        else:
+            # Explicit CLI event: Cursor-shaped stdout, even if the payload
+            # happens to carry a native hook_event_name (keeps existing
+            # tests and Cursor wiring stable).
+            runtime = "cursor"
         if root is None:
-            return {"permission": "allow"} if event == "gate" else {}
+            return fail_open_response(runtime, action)
         if parse_failed or not payload:
             # The payload was empty or not a JSON object: record the raw
             # stdin head so the transport problem is diagnosable from the
             # session record alone.
             SessionStore(root).session("unknown").append_event(
                 "payload_debug",
-                hook=event,
+                hook=action,
                 stdin_len=len(stdin_text),
                 stdin_head=stdin_text[:400],
             )
         config = load_config(root)
-        handler = _HANDLERS.get(event)
-        if handler is None:
-            return {}
-        return handler(root, config, payload)
-    except Exception as exc:  # noqa: BLE001 — hooks must never crash Cursor
-        _log_hook_error(root, event, exc)
+        result = _dispatch(action, root, config, payload)
+        if auto:
+            return render_response(runtime, action, result, payload)
+        return result
+    except Exception as exc:  # noqa: BLE001 — hooks must never crash the editor
+        _log_hook_error(root, action, exc)
         try:
             if root is not None:
                 # Attribute the failure to the real session when the id is
                 # known, so degradation shows up in that session's timeline.
                 SessionStore(root).session(_session_id(payload)).append_event(
-                    "hook_error", event=event, error=repr(exc)
+                    "hook_error", event=action, error=repr(exc)
                 )
         except Exception:  # noqa: BLE001
             pass
-        return {"permission": "allow"} if event == "gate" else {}
+        return fail_open_response(runtime, action)

@@ -2,7 +2,7 @@
 
 Two audiences share this CLI:
 
-- **Cursor** invokes ``archrev hook <event>`` (wired by ``archrev init``)
+- **Agent runtimes** invoke ``archrev hook`` (Cursor, Claude Code, Codex)
   and git invokes ``archrev git-trailer`` — the always-on capture path.
 - **Humans and agents** use everything else: ``plan register`` and
   ``check plan`` during a session, ``sessions`` / ``show`` / ``trace`` /
@@ -72,12 +72,21 @@ def main() -> None:
     "which auto-installs ArchRev on first use: commit the wiring once and "
     "every teammate is captured with zero setup (only uv required).",
 )
-def init(target: Path | None, shim: str) -> None:
+@click.option(
+    "--runtime",
+    "runtimes",
+    multiple=True,
+    type=click.Choice(["cursor", "claude", "codex"]),
+    help="Agent runtime to wire (repeatable). Default: cursor, claude, and "
+    "codex. Use --runtime cursor to install only Cursor wiring.",
+)
+def init(target: Path | None, shim: str, runtimes: tuple[str, ...]) -> None:
     """Install ArchRev into a repository (idempotent, merge-safe)."""
     from archrev.scaffold import init_repo
 
     root = (target or Path.cwd()).resolve()
-    result = init_repo(root, shim=shim)
+    selected = runtimes or ("cursor", "claude", "codex")
+    result = init_repo(root, shim=shim, runtimes=selected)
     for item in result.created:
         click.echo(f"  created  {item}")
     for item in result.skipped:
@@ -85,23 +94,35 @@ def init(target: Path | None, shim: str) -> None:
     for warning in result.warnings:
         click.secho(f"  warning  {warning}", fg="yellow")
     click.echo(
-        "\nArchRev is installed. Cursor reloads hooks automatically; "
-        "start an agent session and run `archrev serve` to watch it live."
+        "\nArchRev is installed. Runtimes wired: " + ", ".join(selected) + "."
     )
+    if "cursor" in selected:
+        click.echo("  Cursor reloads hooks automatically.")
+    if "claude" in selected:
+        click.echo("  Claude Code loads .claude/settings.json for this project.")
+    if "codex" in selected:
+        click.echo(
+            "  Codex: run /hooks and trust the ArchRev commands before they fire."
+        )
+    click.echo("Start an agent session and run `archrev serve` to watch it live.")
 
 
 @main.command()
 @click.argument(
     "event",
+    required=False,
+    default="auto",
     type=click.Choice(
-        ["prompt", "edit", "gate", "shell", "read", "mcp", "finalize"]
+        ["auto", "prompt", "edit", "gate", "shell", "read", "mcp", "finalize"]
     ),
 )
 def hook(event: str) -> None:
-    """Cursor hook adapter (reads the event payload from stdin).
+    """Hook adapter (reads the event payload from stdin).
 
-    Not intended for manual use. Never fails: on internal errors it logs to
-    .archrev/hook-errors.log and answers permissively.
+    Cursor wires ``archrev hook <event>``. Claude Code and Codex wire a
+    bare ``archrev hook``; the payload's ``hook_event_name`` selects the
+    handler. Not intended for manual use. Never fails: on internal errors
+    it logs to .archrev/hook-errors.log and answers permissively.
     """
     from archrev.hooks import run_hook
 

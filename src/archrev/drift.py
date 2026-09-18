@@ -197,6 +197,7 @@ def compute_view(
         "generated_at": utc_now_iso(),
         "prompts": prompts,
         "branch": meta.get("branch") or (git.branch() if git.is_repo() else None),
+        "runtime": meta.get("runtime") or None,
         "plan": {
             "registered": plan_registered,
             "declared_files": declared,

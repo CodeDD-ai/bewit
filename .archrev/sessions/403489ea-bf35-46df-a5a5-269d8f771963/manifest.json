@@ -3,7 +3,7 @@
   "started_at": "2026-09-18T10:41:40Z",
   "head_sha": "a976f5ee52629021afed37bd7247409bbe750589",
   "finalized": true,
-  "generated_at": "2026-09-18T13:04:21Z",
+  "generated_at": "2026-09-18T14:21:45Z",
   "prompts": [
     {
       "ts": "2026-09-18T10:52:16Z",
@@ -40,9 +40,22 @@
     {
       "ts": "2026-09-18T13:03:35Z",
       "text": "ArchRev final review found issues in this session:\n- 3 file(s) touched but not declared in the plan: src/archrev/quality.py, tests/test_quality.py, .archrev/rules/10-archrev-repo.yaml\nReview them with the user: confirm legitimate ones with `archrev ack <path|plan-check> --note \"<reason>\"` (audited, stops re-raising); revert unintended ones. See `archrev show` for the full record."
+    },
+    {
+      "ts": "2026-09-18T13:09:37Z",
+      "text": "Build all of this and write on readme.md \nThe pieces I'd build next for this, in order: the uvx-shim option in init, a GitLab CI template (check diff + verify + MR comment), the prompt-privacy config, and then the pull-based archrev index for the CTO metrics. Say which to start with and I'll build it.\n\n"
+    },
+    {
+      "ts": "2026-09-18T13:28:13Z",
+      "text": "what do we need to do to make it also claude + other coding agents compatible? "
+    },
+    {
+      "ts": "2026-09-18T14:03:15Z",
+      "text": "yes build claude and codex"
     }
   ],
   "branch": "master",
+  "runtime": null,
   "checks": [
     {
       "ts": "2026-09-18T10:47:48Z",
@@ -487,6 +500,355 @@
       "strict_mode": false,
       "prev": "b276fc27264bfca35ae1930fe040bbb877a79094b88a7ea53db9dd34c6c0a11f",
       "hash": "7974d7f7d70fe4a385c0e6b640a37f4348845708f1e5dc85bb8f4e92c42dca6a"
+    },
+    {
+      "ts": "2026-09-18T13:11:04Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        "src/archrev/scaffold.py",
+        "src/archrev/cli.py",
+        "src/archrev/ci.py",
+        "src/archrev/config.py",
+        "src/archrev/hooks.py",
+        "src/archrev/metrics.py",
+        "src/archrev/__init__.py",
+        "tests/test_team.py",
+        "tests/test_hooks.py",
+        "README.md",
+        "pyproject.toml"
+      ],
+      "path_findings": [
+        {
+          "path": "src/archrev/config.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": "src/archrev/hooks.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": "pyproject.toml",
+          "rule_id": "block-packaging",
+          "action": "block",
+          "message": "Packaging/dependency changes require explicit approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "batch 5 registered pre-implementation; attestations to be honored during the batch",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "789f671ce1ad4ced7c62f82b8dfc0898d23a96ed3531b884a15c04e67441432c",
+      "hash": "d1d020e3319c131e61203dccee6d36413a0aec250085804125ac992eee1f0def"
+    },
+    {
+      "ts": "2026-09-18T13:19:43Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        "src/archrev/rules.py",
+        "src/archrev/gate.py",
+        "src/archrev/storage.py",
+        "src/archrev/planning.py",
+        "src/archrev/drift.py",
+        "src/archrev/hooks.py",
+        "src/archrev/gitutil.py",
+        "src/archrev/trailer.py",
+        "src/archrev/config.py",
+        "src/archrev/cli.py",
+        "src/archrev/scaffold.py",
+        "src/archrev/quality.py",
+        "src/archrev/ci.py",
+        "src/archrev/metrics.py",
+        "src/archrev/report/render.py",
+        "src/archrev/report/server.py",
+        "src/archrev/report/template.html",
+        "tests/test_boundaries.py",
+        "tests/test_finalize.py",
+        "tests/test_hooks.py",
+        "tests/test_planning.py",
+        "tests/test_quality.py",
+        "tests/test_report.py",
+        "tests/test_storage.py",
+        "tests/test_team.py",
+        "tests/test_trailer.py",
+        "src/archrev/__init__.py",
+        ".archrev/rules/10-archrev-repo.yaml",
+        ".archrev/rules/20-agent-boundaries.yaml",
+        ".cursor/hooks.json",
+        "README.md",
+        "pyproject.toml"
+      ],
+      "path_findings": [
+        {
+          "path": "src/archrev/gate.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": "src/archrev/storage.py",
+          "rule_id": "flag-audit-format",
+          "action": "flag",
+          "message": "This file defines the on-disk audit format / git linkage. Changes must stay backward-compatible with existing session records."
+        },
+        {
+          "path": "src/archrev/hooks.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": "src/archrev/gitutil.py",
+          "rule_id": "flag-audit-format",
+          "action": "flag",
+          "message": "This file defines the on-disk audit format / git linkage. Changes must stay backward-compatible with existing session records."
+        },
+        {
+          "path": "src/archrev/config.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": ".archrev/rules/10-archrev-repo.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/20-agent-boundaries.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".cursor/hooks.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "pyproject.toml",
+          "rule_id": "block-packaging",
+          "action": "block",
+          "message": "Packaging/dependency changes require explicit approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "cumulative re-registration; all new behavior covered in tests/test_team.py, suite green (91 passed)",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "5634dd5e57d3ae92443fae694ae2cb78ce82f74fd1ec81b71bcfedee616beabd",
+      "hash": "0e827b3d5c23d29f2e3f6d3b3472ffe1cb681ec27a5f5785891064be6c3aa3d3"
+    },
+    {
+      "ts": "2026-09-18T14:08:19Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        "src/archrev/adapters.py",
+        "src/archrev/hooks.py",
+        "src/archrev/storage.py",
+        "src/archrev/cli.py",
+        "src/archrev/scaffold.py",
+        "src/archrev/drift.py",
+        "src/archrev/report/render.py",
+        ".archrev/rules/90-archrev-self-protection.yaml",
+        "tests/test_adapters.py",
+        "tests/test_team.py",
+        "tests/test_hooks.py",
+        "src/archrev/__init__.py",
+        "README.md",
+        "pyproject.toml"
+      ],
+      "path_findings": [
+        {
+          "path": "src/archrev/hooks.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": "src/archrev/storage.py",
+          "rule_id": "flag-audit-format",
+          "action": "flag",
+          "message": "This file defines the on-disk audit format / git linkage. Changes must stay backward-compatible with existing session records."
+        },
+        {
+          "path": ".archrev/rules/90-archrev-self-protection.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "pyproject.toml",
+          "rule_id": "block-packaging",
+          "action": "block",
+          "message": "Packaging/dependency changes require explicit approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "Claude/Codex adapters: handlers still fail-open; meta.json gains optional runtime field (old records remain readable); tests in tests/test_adapters.py plus hook/team updates",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "650187f7908584b35a72391ef9a58d6129a8a77f97839512d77f65cc1d178ba9",
+      "hash": "93efad08d0ca488f6dae374dc3b15a6bda118093171c8f28236cdea78c3e5913"
+    },
+    {
+      "ts": "2026-09-18T14:21:33Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        "src/archrev/adapters.py",
+        "src/archrev/hooks.py",
+        "src/archrev/storage.py",
+        "src/archrev/cli.py",
+        "src/archrev/scaffold.py",
+        "src/archrev/drift.py",
+        "src/archrev/report/render.py",
+        "src/archrev/report/template.html",
+        ".archrev/rules/90-archrev-self-protection.yaml",
+        "tests/test_adapters.py",
+        "tests/test_team.py",
+        "tests/test_hooks.py",
+        "tests/test_storage.py",
+        "src/archrev/__init__.py",
+        ".claude/settings.json",
+        ".claude/rules/archrev.md",
+        ".codex/hooks.json",
+        "README.md",
+        "pyproject.toml",
+        "AGENTS.md"
+      ],
+      "path_findings": [
+        {
+          "path": "src/archrev/hooks.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (gate semantics, hook fail-open behavior, exemptions). Requires regression tests in tests/test_gate.py or tests/test_hooks.py."
+        },
+        {
+          "path": "src/archrev/storage.py",
+          "rule_id": "flag-audit-format",
+          "action": "flag",
+          "message": "This file defines the on-disk audit format / git linkage. Changes must stay backward-compatible with existing session records."
+        },
+        {
+          "path": ".archrev/rules/90-archrev-self-protection.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".claude/settings.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".claude/rules/archrev.md",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".codex/hooks.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "pyproject.toml",
+          "rule_id": "block-packaging",
+          "action": "block",
+          "message": "Packaging/dependency changes require explicit approval."
+        },
+        {
+          "path": "AGENTS.md",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "v0.4 adapters: fail-open preserved; meta.runtime is optional; 107 tests passing including tests/test_adapters.py",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "b29707f7f4198af701e69d455a4c421bcf1e9b99bed45192f509409369d7a0b5",
+      "hash": "234300ac517548fccbb8e9a8e2e6a71ab046a251ead45e62a9e43a37af7ad456"
     }
   ],
   "final_checks": [
@@ -553,6 +915,33 @@
       "notified": true,
       "prev": "c35dbcc37547d3dbb12a3dc36ea80160e4835a4fe97a3adc81ae52ef28c77c3d",
       "hash": "dd01c3aed55f8fd86b721493bd2482c68729df66f9f376fe91b6fbe189c5bef2"
+    },
+    {
+      "ts": "2026-09-18T13:04:22Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "prev": "8ebf98b65f160a49689cf095490de5c9ef76dd2b2c39dd5749948dd54ea659ad",
+      "hash": "d1c1f2e98fb9ad336e447956230a2717520ce1b71dc02d0e408a0ed2c6845d62"
+    },
+    {
+      "ts": "2026-09-18T13:20:40Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "prev": "fabbb875474c8c5571be65ae9c9c1d671d094df9f5927f923f8d6c583bc7065c",
+      "hash": "060569b32694be01e68cdaf2f508bace8b4c3c033d3a3505fc28f158e12deaf7"
+    },
+    {
+      "ts": "2026-09-18T13:29:51Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "prev": "3b1ae911862bf7e33f05838e54792eb6bdb61dc6d4267de7fff980d462e9cee6",
+      "hash": "500474ba1b2e3991209236091e7bca6a28f45873728e746002c00f6c829cb3c6"
     }
   ],
   "human_changes": [],
@@ -650,6 +1039,176 @@
       "error": null,
       "prev": "e67aee917f2d1fb86496fbdeb91201dde84e5e1e364e345d9de72a879264efe5",
       "hash": "8ebf98b65f160a49689cf095490de5c9ef76dd2b2c39dd5749948dd54ea659ad"
+    },
+    {
+      "ts": "2026-09-18T13:20:40Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must compile (py_compile).",
+      "files": [
+        "src/archrev/cli.py",
+        "src/archrev/hooks.py",
+        "src/archrev/rules.py",
+        "src/archrev/gate.py",
+        "src/archrev/scaffold.py",
+        "tests/test_boundaries.py",
+        "src/archrev/planning.py",
+        "tests/test_planning.py",
+        "tests/test_hooks.py",
+        "src/archrev/config.py",
+        "src/archrev/storage.py",
+        "src/archrev/gitutil.py",
+        "src/archrev/trailer.py",
+        "src/archrev/drift.py",
+        "src/archrev/report/server.py",
+        "src/archrev/report/render.py",
+        "tests/test_trailer.py",
+        "tests/test_storage.py",
+        "tests/test_report.py",
+        "tests/test_finalize.py",
+        "src/archrev/quality.py",
+        "tests/test_quality.py",
+        "src/archrev/ci.py",
+        "src/archrev/metrics.py",
+        "tests/test_team.py"
+      ],
+      "command": "python -m py_compile \"src/archrev/cli.py\" \"src/archrev/hooks.py\" \"src/archrev/rules.py\" \"src/archrev/gate.py\" \"src/archrev/scaffold.py\" \"tests/test_boundaries.py\" \"src/archrev/planning.py\" \"tests/test_planning.py\" \"tests/test_hooks.py\" \"src/archrev/config.py\" \"src/archrev/storage.py\" \"src/archrev/gitutil.py\" \"src/archrev/trailer.py\" \"src/archrev/drift.py\" \"src/archrev/report/server.py\" \"src/archrev/report/render.py\" \"tests/test_trailer.py\" \"tests/test_storage.py\" \"tests/test_report.py\" \"tests/test_finalize.py\" \"src/archrev/quality.py\" \"tests/test_quality.py\" \"src/archrev/ci.py\" \"src/archrev/metrics.py\" \"tests/test_team.py\"",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "45b761bac1acc08180f44ca36952db9fbff1e5559fd3c01ed0588ec017df3496",
+      "hash": "fabbb875474c8c5571be65ae9c9c1d671d094df9f5927f923f8d6c583bc7065c"
+    },
+    {
+      "ts": "2026-09-18T13:29:50Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must compile (py_compile).",
+      "files": [
+        "src/archrev/cli.py",
+        "src/archrev/hooks.py",
+        "src/archrev/rules.py",
+        "src/archrev/gate.py",
+        "src/archrev/scaffold.py",
+        "tests/test_boundaries.py",
+        "src/archrev/planning.py",
+        "tests/test_planning.py",
+        "tests/test_hooks.py",
+        "src/archrev/config.py",
+        "src/archrev/storage.py",
+        "src/archrev/gitutil.py",
+        "src/archrev/trailer.py",
+        "src/archrev/drift.py",
+        "src/archrev/report/server.py",
+        "src/archrev/report/render.py",
+        "tests/test_trailer.py",
+        "tests/test_storage.py",
+        "tests/test_report.py",
+        "tests/test_finalize.py",
+        "src/archrev/quality.py",
+        "tests/test_quality.py",
+        "src/archrev/ci.py",
+        "src/archrev/metrics.py",
+        "tests/test_team.py"
+      ],
+      "command": "python -m py_compile \"src/archrev/cli.py\" \"src/archrev/hooks.py\" \"src/archrev/rules.py\" \"src/archrev/gate.py\" \"src/archrev/scaffold.py\" \"tests/test_boundaries.py\" \"src/archrev/planning.py\" \"tests/test_planning.py\" \"tests/test_hooks.py\" \"src/archrev/config.py\" \"src/archrev/storage.py\" \"src/archrev/gitutil.py\" \"src/archrev/trailer.py\" \"src/archrev/drift.py\" \"src/archrev/report/server.py\" \"src/archrev/report/render.py\" \"tests/test_trailer.py\" \"tests/test_storage.py\" \"tests/test_report.py\" \"tests/test_finalize.py\" \"src/archrev/quality.py\" \"tests/test_quality.py\" \"src/archrev/ci.py\" \"src/archrev/metrics.py\" \"tests/test_team.py\"",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "ad240f858ceecc7aa0353e6f8c8d2dd86532d9df4ba782b8edb1bc44bd06c451",
+      "hash": "3b1ae911862bf7e33f05838e54792eb6bdb61dc6d4267de7fff980d462e9cee6"
+    },
+    {
+      "ts": "2026-09-18T14:21:45Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must compile (py_compile).",
+      "files": [
+        "src/archrev/cli.py",
+        "src/archrev/hooks.py",
+        "src/archrev/rules.py",
+        "src/archrev/gate.py",
+        "src/archrev/scaffold.py",
+        "tests/test_boundaries.py",
+        "src/archrev/planning.py",
+        "tests/test_planning.py",
+        "tests/test_hooks.py",
+        "src/archrev/config.py",
+        "src/archrev/storage.py",
+        "src/archrev/gitutil.py",
+        "src/archrev/trailer.py",
+        "src/archrev/drift.py",
+        "src/archrev/report/server.py",
+        "src/archrev/report/render.py",
+        "tests/test_trailer.py",
+        "tests/test_storage.py",
+        "tests/test_report.py",
+        "tests/test_finalize.py",
+        "src/archrev/quality.py",
+        "tests/test_quality.py",
+        "src/archrev/ci.py",
+        "src/archrev/metrics.py",
+        "tests/test_team.py",
+        "src/archrev/adapters.py",
+        "tests/test_adapters.py",
+        "src/archrev/__init__.py"
+      ],
+      "command": "python -m py_compile \"src/archrev/cli.py\" \"src/archrev/hooks.py\" \"src/archrev/rules.py\" \"src/archrev/gate.py\" \"src/archrev/scaffold.py\" \"tests/test_boundaries.py\" \"src/archrev/planning.py\" \"tests/test_planning.py\" \"tests/test_hooks.py\" \"src/archrev/config.py\" \"src/archrev/storage.py\" \"src/archrev/gitutil.py\" \"src/archrev/trailer.py\" \"src/archrev/drift.py\" \"src/archrev/report/server.py\" \"src/archrev/report/render.py\" \"tests/test_trailer.py\" \"tests/test_storage.py\" \"tests/test_report.py\" \"tests/test_finalize.py\" \"src/archrev/quality.py\" \"tests/test_quality.py\" \"src/archrev/ci.py\" \"src/archrev/metrics.py\" \"tests/test_team.py\" \"src/archrev/adapters.py\" \"tests/test_adapters.py\" \"src/archrev/__init__.py\"",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "0a79e0f2c8f80db3f8e7ff68238555859e8fdd0d99f985e6a1a4d10c330826ec",
+      "hash": "7049b8c11c98f33304cdef42b0f7c743ebf2df82b760c76845f56fc2f906e534"
+    },
+    {
+      "ts": "2026-09-18T14:21:45Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must compile (py_compile).",
+      "files": [
+        "src/archrev/cli.py",
+        "src/archrev/hooks.py",
+        "src/archrev/rules.py",
+        "src/archrev/gate.py",
+        "src/archrev/scaffold.py",
+        "tests/test_boundaries.py",
+        "src/archrev/planning.py",
+        "tests/test_planning.py",
+        "tests/test_hooks.py",
+        "src/archrev/config.py",
+        "src/archrev/storage.py",
+        "src/archrev/gitutil.py",
+        "src/archrev/trailer.py",
+        "src/archrev/drift.py",
+        "src/archrev/report/server.py",
+        "src/archrev/report/render.py",
+        "tests/test_trailer.py",
+        "tests/test_storage.py",
+        "tests/test_report.py",
+        "tests/test_finalize.py",
+        "src/archrev/quality.py",
+        "tests/test_quality.py",
+        "src/archrev/ci.py",
+        "src/archrev/metrics.py",
+        "tests/test_team.py",
+        "src/archrev/adapters.py",
+        "tests/test_adapters.py",
+        "src/archrev/__init__.py"
+      ],
+      "command": "python -m py_compile \"src/archrev/cli.py\" \"src/archrev/hooks.py\" \"src/archrev/rules.py\" \"src/archrev/gate.py\" \"src/archrev/scaffold.py\" \"tests/test_boundaries.py\" \"src/archrev/planning.py\" \"tests/test_planning.py\" \"tests/test_hooks.py\" \"src/archrev/config.py\" \"src/archrev/storage.py\" \"src/archrev/gitutil.py\" \"src/archrev/trailer.py\" \"src/archrev/drift.py\" \"src/archrev/report/server.py\" \"src/archrev/report/render.py\" \"tests/test_trailer.py\" \"tests/test_storage.py\" \"tests/test_report.py\" \"tests/test_finalize.py\" \"src/archrev/quality.py\" \"tests/test_quality.py\" \"src/archrev/ci.py\" \"src/archrev/metrics.py\" \"tests/test_team.py\" \"src/archrev/adapters.py\" \"tests/test_adapters.py\" \"src/archrev/__init__.py\"",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "7049b8c11c98f33304cdef42b0f7c743ebf2df82b760c76845f56fc2f906e534",
+      "hash": "9f0b35b4cc6773c610aa5eebeb88a42ba6eb2b45e1834645afdc89277e339006"
     }
   ],
   "gate_events": [
@@ -1244,6 +1803,403 @@
       ],
       "prev": "4ab3e1485564c33a67b9d2f8863df9233b32bf50af78379446f8872c66ebd446",
       "hash": "ce9e189d384b541ed9c53cfefd77d0423ac5c37d6c2861c2ad357b8daf877fba"
+    },
+    {
+      "ts": "2026-09-18T13:12:48Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "9c9f16ab14e9fd690fbde6231c338dccda7fbd565fbff5b410b943e7c745c9eb",
+      "hash": "b290d1251d8d24802158ef4a4554b759aab8791ce7fa40205772ad5dc5e3f9d2"
+    },
+    {
+      "ts": "2026-09-18T13:12:53Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/config.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/config.py"
+        }
+      ],
+      "prev": "49d4f24795871777a0315a17a107d1d15e74585416ce8ff37c297fac48990769",
+      "hash": "df2ed9c872aca984352cc1b3d6843d671b51fd2e5ef9dababb8981886a5caad6"
+    },
+    {
+      "ts": "2026-09-18T13:13:02Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/config.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/config.py"
+        }
+      ],
+      "prev": "eab08294b2d5e5ca66ac416c7cd456c45acd9f51a839b96af847165e1809a7a2",
+      "hash": "9872d6f8e7d86e47239e2af23b0750b3494c32a82df88cecf34c780fb61332fe"
+    },
+    {
+      "ts": "2026-09-18T13:13:05Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/config.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/config.py"
+        }
+      ],
+      "prev": "15216968402e2eb3c4aacce086f823638eeb2b0967ae0e7e8f1e0f51f9a554be",
+      "hash": "e17befba63db95b9eddadd0b5259d1986ade2570255b6ab28fc585028ccf08ec"
+    },
+    {
+      "ts": "2026-09-18T13:16:47Z",
+      "type": "gate",
+      "kind": "shell",
+      "target": "pip install -e . --quiet 2>&1 | Select-Object -Last 1; archrev index E:\\ArchRev E:\\CodeDD 2>&1",
+      "permission": "allow",
+      "paths": [],
+      "hits": [
+        {
+          "rule_id": "flag-dependency-installs",
+          "action": "flag",
+          "path": "pip install -e . --quiet 2>&1 | Select-Object -Last 1; archrev index E:\\ArchRev E:\\CodeDD 2>&1"
+        }
+      ],
+      "prev": "a3f5f6738a3872c25890f6868f8d31c7d954741e6ce2e4924b35b7b33045b284",
+      "hash": "1700dc6c930d6310ae92a24654347f962835dd7d35fb1d46815718c645e58135"
+    },
+    {
+      "ts": "2026-09-18T14:09:52Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/storage.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-audit-format",
+          "action": "flag",
+          "path": "src/archrev/storage.py"
+        }
+      ],
+      "prev": "8710ece048b20023b19b93580a9c60370c406b38a75a00f9a28d3c1dc75820ab",
+      "hash": "4cf8cb39925243a6e3c7629a22fc9ca5bbf55df72509c28250666e1637ff71e4"
+    },
+    {
+      "ts": "2026-09-18T14:09:54Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "559793f57deee3436349eadcc7e54abb21eb54dc58a8d74729161a51eaea669c",
+      "hash": "479f2e6ae36731c9ee8f277cc229070cd6e58b5d01175822642b54eef116d8af"
+    },
+    {
+      "ts": "2026-09-18T14:09:55Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "55e073948383bfa09fd05d40c4fa31dd6b4261763a325ca93dc90e0a90f9c3aa",
+      "hash": "6c9b3e5423d9a78bc99096020531446b52d081ea0de730cdbae1c6d01b2a2ea0"
+    },
+    {
+      "ts": "2026-09-18T14:09:57Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "fdbde09ad83cc3158ca23f7c93742e2756de86d961189c46f545f1c98497fa5f",
+      "hash": "86cc4c2de9e2abb12dd49c995931bd7d3230f6a7439c3d0f874b038b6c59bb13"
+    },
+    {
+      "ts": "2026-09-18T14:10:06Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "7a3d59016921887d414b7c0018f3cb36ce9d616012d6c85e0d80407bab95e408",
+      "hash": "e665880632fd535113c5b6756e097c147525d81b21f6a96d1b346262d252520a"
+    },
+    {
+      "ts": "2026-09-18T14:10:15Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "a07d99d3e6ed0f441d42c210484e43ff6aa76f8300448a8871501714dff3e71b",
+      "hash": "47a6ddb9dec92eb1b1f2f89c2de6c9ff53ffd03664999c7b13eea55d57d05f7a"
+    },
+    {
+      "ts": "2026-09-18T14:10:16Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "c280ae97955f8fcf41947c640f41efd2f5eee96e1afafb1fbc498076b1c054be",
+      "hash": "6f527e94a2d9a137fb423099093342d0e3b28a25849b5f0448cf304a9cf2780b"
+    },
+    {
+      "ts": "2026-09-18T14:10:51Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "9191b4ba423f8f006e7ff11aa2baf2f74a89435340a26cedd07069682c8d1895",
+      "hash": "b9c96e84f4b661e446d83f702fdc68e17484059f6a4b291339f1156412cf2a06"
+    },
+    {
+      "ts": "2026-09-18T14:11:02Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "12abe66e5c7c5660446394acb63c553395dcbc469399a67aa402dafa53dba328",
+      "hash": "570f2454837d2939b1e7758633ff8295dd425ce4a3753760c24e144086a9555c"
+    },
+    {
+      "ts": "2026-09-18T14:11:33Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "0619c4aaaf56146742aca7f926aa7ab01473e96552b7d46419e800e2dd6cd941",
+      "hash": "534ec0a8340d256e05326241147e06245a55510cebaa5fbaac819c1ebc487044"
+    },
+    {
+      "ts": "2026-09-18T14:13:27Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "3481b78525085b9e22e4f94f13396d6f9d0ad6c56d7a1dadb180f30456344683",
+      "hash": "c112aa67ddba78d07e58282105472f4aabbb8ca5d88ba9f95a5886e6bbd20c99"
+    },
+    {
+      "ts": "2026-09-18T14:13:49Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        ".archrev/rules/90-archrev-self-protection.yaml"
+      ],
+      "hits": [
+        {
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "path": ".archrev/rules/90-archrev-self-protection.yaml"
+        }
+      ],
+      "prev": "0871a4c1a9f91d494d8d6aaefbc3a800618df1c9944794827bf79884ea62ea77",
+      "hash": "6d59c7064ce993c1b8bee97fe591c4a27315932d19e80cf058bcf7269efa442b"
+    },
+    {
+      "ts": "2026-09-18T14:14:40Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "4cc34206b213484daa12a30dc0a0c7db53e5e25c045c167273bb5496bd295f94",
+      "hash": "16ac3ad44c5f068685ab18abc1dcee688136b647e54940038bb048d75516057e"
+    },
+    {
+      "ts": "2026-09-18T14:16:19Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        "pyproject.toml"
+      ],
+      "hits": [
+        {
+          "rule_id": "block-packaging",
+          "action": "block",
+          "path": "pyproject.toml"
+        }
+      ],
+      "prev": "1ae33ab0d02f230872b055fa23ec9db7adff11807601ee6d5e386e37dd9202f0",
+      "hash": "24729a227fb37302cddfe5ee99e479490ca76eb47ed8b87969e81e94260d409f"
+    },
+    {
+      "ts": "2026-09-18T14:16:21Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        "pyproject.toml"
+      ],
+      "hits": [
+        {
+          "rule_id": "block-packaging",
+          "action": "block",
+          "path": "pyproject.toml"
+        }
+      ],
+      "prev": "ea512e7f3f19211f3dea0d1ffb9f65c2d92c880179504cc2fad2923880a43e17",
+      "hash": "67e2640f1f86ce035a06f4914d7d93ca71635b274cbc76fa81d785e90f78d470"
+    },
+    {
+      "ts": "2026-09-18T14:18:13Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "allow",
+      "paths": [
+        "src/archrev/hooks.py"
+      ],
+      "hits": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "path": "src/archrev/hooks.py"
+        }
+      ],
+      "prev": "3dbc423d49fa7333a17fccede2d67a680e452856bc06909d8373768bfb8bfa96",
+      "hash": "967a45b7fb274547dcdc40525e910e81bbbd7b4c098bfaadd37fc73e277090e7"
     }
   ],
   "edits": [
@@ -2086,21 +3042,477 @@
       "path": ".archrev/rules/10-archrev-repo.yaml",
       "tool": "",
       "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:11:24Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:11:30Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:11:38Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:12:03Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:12:27Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:12:49Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:12:54Z",
+      "path": "src/archrev/config.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:13:02Z",
+      "path": "src/archrev/config.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:13:05Z",
+      "path": "src/archrev/config.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:13:16Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:13:44Z",
+      "path": "src/archrev/metrics.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:13:59Z",
+      "path": "src/archrev/cli.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:14:13Z",
+      "path": "src/archrev/cli.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:14:43Z",
+      "path": "tests/test_team.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:15:01Z",
+      "path": "tests/test_team.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:15:02Z",
+      "path": "tests/test_team.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:15:52Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:15:55Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:17:35Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:17:37Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:18:01Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:18:08Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:18:10Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:18:17Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:18:28Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:28:39Z",
+      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/4352bcb5-b578-4964-b540-b5f46a48a392.txt",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:28:41Z",
+      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/462fa3f7-a9be-4bf2-b220-9befae1e08e3.txt",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:28:41Z",
+      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/56600e79-c92b-4adb-af6c-cb3536b52217.txt",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:28:42Z",
+      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/032e8149-fec2-4755-bed1-2bedbcf1f12f.txt",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:28:43Z",
+      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/2b187c22-116a-4d0f-9da9-9a43d34a5ea6.txt",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:28:44Z",
+      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/6102eab4-e607-4296-9ea5-48e96a058749.txt",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T13:28:45Z",
+      "path": "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/9ae268f8-e699-463c-a329-2d490e0c00b4.txt",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:09:42Z",
+      "path": "src/archrev/adapters.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:09:53Z",
+      "path": "src/archrev/storage.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:09:55Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:09:56Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:09:57Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:10:07Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:10:15Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:10:17Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:10:52Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:11:03Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:11:34Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:12:22Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:12:23Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:12Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:14Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:28Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:31Z",
+      "path": "src/archrev/cli.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:36Z",
+      "path": "src/archrev/cli.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:38Z",
+      "path": "src/archrev/cli.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:40Z",
+      "path": "src/archrev/drift.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:40Z",
+      "path": "src/archrev/report/render.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:13:49Z",
+      "path": ".archrev/rules/90-archrev-self-protection.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:14:03Z",
+      "path": "src/archrev/report/render.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:14:41Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:14:43Z",
+      "path": "src/archrev/report/template.html",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:15:01Z",
+      "path": "src/archrev/report/template.html",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:15:06Z",
+      "path": "src/archrev/report/template.html",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:15:55Z",
+      "path": "tests/test_adapters.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:15:56Z",
+      "path": "tests/test_storage.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:17Z",
+      "path": "tests/test_adapters.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:18Z",
+      "path": "tests/test_adapters.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:19Z",
+      "path": "src/archrev/__init__.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:20Z",
+      "path": "pyproject.toml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:21Z",
+      "path": "pyproject.toml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:34Z",
+      "path": "src/archrev/__init__.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:34Z",
+      "path": "src/archrev/cli.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:16:59Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:17:01Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:17:15Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:17:18Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:17:23Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:17:29Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:17:36Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-18T14:18:14Z",
+      "path": "src/archrev/hooks.py",
+      "tool": "",
+      "origin": "agent"
     }
   ],
   "files": [
     {
       "path": "src/archrev/cli.py",
-      "added": 143,
-      "removed": 17,
+      "added": 283,
+      "removed": 25,
       "untracked": false,
       "in_plan": true,
       "rules": []
     },
     {
       "path": "src/archrev/hooks.py",
-      "added": 262,
-      "removed": 25,
+      "added": 468,
+      "removed": 54,
       "untracked": false,
       "in_plan": true,
       "rules": [
@@ -2116,7 +3528,7 @@
       "added": 169,
       "removed": 36,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
@@ -2124,7 +3536,7 @@
       "added": 135,
       "removed": 38,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": [
         {
           "rule_id": "flag-enforcement-core",
@@ -2135,15 +3547,15 @@
     },
     {
       "path": "src/archrev/scaffold.py",
-      "added": 100,
-      "removed": 17,
+      "added": 296,
+      "removed": 39,
       "untracked": false,
       "in_plan": true,
       "rules": []
     },
     {
       "path": "src/archrev/report/template.html",
-      "added": 464,
+      "added": 465,
       "removed": 88,
       "untracked": false,
       "in_plan": true,
@@ -2151,8 +3563,8 @@
     },
     {
       "path": "README.md",
-      "added": 194,
-      "removed": 16,
+      "added": 345,
+      "removed": 29,
       "untracked": false,
       "in_plan": true,
       "rules": []
@@ -2162,7 +3574,7 @@
       "added": 144,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
@@ -2170,7 +3582,7 @@
       "added": 27,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": [
         {
           "rule_id": "archrev-self-protection",
@@ -2184,7 +3596,7 @@
       "added": 30,
       "removed": 3,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
@@ -2192,12 +3604,12 @@
       "added": 39,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
       "path": "pyproject.toml",
-      "added": 1,
+      "added": 3,
       "removed": 1,
       "untracked": false,
       "in_plan": true,
@@ -2219,10 +3631,10 @@
     },
     {
       "path": "src/archrev/config.py",
-      "added": 10,
+      "added": 21,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": [
         {
           "rule_id": "flag-enforcement-core",
@@ -2233,8 +3645,8 @@
     },
     {
       "path": "src/archrev/storage.py",
-      "added": 85,
-      "removed": 3,
+      "added": 97,
+      "removed": 4,
       "untracked": false,
       "in_plan": true,
       "rules": [
@@ -2250,7 +3662,7 @@
       "added": 27,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": [
         {
           "rule_id": "flag-audit-format",
@@ -2264,12 +3676,12 @@
       "added": 60,
       "removed": 8,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
       "path": "src/archrev/drift.py",
-      "added": 70,
+      "added": 71,
       "removed": 12,
       "untracked": false,
       "in_plan": true,
@@ -2280,12 +3692,12 @@
       "added": 58,
       "removed": 3,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
       "path": "src/archrev/report/render.py",
-      "added": 94,
+      "added": 98,
       "removed": 0,
       "untracked": false,
       "in_plan": true,
@@ -2296,13 +3708,13 @@
       "added": 45,
       "removed": 2,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
       "path": "tests/test_storage.py",
-      "added": 49,
-      "removed": 1,
+      "added": 53,
+      "removed": 4,
       "untracked": false,
       "in_plan": true,
       "rules": []
@@ -2312,7 +3724,7 @@
       "added": 48,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
@@ -2320,7 +3732,7 @@
       "added": 42,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
@@ -2328,7 +3740,7 @@
       "added": 101,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
@@ -2336,12 +3748,58 @@
       "added": 149,
       "removed": 0,
       "untracked": false,
-      "in_plan": true,
+      "in_plan": false,
       "rules": []
     },
     {
       "path": ".archrev/rules/10-archrev-repo.yaml",
       "added": 9,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": false,
+      "rules": [
+        {
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ]
+    },
+    {
+      "path": "src/archrev/ci.py",
+      "added": 98,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": false,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/metrics.py",
+      "added": 164,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": false,
+      "rules": []
+    },
+    {
+      "path": "tests/test_team.py",
+      "added": 124,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/adapters.py",
+      "added": 294,
+      "removed": 0,
+      "untracked": true,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": ".archrev/rules/90-archrev-self-protection.yaml",
+      "added": 4,
       "removed": 0,
       "untracked": false,
       "in_plan": true,
@@ -2352,6 +3810,22 @@
           "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
         }
       ]
+    },
+    {
+      "path": "tests/test_adapters.py",
+      "added": 313,
+      "removed": 0,
+      "untracked": true,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/__init__.py",
+      "added": 4,
+      "removed": 3,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
     }
   ],
   "outside_repo": [
@@ -2361,17 +3835,44 @@
     "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-cff844ba-18e6-4067-8504-9f60f0e5be4e.png",
     "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-10785df2-5df4-4032-9cba-4a63bc091d09.png",
     "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-149506be-84e8-42ee-a7ed-9184ac25ec46.png",
-    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png"
+    "C:/Users/CP/.cursor/projects/e-ArchRev/assets/c__Users_CP_AppData_Roaming_Cursor_User_workspaceStorage_7c2f4243dd6f3888a7a7258fcfbcf0db_images_image-db58d5c8-bc03-4ab2-b925-5b52ccb28ee6.png",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/4352bcb5-b578-4964-b540-b5f46a48a392.txt",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/462fa3f7-a9be-4bf2-b220-9befae1e08e3.txt",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/56600e79-c92b-4adb-af6c-cb3536b52217.txt",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/032e8149-fec2-4755-bed1-2bedbcf1f12f.txt",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/2b187c22-116a-4d0f-9da9-9a43d34a5ea6.txt",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/6102eab4-e607-4296-9ea5-48e96a058749.txt",
+    "C:/Users/CP/.cursor/projects/e-ArchRev/agent-tools/9ae268f8-e699-463c-a329-2d490e0c00b4.txt"
   ],
   "other_changes": [
     {
+      "path": ".archrev/sessions/0627d0df-c47a-4a88-be13-5d1c6b7ce734/events.jsonl",
+      "added": 8,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/0627d0df-c47a-4a88-be13-5d1c6b7ce734/manifest.json",
+      "added": 141,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/0627d0df-c47a-4a88-be13-5d1c6b7ce734/meta.json",
+      "added": 6,
+      "removed": 0
+    },
+    {
+      "path": ".archrev/sessions/0627d0df-c47a-4a88-be13-5d1c6b7ce734/report.md",
+      "added": 53,
+      "removed": 0
+    },
+    {
       "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/events.jsonl",
-      "added": 215,
+      "added": 334,
       "removed": 0
     },
     {
       "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/manifest.json",
-      "added": 2425,
+      "added": 3222,
       "removed": 0
     },
     {
@@ -2386,7 +3887,7 @@
     },
     {
       "path": ".archrev/sessions/403489ea-bf35-46df-a5a5-269d8f771963/report.md",
-      "added": 230,
+      "added": 304,
       "removed": 0
     },
     {
@@ -2408,19 +3909,34 @@
       "path": ".cursor/hooks.json",
       "added": 23,
       "removed": 3
-    },
-    {
-      "path": "src/archrev/__init__.py",
-      "added": 1,
-      "removed": 1
     }
   ],
   "drift": {
-    "out_of_plan": [],
+    "out_of_plan": [
+      "src/archrev/rules.py",
+      "src/archrev/gate.py",
+      "tests/test_boundaries.py",
+      ".archrev/rules/20-agent-boundaries.yaml",
+      "src/archrev/planning.py",
+      "tests/test_planning.py",
+      "src/archrev/config.py",
+      "src/archrev/gitutil.py",
+      "src/archrev/trailer.py",
+      "src/archrev/report/server.py",
+      "tests/test_trailer.py",
+      "tests/test_report.py",
+      "tests/test_finalize.py",
+      "src/archrev/quality.py",
+      "tests/test_quality.py",
+      ".archrev/rules/10-archrev-repo.yaml",
+      "src/archrev/ci.py",
+      "src/archrev/metrics.py"
+    ],
     "unrealized": [
-      "tests/test_gate.py",
-      "src/archrev/__init__.py",
-      ".cursor/hooks.json"
+      ".claude/settings.json",
+      ".claude/rules/archrev.md",
+      ".codex/hooks.json",
+      "AGENTS.md"
     ]
   },
   "protected_findings": [
@@ -2433,6 +3949,13 @@
     },
     {
       "path": ".archrev/rules/20-agent-boundaries.yaml",
+      "rule_id": "archrev-self-protection",
+      "action": "block",
+      "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": ".archrev/rules/90-archrev-self-protection.yaml",
       "rule_id": "archrev-self-protection",
       "action": "block",
       "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval.",
@@ -2489,6 +4012,11 @@
     }
   ],
   "commits": [
+    {
+      "sha": "75713dcfeb99cd162b3841b9bd2af3efce4508bf",
+      "date": "2026-09-18 15:20:10 +0200",
+      "subject": "feat: team adoption toolkit - uvx shim, GitLab CI template, prompt privacy, cross-repo index (v0.3.0)"
+    },
     {
       "sha": "76a7fccb7a387a0a028e9e8a0a5ee8b2badedfd1",
       "date": "2026-09-18 14:59:11 +0200",
@@ -2547,47 +4075,37 @@
     "src",
     "tests"
   ],
-  "event_count": 215,
+  "event_count": 334,
   "chain": {
     "ok": true,
-    "checked": 153,
+    "checked": 273,
     "legacy": 62,
     "break_at": null
   },
   "plan": {
     "registered": true,
     "declared_files": [
-      "src/archrev/quality.py",
-      "src/archrev/rules.py",
-      "src/archrev/cli.py",
+      "src/archrev/adapters.py",
       "src/archrev/hooks.py",
+      "src/archrev/storage.py",
+      "src/archrev/cli.py",
+      "src/archrev/scaffold.py",
       "src/archrev/drift.py",
       "src/archrev/report/render.py",
       "src/archrev/report/template.html",
-      "src/archrev/scaffold.py",
-      "tests/test_quality.py",
-      ".archrev/rules/10-archrev-repo.yaml",
-      "src/archrev/gate.py",
-      "src/archrev/planning.py",
-      "src/archrev/storage.py",
-      "src/archrev/gitutil.py",
-      "src/archrev/trailer.py",
-      "src/archrev/config.py",
-      "src/archrev/report/server.py",
-      "tests/test_boundaries.py",
-      "tests/test_planning.py",
+      ".archrev/rules/90-archrev-self-protection.yaml",
+      "tests/test_adapters.py",
+      "tests/test_team.py",
       "tests/test_hooks.py",
       "tests/test_storage.py",
-      "tests/test_trailer.py",
-      "tests/test_report.py",
-      "tests/test_gate.py",
-      "tests/test_finalize.py",
-      ".archrev/rules/20-agent-boundaries.yaml",
       "src/archrev/__init__.py",
-      ".cursor/hooks.json",
+      ".claude/settings.json",
+      ".claude/rules/archrev.md",
+      ".codex/hooks.json",
       "README.md",
-      "pyproject.toml"
+      "pyproject.toml",
+      "AGENTS.md"
     ]
   },
-  "finalized_at": "2026-09-18T13:04:22Z"
+  "finalized_at": "2026-09-18T14:21:45Z"
 }
