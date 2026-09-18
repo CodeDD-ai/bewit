@@ -44,10 +44,30 @@ def test_exempt_paths_never_gated(repo: Path):
     config = Config(strict_plan_check=True)  # would deny anything else
     decision = evaluate_edit(
         config, load_rules(repo), _session(repo),
-        [".archrev/sessions/s1/plan.md", ".cursor/rules/x.mdc", "notes.plan.md"],
+        [".archrev/sessions/s1/plan.md", "notes.plan.md"],
         repo,
     )
     assert decision.permission == "allow"
+
+
+def test_governance_files_are_not_exempt(repo: Path):
+    """Regression: an agent must not be able to edit ArchRev's own config,
+    rules, or hooks wiring without gating (tamper protection)."""
+    (repo / ".archrev" / "rules" / "90-self.yaml").write_text(
+        "{id: self-protect, kind: path, action: block,\n"
+        " match: ['.archrev/config.yaml', '.archrev/rules/**', "
+        "'.cursor/hooks.json', '.cursor/rules/archrev.mdc']}",
+        encoding="utf-8",
+    )
+    ruleset = load_rules(repo)
+    for path in (
+        ".archrev/config.yaml",
+        ".archrev/rules/rules.yaml",
+        ".cursor/hooks.json",
+        ".cursor/rules/archrev.mdc",
+    ):
+        decision = evaluate_edit(Config(), ruleset, _session(repo), [path], repo)
+        assert decision.permission == "ask", path
 
 
 def test_strict_mode_denies_until_plan_checked(repo: Path):
@@ -59,6 +79,30 @@ def test_strict_mode_denies_until_plan_checked(repo: Path):
 
     session.append_event("plan_check", ok=True)
     decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
+    assert decision.permission == "allow"
+
+
+def test_strict_mode_failed_check_keeps_gate_closed(repo: Path):
+    """Regression: attesting 'fail' must not unlock strict mode."""
+    config = Config(strict_plan_check=True)
+    session = _session(repo)
+    session.append_event("plan_check", ok=False)
+    decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
+    assert decision.permission == "deny"
+    assert "did NOT pass" in decision.agent_message
+
+    # A later passing check (after resolving with the user) unlocks.
+    session.append_event("plan_check", ok=True)
+    decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
+    assert decision.permission == "allow"
+
+
+def test_enforcement_off_is_the_master_switch(repo: Path):
+    """Regression: 'off' must disable strict mode too, as documented."""
+    config = Config(enforcement="off", strict_plan_check=True)
+    decision = evaluate_edit(
+        config, load_rules(repo), _session(repo), ["app/main.py"], repo
+    )
     assert decision.permission == "allow"
 
 
@@ -92,4 +136,7 @@ def test_config_exempt_extends_defaults(repo: Path):
         "exempt:\n  - docs/**\n", encoding="utf-8"
     )
     config = load_config(repo)
-    assert ".archrev/**" in config.exempt and "docs/**" in config.exempt
+    assert ".archrev/sessions/**" in config.exempt and "docs/**" in config.exempt
+    # Governance paths must never sneak back into the defaults.
+    assert ".archrev/**" not in config.exempt
+    assert ".cursor/**" not in config.exempt

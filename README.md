@@ -131,6 +131,17 @@ strict_plan_check: false
 protected_scan: true
 ```
 
+With strict mode on, only a **passing** plan check unlocks edits — a check
+with failed or unattested policies keeps the gate closed until the agent
+resolves them with you and re-checks.
+
+The gate exempts only `.archrev/sessions/**` (ArchRev's own bookkeeping)
+and `*.plan.md`. ArchRev's governance files — `.archrev/config.yaml`, the
+rules directory, `.cursor/hooks.json`, `.cursor/rules/archrev.mdc` — are
+deliberately *not* exempt: `archrev init` ships an enabled
+`archrev-self-protection` rule that pauses any agent edit to them, so an
+agent cannot silently switch enforcement off.
+
 ## How to review — at any point in time
 
 **Live, while the agent works** (the second-monitor view):

@@ -63,6 +63,14 @@ _STRICT_AGENT_MESSAGE = (
     "Then retry the edit. Do not bypass this by writing files via shell commands."
 )
 
+_STRICT_FAILED_CHECK_MESSAGE = (
+    "ArchRev strict mode: the latest plan check for this session did NOT "
+    "pass (failed or unattested prompt rules), so file edits remain "
+    "blocked. Resolve every failed policy with the user, then re-run "
+    "`archrev check plan` with updated attestations. A failing check can "
+    "not be 'attested through' - the user must agree to the resolution."
+)
+
 
 def relativize(path: str, root: Path) -> str:
     """Best-effort repo-relative normalized path for matching and storage."""
@@ -90,20 +98,30 @@ def evaluate_edit(
     if not actionable:
         return GateDecision(permission="allow")
 
-    # Strict mode precedes rule matching: without a recorded plan check the
-    # session has no validated intent to measure any edit against.
-    if config.strict_plan_check and not session.has_event("plan_check"):
-        return GateDecision(
-            permission="deny",
-            user_message=(
-                "ArchRev blocked an edit: strict mode requires a registered, "
-                "checked plan before any file changes in this session."
-            ),
-            agent_message=_STRICT_AGENT_MESSAGE,
-        )
-
+    # 'off' disables the gate entirely, including strict mode - it must be
+    # the master switch the documentation promises.
     if config.enforcement == "off":
         return GateDecision(permission="allow")
+
+    # Strict mode precedes rule matching: without a *passing* plan check
+    # the session has no validated intent to measure any edit against. A
+    # recorded-but-failed check must not unlock the gate, otherwise the
+    # agent could attest 'fail' and proceed anyway.
+    if config.strict_plan_check:
+        last_check = session.last_event("plan_check")
+        if last_check is None or not last_check.get("ok"):
+            failed = last_check is not None
+            return GateDecision(
+                permission="deny",
+                user_message=(
+                    "ArchRev blocked an edit: strict mode requires a "
+                    + ("passing" if failed else "registered, checked")
+                    + " plan before any file changes in this session."
+                ),
+                agent_message=(
+                    _STRICT_FAILED_CHECK_MESSAGE if failed else _STRICT_AGENT_MESSAGE
+                ),
+            )
 
     hits: list[RuleHit] = []
     for rel in actionable:

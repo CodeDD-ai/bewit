@@ -34,6 +34,9 @@ def test_finalize_files_loc_and_drift(repo: Path):
     assert by_path["app/main.py"]["added"] == 1  # one line added
     assert by_path["app/extra.py"]["in_plan"] is False
     assert by_path["app/extra.py"]["untracked"] is True
+    # Untracked files get real line counts (git diff cannot provide them).
+    assert by_path["app/extra.py"]["added"] == 1
+    assert by_path["app/extra.py"]["removed"] == 0
     assert view["drift"]["out_of_plan"] == ["app/extra.py"]
     assert view["drift"]["unrealized"] == []
     assert session.manifest() is not None

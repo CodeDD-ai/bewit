@@ -35,7 +35,9 @@ strict_plan_check: false
 protected_scan: true
 
 # Additional glob patterns the gate never blocks (extends built-in exemptions
-# for .archrev/**, .cursor/**, and *.plan.md).
+# for .archrev/sessions/** and *.plan.md). Note: ArchRev governance files
+# (.archrev/config.yaml, rules, .cursor/hooks.json) are intentionally NOT
+# exempt - see rules/90-archrev-self-protection.yaml.
 # exempt:
 #   - docs/**
 """
@@ -110,6 +112,26 @@ This repository records agent sessions with ArchRev. Follow this protocol:
    final diff scan reports bypasses. Ask the user or adjust the plan.
 
 4. Never modify files under `.archrev/sessions/` - they are the audit record.
+"""
+
+_SELF_PROTECTION_RULES = """\
+# ArchRev self-protection (enabled by default - think twice before removing).
+#
+# The edit gate exempts only .archrev/sessions/** and plan files. These
+# governance files stay gated so an agent cannot silently disable capture
+# or enforcement by editing them; changes pause for your explicit approval.
+
+- id: archrev-self-protection
+  kind: path
+  match:
+    - ".archrev/config.yaml"
+    - ".archrev/rules/**"
+    - ".cursor/hooks.json"
+    - ".cursor/rules/archrev.mdc"
+  action: block
+  message: >-
+    ArchRev governance file - changing capture or enforcement configuration
+    requires explicit user approval.
 """
 
 _GIT_HOOK = """\
@@ -224,6 +246,11 @@ def init_repo(root: Path) -> InitResult:
     base = root / ARCHREV_DIRNAME
     _write_if_absent(base / "config.yaml", _CONFIG_TEMPLATE, result)
     _write_if_absent(base / "rules" / "00-starter-rules.yaml", _STARTER_RULES, result)
+    _write_if_absent(
+        base / "rules" / "90-archrev-self-protection.yaml",
+        _SELF_PROTECTION_RULES,
+        result,
+    )
     # Keep the sessions directory present so its purpose is discoverable.
     sessions_dir = base / "sessions"
     if not sessions_dir.exists():

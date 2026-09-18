@@ -85,11 +85,25 @@ def compute_view(
     files = []
     for path in touched:
         stat = numstat.get(path)
+        added = stat.added if stat else None
+        removed = stat.removed if stat else None
+        if stat is None and path in untracked:
+            # git diff never covers untracked files; count a brand-new
+            # file's lines directly so the review shows real numbers.
+            try:
+                added = len(
+                    (root / path)
+                    .read_text(encoding="utf-8", errors="replace")
+                    .splitlines()
+                )
+                removed = 0
+            except OSError:
+                pass
         files.append(
             {
                 "path": path,
-                "added": stat.added if stat else None,
-                "removed": stat.removed if stat else None,
+                "added": added,
+                "removed": removed,
                 "untracked": path in untracked,
                 "in_plan": path.lower() in declared_set,
                 "rules": [

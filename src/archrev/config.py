@@ -16,10 +16,13 @@ import yaml
 #: Name of the ArchRev data directory at the repository root.
 ARCHREV_DIRNAME = ".archrev"
 
-#: Paths never gated: ArchRev's own data, Cursor config, and plan documents.
+#: Paths never gated: session bookkeeping and plan documents only.
+#: Deliberately narrow - ArchRev's *governance* files (config, rules,
+#: hooks.json, archrev.mdc) are NOT exempt, otherwise an agent could
+#: silently disable enforcement by editing them. `archrev init` ships an
+#: enabled self-protection rule that gates exactly those files.
 DEFAULT_EXEMPT: tuple[str, ...] = (
-    ".archrev/**",
-    ".cursor/**",
+    ".archrev/sessions/**",
     "**/*.plan.md",
 )
 

@@ -206,10 +206,14 @@ def run_hook(event: str, stdin_text: str) -> dict:
     degradation visible.
     """
     root: Path | None = None
+    payload: dict = {}
     try:
-        payload = json.loads(stdin_text) if stdin_text.strip() else {}
-        if not isinstance(payload, dict):
-            payload = {}
+        parsed = json.loads(stdin_text) if stdin_text.strip() else {}
+        if isinstance(parsed, dict):
+            payload = parsed
+    except json.JSONDecodeError:
+        payload = {}
+    try:
         root = _payload_root(payload)
         if root is None:
             return {"permission": "allow"} if event == "gate" else {}
@@ -222,7 +226,9 @@ def run_hook(event: str, stdin_text: str) -> dict:
         _log_hook_error(root, event, exc)
         try:
             if root is not None:
-                SessionStore(root).session("unknown").append_event(
+                # Attribute the failure to the real session when the id is
+                # known, so degradation shows up in that session's timeline.
+                SessionStore(root).session(_session_id(payload)).append_event(
                     "hook_error", event=event, error=repr(exc)
                 )
         except Exception:  # noqa: BLE001

@@ -81,9 +81,9 @@ class Git:
     def numstat(self, base: str | None) -> list[NumstatEntry]:
         """Per-file line changes between ``base`` and the working tree.
 
-        With ``base=None`` (e.g. a repo with no commits yet) compares the
-        index+worktree against an empty tree, so brand-new repositories
-        still produce useful statistics.
+        With ``base=None`` falls back to ``HEAD``; in a repository with no
+        commits yet this yields no entries and callers degrade to counting
+        untracked files directly.
         """
         if base:
             out = self._run("diff", "--numstat", "--find-renames", base)

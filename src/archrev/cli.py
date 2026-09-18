@@ -225,7 +225,7 @@ def check_plan_cmd(
 
 
 @check.command(name="diff")
-@click.option("--base", default=None, help="Git base ref (default: session start / HEAD).")
+@click.option("--base", default=None, help="Git base ref (default: HEAD).")
 def check_diff_cmd(base: str | None) -> None:
     """Scan current git changes against path rules (post-hoc / CI usage).
 

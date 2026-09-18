@@ -133,6 +133,13 @@ class Session:
     def has_event(self, event_type: str) -> bool:
         return any(e.get("type") == event_type for e in self.events())
 
+    def last_event(self, event_type: str) -> dict | None:
+        """Most recent event of ``event_type``, or None."""
+        for event in reversed(self.events()):
+            if event.get("type") == event_type:
+                return event
+        return None
+
     def last_activity(self) -> float:
         """Modification time of the event log (0.0 when absent)."""
         try:
