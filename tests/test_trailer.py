@@ -82,6 +82,16 @@ def test_unattributed_staged_files_recorded_as_human(repo: Path):
     assert "human" not in sessions_for_staged(repo)
 
 
+def test_archrev_bookkeeping_never_counts_as_human(repo: Path):
+    """Session files are written by hooks; the human ledger must skip them."""
+    session = _session_with_edit(repo, "sess-one", "app/main.py")
+    git(repo, "add", str(session.dir.relative_to(repo)).replace("\\", "/"))
+    msg = repo / "COMMIT_EDITMSG"
+    msg.write_text("chore: record session\n", encoding="utf-8")
+    add_trailers(msg, repo)
+    assert SessionStore(repo).session("human").events() == []
+
+
 def test_no_human_record_without_agent_sessions(repo: Path):
     """Purely manual repositories must not accumulate human-change noise."""
     (repo / "app" / "manual.py").write_text("print('human')\n", encoding="utf-8")

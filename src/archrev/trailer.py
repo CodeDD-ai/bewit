@@ -73,6 +73,12 @@ def record_human_changes(root: Path, unattributed: list[str]) -> None:
     marked human. Only active when agent sessions exist, so purely manual
     repositories don't generate noise.
     """
+    # ArchRev's own session bookkeeping is written by hooks, not by people;
+    # counting it as human changes would be pure noise.
+    unattributed = [
+        p for p in unattributed
+        if not p.lower().startswith(".archrev/sessions/")
+    ]
     if not unattributed:
         return
     store = SessionStore(root)
