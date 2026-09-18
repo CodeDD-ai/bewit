@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "archrev hook prompt"
+      }
+    ],
+    "afterFileEdit": [
+      {
+        "command": "archrev hook edit"
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "archrev hook gate",
+        "matcher": "Write|StrReplace|Edit|MultiEdit|SearchReplace"
+      }
+    ],
+    "stop": [
+      {
+        "command": "archrev hook finalize"
+      }
+    ]
+  }
+}

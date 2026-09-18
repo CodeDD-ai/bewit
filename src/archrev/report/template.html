@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArchRev — session provenance</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1d212b; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #8b93a3; --accent: #6ea8fe;
+    --pass: #4cc38a; --flag: #f0b429; --block: #ef5350; --chip: #232936;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, "Segoe UI", sans-serif;
+  }
+  code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px; }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 18px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 5;
+  }
+  header .logo { font-weight: 700; font-size: 16px; letter-spacing: .4px; }
+  header .logo span { color: var(--accent); }
+  header .root { color: var(--muted); font-size: 12px; }
+  header .mode { margin-left: auto; }
+  .badge {
+    display: inline-block; padding: 1px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; background: var(--chip); color: var(--muted);
+  }
+  .badge.live { color: var(--pass); }
+  .badge.export { color: var(--accent); }
+  .badge.pass { color: var(--pass); }
+  .badge.flag { color: var(--flag); }
+  .badge.block { color: var(--block); }
+  .badge.neutral { color: var(--muted); }
+  .layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 49px); }
+  .layout.single { grid-template-columns: 1fr; }
+  /* Sessions list */
+  #sidebar { border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
+  .session-card {
+    padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .session-card:hover { background: var(--panel-2); }
+  .session-card.active { background: var(--panel-2); border-left: 3px solid var(--accent); padding-left: 11px; }
+  .session-card .sid { color: var(--accent); }
+  .session-card .when { color: var(--muted); font-size: 11px; }
+  .session-card .excerpt { color: var(--text); font-size: 12.5px; margin: 4px 0; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .session-card .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  /* Main */
+  #main { padding: 20px 26px 60px; overflow-y: auto; max-width: 1060px; }
+  h2.session-title { margin: 0 0 2px; font-size: 18px; }
+  .meta-line { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 22px; }
+  .chip { background: var(--chip); border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 11px; font-size: 12px; }
+  .chip b { font-weight: 600; }
+  .chip.warn { border-color: var(--flag); }
+  .chip.bad { border-color: var(--block); }
+  .chip.good { border-color: var(--pass); }
+  section.card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; margin-bottom: 16px;
+  }
+  section.card h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: .8px; color: var(--muted); }
+  .prompt-text { white-space: pre-wrap; background: var(--panel-2); border-radius: 8px;
+    padding: 10px 12px; margin: 6px 0; max-height: 240px; overflow-y: auto; }
+  details summary { cursor: pointer; color: var(--accent); font-size: 12.5px; }
+  .plan-text { white-space: pre-wrap; background: var(--panel-2); border-radius: 8px;
+    padding: 10px 12px; margin-top: 8px; max-height: 420px; overflow-y: auto; font-size: 12.5px; }
+  /* Timeline */
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .timeline li { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+  .timeline li:last-child { border-bottom: none; }
+  .timeline .ts { color: var(--muted); font-size: 11px; white-space: nowrap; padding-top: 2px; width: 130px; }
+  .timeline .dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex: none; }
+  .dot.prompt { background: var(--accent); }
+  .dot.edit { background: #5c6b8a; }
+  .dot.gate-ask, .dot.gate-deny { background: var(--block); }
+  .dot.gate-flag { background: var(--flag); }
+  .dot.check { background: var(--pass); }
+  .dot.plan { background: #b085f5; }
+  .timeline .body { flex: 1; min-width: 0; }
+  .timeline .body .what { font-size: 13px; }
+  .timeline .body .detail { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  td.loc { white-space: nowrap; }
+  .add { color: var(--pass); } .del { color: var(--block); }
+  .empty { color: var(--muted); font-style: italic; }
+  #error-banner {
+    display: none; background: #3a1f22; color: #ffb4ab; padding: 8px 18px;
+    border-bottom: 1px solid var(--block); font-size: 13px;
+  }
+  #placeholder { color: var(--muted); padding: 60px; text-align: center; }
+</style>
+</head>
+<body>
+<script>/*__ARCHREV_EMBED__*/</script>
+<header>
+  <div class="logo">Arch<span>Rev</span></div>
+  <div class="root mono" id="root-path"></div>
+  <div class="mode"><span class="badge" id="mode-badge"></span></div>
+</header>
+<div id="error-banner"></div>
+<div class="layout" id="layout">
+  <nav id="sidebar"></nav>
+  <main id="main"><div id="placeholder">Select a session</div></main>
+</div>
+
+<script>
+"use strict";
+
+const EXPORT = window.__ARCHREV_DATA__ || null;
+const POLL_MS = 2500;
+let selectedId = null;
+
+const $ = (id) => document.getElementById(id);
+
+function esc(value) {
+  const div = document.createElement("div");
+  div.textContent = value == null ? "" : String(value);
+  return div.innerHTML;
+}
+
+function shortId(id) { return id.length > 14 ? id.slice(0, 8) + "…" + id.slice(-4) : id; }
+
+function locHtml(added, removed) {
+  const a = Number.isInteger(added) ? `+${added}` : "+?";
+  const r = Number.isInteger(removed) ? `-${removed}` : "-?";
+  return `<span class="add">${a}</span>/<span class="del">${r}</span>`;
+}
+
+function badge(text, cls) { return `<span class="badge ${cls}">${esc(text)}</span>`; }
+
+/* ---------------- sessions sidebar (live mode only) ---------------- */
+
+function renderSidebar(state) {
+  $("root-path").textContent = state.root || "";
+  const items = state.sessions.map((s) => {
+    const badges = [];
+    if (s.finalized) badges.push(badge("finalized", "neutral")); else badges.push(badge("live", "live"));
+    if (s.plan_registered) badges.push(badge("plan", "pass"));
+    if (s.checked) badges.push(badge("checked", "pass"));
+    if (s.blocks) badges.push(badge(`${s.blocks} gated`, "block"));
+    if (s.flags) badges.push(badge(`${s.flags} flagged`, "flag"));
+    badges.push(badge(`${s.edits} edits`, "neutral"));
+    return `
+      <div class="session-card ${s.id === selectedId ? "active" : ""}" data-id="${esc(s.id)}">
+        <div><span class="sid mono">${esc(shortId(s.id))}</span>
+             <span class="when"> · ${esc(s.started_at || "")}</span></div>
+        <div class="excerpt">${esc(s.prompt_excerpt || "(no prompt captured)")}</div>
+        <div class="badges">${badges.join("")}</div>
+      </div>`;
+  });
+  $("sidebar").innerHTML = items.join("") ||
+    `<div id="placeholder">No sessions yet.<br>Start an agent conversation.</div>`;
+  for (const el of document.querySelectorAll(".session-card")) {
+    el.addEventListener("click", () => { selectedId = el.dataset.id; refreshSession(); });
+  }
+}
+
+/* ---------------- session detail ---------------- */
+
+function timelineItems(view) {
+  const items = [];
+  for (const p of view.prompts || [])
+    items.push({ ts: p.ts, kind: "prompt", what: "Prompt submitted",
+                 detail: (p.text || "").split("\n")[0].slice(0, 160) });
+  if (view.plan && view.plan.registered)
+    items.push({ ts: (view.checks[0] || {}).ts || view.started_at, kind: "plan",
+                 what: "Plan registered",
+                 detail: `${(view.plan.declared_files || []).length} file(s) declared` });
+  for (const c of view.checks || [])
+    items.push({ ts: c.ts, kind: "check",
+                 what: `Plan check — ${c.ok ? "OK" : "NOT OK"}`,
+                 detail: (c.prompt_rules || []).map((r) => `${r.rule_id}: ${r.verdict}`).join(", ") });
+  for (const g of view.gate_events || []) {
+    const kind = g.permission === "allow" ? "gate-flag" : `gate-${g.permission}`;
+    const what = g.permission === "allow" ? "Edit flagged" :
+                 g.permission === "ask" ? "Edit paused for approval" : "Edit denied";
+    items.push({ ts: g.ts, kind, what,
+                 detail: (g.paths || []).join(", ") + "  [" +
+                         (g.hits || []).map((h) => `${h.action}:${h.rule_id}`).join(", ") + "]" });
+  }
+  for (const e of view.edits || [])
+    items.push({ ts: e.ts, kind: "edit", what: "File edited", detail: e.path });
+  items.sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
+  return items;
+}
+
+function driftChips(view) {
+  const chips = [];
+  const plan = view.plan || {};
+  if (!plan.registered) {
+    chips.push(`<div class="chip warn"><b>No plan registered</b> — drift not measurable</div>`);
+    return chips;
+  }
+  const out = (view.drift || {}).out_of_plan || [];
+  const unrealized = (view.drift || {}).unrealized || [];
+  chips.push(`<div class="chip">planned <b>${(plan.declared_files || []).length}</b></div>`);
+  chips.push(`<div class="chip">touched <b>${(view.files || []).length}</b></div>`);
+  chips.push(`<div class="chip ${out.length ? "warn" : "good"}">out-of-plan <b>${out.length}</b></div>`);
+  chips.push(`<div class="chip ${unrealized.length ? "warn" : "good"}">unrealized <b>${unrealized.length}</b></div>`);
+  const bypass = (view.protected_findings || []).filter((f) => !f.via_gate);
+  if (bypass.length)
+    chips.push(`<div class="chip bad">protected changes bypassing gate <b>${bypass.length}</b></div>`);
+  return chips;
+}
+
+function renderSession(view) {
+  const fileRows = (view.files || []).map((f) => {
+    const notes = [];
+    if (f.untracked) notes.push(badge("new", "neutral"));
+    if (view.plan && view.plan.registered && !f.in_plan) notes.push(badge("out-of-plan", "flag"));
+    for (const r of f.rules || []) notes.push(badge(`${r.action}: ${r.rule_id}`, r.action === "block" ? "block" : "flag"));
+    return `<tr><td class="mono">${esc(f.path)}</td>
+      <td class="loc">${locHtml(f.added, f.removed)}</td><td>${notes.join(" ") || "—"}</td></tr>`;
+  });
+  const otherRows = (view.other_changes || []).map((f) =>
+    `<tr><td class="mono">${esc(f.path)}</td><td class="loc">${locHtml(f.added, f.removed)}</td>
+     <td>${badge("outside tracked edits", "neutral")}</td></tr>`);
+
+  const checkBlocks = (view.checks || []).map((c) => {
+    const rows = [];
+    for (const f of c.path_findings || [])
+      rows.push(`<li>${badge(f.action, f.action === "block" ? "block" : "flag")}
+                 <span class="mono">${esc(f.path)}</span> <span class="badge neutral">${esc(f.rule_id)}</span></li>`);
+    for (const r of c.prompt_rules || []) {
+      const cls = r.verdict === "pass" ? "pass" : r.verdict === "fail" ? "block" : "flag";
+      rows.push(`<li>${badge(r.verdict, cls)} <b>${esc(r.rule_id)}</b> — ${esc(r.policy)}</li>`);
+    }
+    return `<p><b>${esc(c.ts)}</b> — ${c.ok ? badge("OK", "pass") : badge("NOT OK", "block")}</p>
+            <ul>${rows.join("") || "<li class='empty'>no rules evaluated</li>"}</ul>`;
+  });
+
+  const commits = (view.commits || []).map((c) =>
+    `<li><span class="mono">${esc(c.sha.slice(0, 10))}</span> ${esc(c.subject)}
+     <span class="when">(${esc(c.date || "")})</span></li>`);
+
+  $("main").innerHTML = `
+    <h2 class="session-title mono">${esc(view.id)}</h2>
+    <div class="meta-line">
+      started ${esc(view.started_at || "?")} ·
+      ${view.finalized ? "finalized" : "live"} ·
+      areas: ${esc((view.areas || []).join(", ") || "—")} ·
+      base ${esc((view.head_sha || "").slice(0, 10) || "—")}
+    </div>
+    <div class="chips">${driftChips(view).join("")}</div>
+
+    <section class="card"><h3>Prompts</h3>
+      ${(view.prompts || []).map((p) =>
+        `<div class="when">${esc(p.ts)}</div><div class="prompt-text">${esc(p.text)}</div>`).join("")
+        || "<p class='empty'>No prompt captured.</p>"}
+    </section>
+
+    <section class="card"><h3>Plan</h3>
+      ${view.plan && view.plan.registered ? `
+        <p>${(view.plan.declared_files || []).map((d) => `<code>${esc(d)}</code>`).join(" ") || "no files declared"}</p>
+        ${view.plan.text ? `<details><summary>show plan text</summary>
+          <div class="plan-text">${esc(view.plan.text)}</div></details>` : ""}`
+        : "<p class='empty'>Not registered — drift against the plan cannot be measured.</p>"}
+    </section>
+
+    <section class="card"><h3>Rule verdicts</h3>
+      ${checkBlocks.join("<hr style='border-color:var(--border)'>") || "<p class='empty'>No plan check recorded.</p>"}
+    </section>
+
+    <section class="card"><h3>Timeline</h3>
+      <ul class="timeline">
+        ${timelineItems(view).map((t) => `
+          <li><span class="ts mono">${esc((t.ts || "").replace("T", " ").replace("Z", ""))}</span>
+              <span class="dot ${t.kind}"></span>
+              <span class="body"><span class="what">${esc(t.what)}</span>
+              <div class="detail mono">${esc(t.detail || "")}</div></span></li>`).join("")
+          || "<li class='empty'>No events yet.</li>"}
+      </ul>
+    </section>
+
+    <section class="card"><h3>Files</h3>
+      <table><thead><tr><th>File</th><th>LOC</th><th>Notes</th></tr></thead>
+      <tbody>${fileRows.join("") + otherRows.join("") ||
+        "<tr><td colspan='3' class='empty'>No changes recorded.</td></tr>"}</tbody></table>
+    </section>
+
+    <section class="card"><h3>Commits</h3>
+      <ul>${commits.join("") || "<li class='empty'>No linked commits (yet). Commit with the ArchRev git hook installed to link.</li>"}</ul>
+    </section>`;
+}
+
+/* ---------------- data flow ---------------- */
+
+function showError(message) {
+  const banner = $("error-banner");
+  banner.style.display = message ? "block" : "none";
+  banner.textContent = message || "";
+}
+
+async function refreshState() {
+  try {
+    const res = await fetch("/api/state");
+    const state = await res.json();
+    showError("");
+    renderSidebar(state);
+    if (!selectedId && state.sessions.length) {
+      selectedId = state.sessions[0].id;
+      refreshSession();
+    }
+  } catch {
+    showError("Cannot reach archrev serve — is it still running?");
+  }
+}
+
+async function refreshSession() {
+  if (!selectedId) return;
+  try {
+    const res = await fetch("/api/session/" + encodeURIComponent(selectedId));
+    if (res.ok) renderSession(await res.json());
+  } catch { /* transient; state poll reports connectivity */ }
+}
+
+if (EXPORT) {
+  $("mode-badge").textContent = "exported report";
+  $("mode-badge").classList.add("export");
+  $("root-path").textContent = EXPORT.root || "";
+  $("layout").classList.add("single");
+  $("sidebar").remove();
+  renderSession(EXPORT.session);
+} else {
+  $("mode-badge").textContent = "live";
+  $("mode-badge").classList.add("live");
+  refreshState();
+  setInterval(refreshState, POLL_MS);
+  setInterval(refreshSession, POLL_MS);
+}
+</script>
+</body>
+</html>

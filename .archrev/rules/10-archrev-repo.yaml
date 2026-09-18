@@ -1,0 +1,22 @@
+# Rules for the ArchRev repository itself (dogfooding).
+
+- id: flag-audit-format
+  kind: path
+  match: ["src/archrev/storage.py", "src/archrev/gitutil.py"]
+  action: flag
+  message: >-
+    This file defines the on-disk audit format / git linkage. Changes must
+    stay backward-compatible with existing session records.
+
+- id: block-packaging
+  kind: path
+  match: ["pyproject.toml"]
+  action: block
+  message: "Packaging/dependency changes require explicit approval."
+
+- id: hooks-fail-open
+  kind: prompt
+  policy: >-
+    Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py
+    hook command) must preserve fail-open behavior: hooks may never raise,
+    block the editor on internal errors, or break git commits.

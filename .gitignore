@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# ArchRev runtime noise (session records themselves ARE committed)
+.archrev/hook-errors.log
+
+# Editors / OS
+.idea/
+*.swp
+Thumbs.db
+archrev-session-*.html
+.archrev-smoke.html

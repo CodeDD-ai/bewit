@@ -1,0 +1,6 @@
+{"ts": "2026-09-18T10:25:16Z", "type": "prompt", "text": "Dogfood: verify the full ArchRev chain end to end"}
+{"ts": "2026-09-18T10:25:16Z", "type": "plan_registered", "origin": "inline", "declared_files": ["README.md", "pyproject.toml"], "chars": 92}
+{"ts": "2026-09-18T10:25:16Z", "type": "plan_check", "plan_registered": true, "declared_files": ["README.md", "pyproject.toml"], "path_findings": [{"path": "pyproject.toml", "rule_id": "block-packaging", "action": "block", "message": "Packaging/dependency changes require explicit approval."}], "prompt_rules": [{"rule_id": "hooks-fail-open", "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.", "verdict": "pass"}], "unknown_attestations": [], "note": "", "ok": true, "strict_mode": false}
+{"ts": "2026-09-18T10:25:16Z", "type": "gate", "tool": "Write", "permission": "ask", "paths": ["pyproject.toml"], "hits": [{"rule_id": "block-packaging", "action": "block", "path": "pyproject.toml"}]}
+{"ts": "2026-09-18T10:25:17Z", "type": "edit", "path": "README.md", "tool": "", "edit_count": null}
+{"ts": "2026-09-18T10:25:17Z", "type": "session_stop", "status": "completed"}

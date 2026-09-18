@@ -1,0 +1,99 @@
+{
+  "id": "smoke-1",
+  "started_at": "2026-09-18T10:25:16Z",
+  "head_sha": null,
+  "finalized": true,
+  "generated_at": "2026-09-18T10:25:17Z",
+  "prompts": [
+    {
+      "ts": "2026-09-18T10:25:16Z",
+      "text": "Dogfood: verify the full ArchRev chain end to end"
+    }
+  ],
+  "checks": [
+    {
+      "ts": "2026-09-18T10:25:16Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        "README.md",
+        "pyproject.toml"
+      ],
+      "path_findings": [
+        {
+          "path": "pyproject.toml",
+          "rule_id": "block-packaging",
+          "action": "block",
+          "message": "Packaging/dependency changes require explicit approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "",
+      "ok": true,
+      "strict_mode": false
+    }
+  ],
+  "gate_events": [
+    {
+      "ts": "2026-09-18T10:25:16Z",
+      "type": "gate",
+      "tool": "Write",
+      "permission": "ask",
+      "paths": [
+        "pyproject.toml"
+      ],
+      "hits": [
+        {
+          "rule_id": "block-packaging",
+          "action": "block",
+          "path": "pyproject.toml"
+        }
+      ]
+    }
+  ],
+  "edits": [
+    {
+      "ts": "2026-09-18T10:25:17Z",
+      "path": "README.md",
+      "tool": ""
+    }
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "added": null,
+      "removed": null,
+      "untracked": true,
+      "in_plan": true,
+      "rules": []
+    }
+  ],
+  "other_changes": [],
+  "drift": {
+    "out_of_plan": [],
+    "unrealized": [
+      "pyproject.toml"
+    ]
+  },
+  "protected_findings": [],
+  "commits": [],
+  "areas": [
+    "README.md"
+  ],
+  "event_count": 6,
+  "plan": {
+    "registered": true,
+    "declared_files": [
+      "README.md",
+      "pyproject.toml"
+    ]
+  },
+  "finalized_at": "2026-09-18T10:25:17Z"
+}

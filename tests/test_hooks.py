@@ -1,0 +1,75 @@
+"""End-to-end hook dispatch: the exact path Cursor exercises."""
+
+import json
+from pathlib import Path
+
+import pytest
+
+from archrev.hooks import run_hook
+from archrev.storage import SessionStore
+
+
+@pytest.fixture()
+def in_repo(repo: Path, monkeypatch):
+    """Hooks run with cwd at the project root, like Cursor does."""
+    monkeypatch.chdir(repo)
+    return repo
+
+
+def _payload(**kwargs) -> str:
+    return json.dumps({"conversation_id": "conv-42", **kwargs})
+
+
+def test_full_hook_lifecycle(in_repo: Path):
+    assert run_hook("prompt", _payload(prompt="Add a feature")) == {}
+    assert run_hook(
+        "edit", _payload(file_path=str(in_repo / "app" / "main.py"))
+    ) == {}
+
+    # Gate: protected path pauses for approval.
+    out = run_hook(
+        "gate",
+        _payload(
+            tool_name="Write",
+            tool_input={"file_path": "db/migrations/0002_x.sql"},
+        ),
+    )
+    assert out["permission"] == "ask"
+    assert "approval" in out["user_message"].lower()
+
+    # Gate: normal path passes silently.
+    out = run_hook(
+        "gate", _payload(tool_name="Write", tool_input={"file_path": "app/main.py"})
+    )
+    assert out == {"permission": "allow"}
+
+    assert run_hook("finalize", _payload(status="completed")) == {}
+
+    session = SessionStore(in_repo).session("conv-42")
+    types = [e["type"] for e in session.events()]
+    assert types[0] == "prompt"
+    assert "edit" in types and "gate" in types and "session_stop" in types
+    assert session.manifest() is not None
+    assert (session.dir / "report.md").exists()
+
+
+def test_gate_without_paths_allows(in_repo: Path):
+    out = run_hook("gate", _payload(tool_name="Shell", tool_input={"command": "ls"}))
+    assert out == {"permission": "allow"}
+
+
+def test_hooks_never_raise_on_garbage(in_repo: Path):
+    assert run_hook("gate", "not json at all") == {"permission": "allow"}
+    assert run_hook("prompt", "[1,2,3]") == {}
+    assert run_hook("finalize", "") == {}
+
+
+def test_edit_paths_from_nested_edits(in_repo: Path):
+    out = run_hook(
+        "gate",
+        _payload(
+            tool_name="MultiEdit",
+            tool_input={"edits": [{"file_path": "db/migrations/0009_z.sql"}]},
+        ),
+    )
+    assert out["permission"] == "ask"
