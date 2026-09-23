@@ -95,15 +95,33 @@ _PLAN_EVENT_TEXT_CAP = 20_000
 
 
 def register_plan(
-    session: Session, text: str, root: Path, origin: str | None = None
+    session: Session,
+    text: str,
+    root: Path,
+    origin: str | None = None,
+    amend: bool = False,
 ) -> list[str]:
     """Snapshot ``text`` as the session plan; returns declared files.
 
-    Re-registering is how plans are *amended*; each registration event
-    carries its own text, so the full revision history (how the plan
-    evolved during development) is reviewable, not just the final state.
+    Each registration event carries its own text, so revision history
+    stays reviewable. Drift uses the *latest* declared set. By default a
+    new registration replaces that set (latest-plan-wins). ``amend=True``
+    unions the new files with the previous declaration, which is what
+    multi-batch sessions need — replacement silently un-declares earlier
+    work and manufactures false drift.
     """
     declared = extract_declared_files(text, root)
+    if amend:
+        previous = session.last_event("plan_registered")
+        prior = [
+            p
+            for p in (previous or {}).get("declared_files") or []
+            if isinstance(p, str)
+        ]
+        merged: dict[str, str] = {p.lower(): p for p in prior}
+        for path in declared:
+            merged.setdefault(path.lower(), path)
+        declared = list(merged.values())
     session.write_plan(text)
     session.append_event(
         "plan_registered",
@@ -111,6 +129,7 @@ def register_plan(
         declared_files=declared,
         chars=len(text),
         text=text[:_PLAN_EVENT_TEXT_CAP],
+        amend=amend,
     )
     return declared
 

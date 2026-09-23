@@ -169,20 +169,52 @@ def test_claude_post_tool_use_records_edit(repo: Path, monkeypatch):
     assert edits and edits[0]["path"].endswith("app/main.py")
 
 
+def _native_bash_write(repo: Path, target: Path, content: str, **extra) -> None:
+    """A Bash tool call that writes ``target``, bracketed by its hooks."""
+    tool = {"tool_name": "Bash", "tool_input": {"command": "./gen.sh"}, **extra}
+    run_hook("auto", _native(repo, "PreToolUse", **tool))
+    target.write_text(content, encoding="utf-8")
+    run_hook("auto", _native(repo, "PostToolUse", **tool))
+
+
 def test_claude_stop_followup_uses_decision_block(repo: Path, monkeypatch):
     monkeypatch.chdir(repo)
     run_hook(
         "auto",
         _native(repo, "UserPromptSubmit", prompt_id="p1", prompt="do it"),
     )
-    (repo / "db" / "migrations" / "0001_init.sql").write_text(
-        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
+    _native_bash_write(
+        repo,
+        repo / "db" / "migrations" / "0001_init.sql",
+        "CREATE TABLE t (id INT, extra TEXT);\n",
+        prompt_id="p1",
     )
     out = run_hook("auto", _native(repo, "Stop", prompt_id="p1"))
     assert out.get("decision") == "block"
     assert "db/migrations/0001_init.sql" in out.get("reason", "")
     # Same findings next turn: debounce, no second continuation.
     assert run_hook("auto", _native(repo, "Stop", prompt_id="p1")) == {}
+
+
+def test_claude_change_after_bash_finished_is_background(repo: Path, monkeypatch):
+    """PostToolUse on Bash closes the window: a later hand edit (or another
+    window's write) is not this session's gate bypass."""
+    monkeypatch.chdir(repo)
+    run_hook(
+        "auto",
+        _native(repo, "UserPromptSubmit", prompt_id="p1", prompt="do it"),
+    )
+    _native_bash_write(repo, repo / "app" / "gen.txt", "generated\n", prompt_id="p1")
+    (repo / "db" / "migrations" / "0001_init.sql").write_text(
+        "CREATE TABLE t (id INT, by_hand TEXT);\n", encoding="utf-8"
+    )
+    assert run_hook("auto", _native(repo, "Stop", prompt_id="p1")) == {}
+    manifest = SessionStore(repo).session("native-sess").manifest()
+    assert [c["path"] for c in manifest["other_changes"]] == ["app/gen.txt"]
+    assert manifest["other_changes"][0]["during"] == ["shell: ./gen.sh"]
+    background = [c["path"] for c in manifest["background_changes"]]
+    assert "db/migrations/0001_init.sql" in background
+    assert manifest["protected_findings"] == []
 
 
 def test_claude_session_end_finalizes_without_followup(repo: Path, monkeypatch):
@@ -281,6 +313,8 @@ def test_init_writes_claude_and_codex_hooks(repo: Path):
     assert cmd == "archrev hook"
     matcher = claude["hooks"]["PostToolUse"][0]["matcher"]
     assert "apply_patch" in matcher
+    # Shell/MCP after-hooks close the session's command window.
+    assert "Bash" in matcher and "mcp__" in matcher
     assert (repo / ".claude" / "rules" / "archrev.md").exists()
 
     codex = json.loads((repo / ".codex" / "hooks.json").read_text(encoding="utf-8"))

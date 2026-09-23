@@ -49,10 +49,13 @@ class Config:
             failed plan checks, out-of-plan drift), so every implementation
             ends with an explicit rule review instead of a silent manifest.
         prompt_capture: How much prompt text enters the record:
-            ``full`` (default), ``excerpt`` (first 200 chars + length), or
-            ``none`` (length + content hash only). Team rollouts should
-            decide this consciously — prompts are the most sensitive
-            artifact ArchRev stores.
+            ``full`` (default), ``excerpt`` (first 200 chars + length),
+            ``none`` (length + content hash only), or ``sealed``
+            (ciphertext to the public keys in ``.archrev/recipients.yaml``).
+        record_scope: ``full`` commits the event log with the repo.
+            ``audit`` (the init default for new repos) gitignores
+            ``events.jsonl`` and commits only the manifest, plan, and
+            report, with the chain head sealed into the manifest.
         exempt: Glob patterns for paths the gate never blocks.
     """
 
@@ -61,6 +64,7 @@ class Config:
     protected_scan: bool = True
     final_check: bool = True
     prompt_capture: str = "full"
+    record_scope: str = "full"
     exempt: tuple[str, ...] = DEFAULT_EXEMPT
 
 
@@ -115,8 +119,12 @@ def load_config(root: Path) -> Config:
         final_check = defaults.final_check
 
     prompt_capture = str(raw.get("prompt_capture", defaults.prompt_capture)).lower()
-    if prompt_capture not in ("full", "excerpt", "none"):
+    if prompt_capture not in ("full", "excerpt", "none", "sealed"):
         prompt_capture = defaults.prompt_capture
+
+    record_scope = str(raw.get("record_scope", defaults.record_scope)).lower()
+    if record_scope not in ("full", "audit"):
+        record_scope = defaults.record_scope
 
     exempt_raw = raw.get("exempt", None)
     if isinstance(exempt_raw, list) and all(isinstance(x, str) for x in exempt_raw):
@@ -132,5 +140,6 @@ def load_config(root: Path) -> Config:
         protected_scan=scan,
         final_check=final_check,
         prompt_capture=prompt_capture,
+        record_scope=record_scope,
         exempt=exempt,
     )

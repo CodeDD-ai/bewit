@@ -16,7 +16,7 @@ import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from archrev.config import ARCHREV_DIRNAME
+from archrev.config import ARCHREV_DIRNAME, load_config
 
 _CONFIG_TEMPLATE = """\
 # ArchRev configuration. Safe to edit; invalid values fall back to defaults.
@@ -44,9 +44,21 @@ final_check: true
 #   full    - the whole prompt (default; best provenance)
 #   excerpt - first 200 characters plus total length
 #   none    - no text; only length and a content hash
+#   sealed  - ciphertext for the public keys in .archrev/recipients.yaml
+#             (archrev seal keygen). Falls back to `none` if sealing
+#             cannot run — never stores plaintext by accident.
 # Prompts are the most sensitive artifact ArchRev stores. Decide this
 # consciously before a team rollout.
 prompt_capture: full
+
+# What of the session record is committed with the repository:
+#   audit - gitignore events.jsonl (full transcript stays local). The
+#           manifest, plan, and report are committed, and the manifest
+#           carries the event-log chain head so integrity is checkable
+#           on the machine that has the log.
+#   full  - commit the event log too (maximum shared provenance, and
+#           every prompt your capture mode kept).
+record_scope: audit
 
 # Additional glob patterns the gate never blocks (extends built-in exemptions
 # for .archrev/sessions/** and *.plan.md). Note: ArchRev governance files
@@ -80,6 +92,8 @@ _STARTER_RULES = """\
 #   kind: shell  - `match_command` regexes over shell commands
 #   kind: mcp    - `match_tool` regexes over MCP tool identifiers
 #   kind: tool   - `match_tool` regexes over agent tool names
+#   Write regexes in 'single quotes': YAML keeps backslashes literal there,
+#   while "double quotes" treat \\s, \\d, ... as (invalid) escape sequences.
 #
 # Honesty note: these gate the agent's *attempts* at the tool layer and
 # record everything - policy plus audit, not a sandbox. Use containers /
@@ -110,14 +124,14 @@ _STARTER_RULES = """\
 
 - id: example-no-push
   kind: shell
-  match_command: ["\\bgit\\s+push\\b"]
+  match_command: ['\\bgit\\s+push\\b']
   action: block
   message: "Pushing requires explicit approval."
   enabled: false
 
 - id: example-flag-installs
   kind: shell
-  match_command: ["\\b(pip|pip3|uv pip|npm|pnpm|yarn)\\s+(install|add)\\b"]
+  match_command: ['\\b(pip|pip3|uv pip|npm|pnpm|yarn)\\s+(install|add)\\b']
   action: flag
   message: "Dependency installation - recorded for review."
   enabled: false
@@ -146,6 +160,14 @@ _STARTER_RULES = """\
   command: "semgrep scan --config .archrev/checks/endpoints.yaml --error --quiet {files}"
   action: block
   message: "New/changed endpoints must validate input (semgrep)."
+  enabled: false
+
+- id: example-python-syntax
+  kind: check
+  match: ["**/*.py"]
+  command: python -m archrev.syntaxcheck {files}
+  action: flag
+  message: "Changed Python files must parse (no bytecode written)."
   enabled: false
 
 - id: example-eslint
@@ -235,11 +257,17 @@ _SHIM_PREFIX = {"none": "archrev ", "uvx": "uvx archrev "}
 _OURS_RE = re.compile(r"\barchrev(\.exe)?\s+(hook|git-trailer)\b")
 
 #: Claude Code / Codex lifecycle events. One bare ``archrev hook`` command;
-#: the payload's ``hook_event_name`` selects the handler.
+#: the payload's ``hook_event_name`` selects the handler. PostToolUse also
+#: matches shell and MCP tools: it closes the session's command window,
+#: which keeps changes made by other sessions out of this session's review.
 _NATIVE_HOOK_SPECS: tuple[tuple[str, str | None, dict], ...] = (
     ("UserPromptSubmit", None, {}),
     ("PreToolUse", None, {}),
-    ("PostToolUse", "Edit|Write|NotebookEdit|apply_patch", {}),
+    (
+        "PostToolUse",
+        "Edit|Write|NotebookEdit|apply_patch|Bash|shell|exec_command|mcp__.*",
+        {},
+    ),
     ("Stop", None, {}),
     ("SessionEnd", None, {"timeout": 60}),
 )
@@ -251,15 +279,18 @@ SUPPORTED_RUNTIMES = ("cursor", "claude", "codex")
 #: answers in milliseconds when nothing applies. afterTabFileEdit captures
 #: human Tab-completion edits (tagged origin=tab in the audit log). The stop
 #: hook carries loop_limit so the final rule review can send the agent one
-#: follow-up without any risk of a notification loop.
+#: follow-up without any risk of a notification loop. The after-shell/MCP
+#: hooks close the session's command window (see archrev.worktree).
 _HOOK_SPECS: tuple[tuple[str, str, dict], ...] = (
     ("beforeSubmitPrompt", "prompt", {}),
     ("afterFileEdit", "edit", {}),
     ("afterTabFileEdit", "edit", {}),
     ("preToolUse", "gate", {}),
     ("beforeShellExecution", "shell", {}),
+    ("afterShellExecution", "exec_end", {}),
     ("beforeReadFile", "read", {}),
     ("beforeMCPExecution", "mcp", {}),
+    ("afterMCPExecution", "exec_end", {}),
     ("stop", "finalize", {"loop_limit": 2}),
 )
 
@@ -269,6 +300,32 @@ class InitResult:
     created: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+
+
+_EVENTS_GITIGNORE_LINE = ".archrev/sessions/*/events.jsonl"
+
+
+def _ensure_audit_gitignore(root: Path, result: InitResult) -> None:
+    """Keep raw event logs out of git when the repo is in audit scope."""
+    if load_config(root).record_scope != "audit":
+        return
+    path = root / ".gitignore"
+    try:
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+    except OSError as exc:
+        result.warnings.append(f"{path}: could not read ({exc})")
+        return
+    if _EVENTS_GITIGNORE_LINE in existing:
+        result.skipped.append(str(path))
+        return
+    block = (
+        "\n# ArchRev audit tier: the full event log stays on the authoring "
+        "machine.\n# Manifests, plans, and reports under .archrev/sessions/ "
+        "stay committed.\n"
+        f"{_EVENTS_GITIGNORE_LINE}\n"
+    )
+    path.write_text(existing.rstrip() + block, encoding="utf-8", newline="\n")
+    result.created.append(str(path))
 
 
 def _write_if_absent(path: Path, content: str, result: InitResult) -> None:
@@ -489,6 +546,7 @@ def init_repo(
     result = InitResult()
     base = root / ARCHREV_DIRNAME
     _write_if_absent(base / "config.yaml", _CONFIG_TEMPLATE, result)
+    _ensure_audit_gitignore(root, result)
     _write_if_absent(base / "rules" / "00-starter-rules.yaml", _STARTER_RULES, result)
     _write_if_absent(
         base / "rules" / "90-archrev-self-protection.yaml",

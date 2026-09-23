@@ -73,6 +73,7 @@ returned.
 | Prompt | `beforeSubmitPrompt` | `UserPromptSubmit` | `UserPromptSubmit` |
 | Gate (path/tool/shell/read/MCP) | split events | one `PreToolUse` (fan-out by tool) | one `PreToolUse` |
 | Edit capture | `afterFileEdit` | `PostToolUse` (`Edit`/`Write`) | `PostToolUse` (`apply_patch`) |
+| Command finished (session scoping) | `afterShellExecution`, `afterMCPExecution` | `PostToolUse` (`Bash`, `mcp__*`) | `PostToolUse` (shell tools) |
 | Final review nag | `stop` → `followup_message` | `Stop` → `decision: block` | `Stop` → `decision: block` |
 | Durable finalize | (same `stop`) | `SessionEnd` | `SessionEnd` |
 | `block` rule | pause (`ask`) | pause (`ask`) | **deny** (Codex cannot ask; returning `ask` would fail-open) |
@@ -248,7 +249,9 @@ prompt ──> plan ──> check ──> edits ──> stop ──> commit
    --numstat` since session start), **drift** (files touched but not
    planned, files planned but never touched), and a **protected-path scan**
    of the full diff — which catches protected files changed *around* the
-   gate, e.g. by shell commands like `manage.py makemigrations`. When
+   gate, e.g. by shell commands like `manage.py makemigrations`. The scan
+   is **session-scoped** (see [Parallel sessions](#parallel-sessions-in-one-checkout)):
+   only changes this session could have made are raised. When
    material findings exist (gate bypasses, a failed plan check, out-of-plan
    drift), the **agent receives a follow-up message** listing them, so every
    implementation ends with an explicit rule review instead of a silent
@@ -278,7 +281,8 @@ enforcement: on      # on | monitor (record, never stop) | off
 strict_plan_check: false
 protected_scan: true
 final_check: true    # notify the agent of open findings at session end
-prompt_capture: full # full | excerpt | none (see "Prompt privacy" below)
+prompt_capture: full # full | excerpt | none | sealed
+record_scope: audit   # audit (gitignore the event log) | full
 ```
 
 With strict mode on, only a **passing** plan check unlocks edits — a check
@@ -307,6 +311,33 @@ natural checkpoints, so the audit log stays complete:
   therefore either linked to an agent session or explicitly marked human —
   nothing is silently unattributed. (Only active once agent sessions exist,
   so purely manual repositories generate no noise.)
+
+## Parallel sessions in one checkout
+
+Several Cursor windows, a Claude/Codex terminal, and your own hand edits
+routinely share one working tree, so "the diff since the session started"
+mixes everybody's work. ArchRev attributes each change to the session
+that could have made it:
+
+- **Edits through agent tools** belong to the session whose hook recorded
+  them. Another session sees them as *other sessions*.
+- **Changes without an edit event** (shell writes, MCP side effects) belong
+  to a session only if they happened **while one of its own commands was
+  running**. Each session records working-tree checkpoints (content
+  fingerprints of dirty files) when it starts, before and after each of
+  its shell/MCP commands, and at each prompt and stop. The review names
+  the command, e.g. `db/x.sql (during shell: python manage.py makemigrations)`.
+- **Everything else** is a *background change*: hand edits, another
+  window's commands, or work that pre-dates the session. It shows up in
+  the files list but is never raised as this session's gate bypass or
+  sent to its agent for acknowledgment.
+
+If the after-command hooks are not wired (older installs: re-run
+`archrev init` to add them), a command window stays open until the
+session's next checkpoint. Attribution then errs toward more review for
+the session, never toward silence. Sessions recorded before checkpoints
+existed keep the previous since-start attribution (`"attribution":
+"since_start"` in the manifest).
 
 ## Tamper-evident audit log
 
@@ -406,6 +437,13 @@ the `include:` snippet for your `.gitlab-ci.yml`:
   set (project access token, `api` scope, masked variable) the report is
   posted as an MR comment; without it, it lands in the job artifacts.
 
+Both jobs install `ARCHREV_PIP_SPEC`, which defaults to the exact release
+that generated the template (`archrev==<version>`). To install from a
+private index or a git URL pinned to a commit, override it as a project
+CI/CD variable. Do not replace it with a bare `archrev`: an unpinned
+install runs whatever the index serves under that name, with access to
+the pipeline's variables.
+
 This is the layer that needs zero developer adoption: even a laptop with
 hooks disabled cannot merge changes that violate block-level rules, and
 reviewers see the session provenance next to the diff.
@@ -422,10 +460,18 @@ record via `.archrev/config.yaml`:
 | `full` (default) | the whole prompt text — best provenance |
 | `excerpt` | first 200 characters plus total length |
 | `none` | no text; only length and a SHA-256 content hash |
+| `sealed` | ciphertext only. `archrev seal keygen` writes a private key to `~/.archrev/seal.key` (optional passphrase) and the public key to `.archrev/recipients.yaml`. Add an org escrow key there only as an explicit decision. Decrypt with `archrev show --unseal` or the passphrase field in the localhost viewer. Plaintext is never written back. If sealing cannot run, capture falls back to `none` — never to plaintext. |
 
-Even `none` keeps sessions traceable: the hash proves *which* prompt
-started a session if the text is later disclosed, without ArchRev ever
-storing it.
+The exact prompt is useful when you are reconstructing a decision ("what was the agent told?"). It is not useful as a permanent copy of scratch thinking. `sealed` keeps the reconstruction possible for the people who hold a key, and keeps it out of everyone else's `git log`.
+
+### What gets committed (`record_scope`)
+
+| Mode | Committed | Local only |
+| --- | --- | --- |
+| `audit` (default for new `archrev init`) | `manifest.json`, `plan.md`, `report.md`. The manifest stores the event-log chain head. | `events.jsonl` (gitignored). `archrev verify` on a checkout without the log says so, instead of pretending the chain is empty. |
+| `full` | the event log too | — |
+
+`archrev prune --keep-days 30` deletes event logs of finalized sessions older than that. It does not touch manifests. `archrev plan register --amend` unions new file declarations with the previous plan instead of replacing it. `archrev rules explain <path>` prints which rules match a path and which checkpoint would fire — including an explicit "no rule matches".
 
 ### Cross-repo oversight (`archrev index`)
 
@@ -465,7 +511,24 @@ forming the tamper-evidence chain (`archrev verify`); records from earlier
 versions remain readable and are reported as pre-chain legacy events. Because it all lives in git, provenance survives ArchRev
 itself: even without the tool, the record is plain text in your history.
 
-## Honest limitations (v0.4)
+Session scoping adds `worktree` checkpoint events (additive; older logs
+without them stay valid and use since-start attribution):
+
+```json
+{"type": "worktree", "phase": "exec_start", "label": "shell: pytest",
+ "changed": {"db/x.sql": "3f2a9c01d4e5b6a7", "gone.py": "-"}}
+```
+
+`phase` is `start`, `exec_start`, `exec_end`, `turn_start`, or `turn_end`.
+`changed` holds content fingerprints relative to the session's previous
+checkpoint (`-` marks a deleted file); the `start` event holds the full
+baseline of pre-existing changes. Command text is stored in `label` only
+with `prompt_capture: full`; otherwise the label is just `shell`. The
+manifest gains `background_changes`, an `attribution` mode
+(`checkpoints` | `since_start`), and a `during` list on unexplained
+changes and protected findings.
+
+## Honest limitations (v0.5)
 
 - Live capture requires a runtime with lifecycle hooks. Cursor, Claude
   Code, and Codex are wired; Aider/Cline/Copilot Chat get the protocol
@@ -482,9 +545,22 @@ itself: even without the tool, the record is plain text in your history.
 - Human tab-completion capture (`afterTabFileEdit`) is Cursor-only; on
   Claude/Codex, human edits land in the commit-time `human` ledger.
 - Human hand-edits are captured at commit time (the `human` ledger), not
-  live; between commits they appear in the finalize diff as `other changes`.
-- `plan register` / `check plan` bind to the most recently active session;
-  with several agents in one repo simultaneously, pass `--session` explicitly.
+  live; between commits they appear in the finalize diff as background
+  changes.
+- Session scoping cannot separate a hand edit saved *while* one of this
+  session's commands is running from that command's own writes; such a
+  change is attributed to the session (resolve it with `archrev ack`).
+  Timestamps have one-second resolution, so another session's edit event
+  in the same second as this session's command window counts as theirs.
+- `plan register` / `check plan` bind to the most recently active session.
+  The shell hook right before the command marks its own session active,
+  which makes this reliable in practice; pass `--session` to be explicit.
+- `sealed` prompts are only as private as the recipient set. A public key
+  in `.archrev/recipients.yaml` can read every sealed prompt. There is no
+  per-prompt access control.
+- `record_scope: audit` means `archrev verify` on a colleague's checkout
+  cannot recompute the chain; it can only show the committed chain head.
+  The log has to be verified where it was written.
 - If hooks are disabled or the CLI leaves PATH, capture stops silently by
   design (fail-open); `archrev sessions` shows the gap.
 

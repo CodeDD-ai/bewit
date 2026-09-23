@@ -50,6 +50,17 @@ from archrev.gate import (
 from archrev.gitutil import Git
 from archrev.rules import load_rules
 from archrev.storage import Session, SessionStore, utc_now_iso
+from archrev.worktree import (
+    PHASE_EXEC_END,
+    PHASE_EXEC_START,
+    PHASE_START,
+    PHASE_TURN_END,
+    PHASE_TURN_START,
+    record_checkpoint,
+)
+
+#: Characters of a shell command kept as a checkpoint label.
+_COMMAND_LABEL_CHARS = 120
 
 #: Tool names whose calls modify files and are therefore subject to path
 #: (edit) rules in the preToolUse gate.
@@ -66,7 +77,9 @@ _PATH_KEYS = (
     "notebook_path",
 )
 
-HOOK_EVENTS = ("prompt", "edit", "gate", "shell", "read", "mcp", "finalize")
+HOOK_EVENTS = (
+    "prompt", "edit", "gate", "shell", "read", "mcp", "exec_end", "finalize"
+)
 
 
 def _session_id(payload: dict) -> str:
@@ -115,11 +128,28 @@ def _trim_payload(value: object, depth: int = 0) -> object:
     return repr(value)[:200]
 
 
-def _ensure_session(
+def _checkpoint(
+    root: Path, session: Session, phase: str, label: str | None = None
+) -> None:
+    """Record a working-tree checkpoint; never raises.
+
+    Checkpoints only sharpen attribution. A failure here must not turn a
+    shell or edit gate decision into the generic fail-open ``allow``, so it
+    is logged and swallowed right here.
+    """
+    try:
+        record_checkpoint(session, root, phase, label)
+    except Exception as exc:  # noqa: BLE001 — attribution is best-effort
+        _log_hook_error(root, f"checkpoint:{phase}", exc)
+
+
+def _open_session(
     root: Path, payload: dict, hook_event: str, runtime: str | None = None
-) -> Session:
+) -> tuple[Session, bool]:
+    """Resolve the payload's session; the flag is True when it was just created."""
     store = SessionStore(root)
     session = store.session(_session_id(payload))
+    created = session.meta() is None
     git = Git(root)
     session.ensure_meta(
         git.head_sha(),
@@ -134,6 +164,16 @@ def _ensure_session(
         session.append_event(
             "payload_debug", hook=hook_event, payload=_trim_payload(payload)
         )
+    return session, created
+
+
+def _ensure_session(
+    root: Path, payload: dict, hook_event: str, runtime: str | None = None
+) -> Session:
+    """Resolve the session; a new one gets its working-tree baseline."""
+    session, created = _open_session(root, payload, hook_event, runtime)
+    if created:
+        _checkpoint(root, session, PHASE_START)
     return session
 
 
@@ -187,8 +227,20 @@ def handle_prompt(root: Path, config: Config, payload: dict) -> dict:
     - ``none``    — no text at all; only length and a content hash, so the
       event still proves *a* prompt started the session and can be matched
       against a disclosed prompt later without ArchRev storing it.
+    - ``sealed``  — ciphertext for the public keys in recipients.yaml.
+      If sealing cannot run, this falls back to ``none`` and records why.
+      It never stores the plaintext as a consolation.
+
+    The working-tree checkpoint is taken after the prompt event, so a
+    session's record still opens with its prompt.
     """
-    session = _ensure_session(root, payload, "prompt")
+    session, created = _open_session(root, payload, "prompt")
+    _record_prompt(root, config, session, payload)
+    _checkpoint(root, session, PHASE_START if created else PHASE_TURN_START)
+    return {}
+
+
+def _record_prompt(root: Path, config: Config, session: Session, payload: dict) -> None:
     text = ""
     for key in ("prompt", "text", "user_prompt"):
         value = payload.get(key)
@@ -206,9 +258,32 @@ def handle_prompt(root: Path, config: Config, payload: dict) -> dict:
             "prompt", text=text[:_PROMPT_EXCERPT_CHARS], chars=len(text),
             capture="excerpt",
         )
+    elif config.prompt_capture == "sealed":
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        from archrev.seal import SealUnavailable, seal_text
+
+        try:
+            sealed = seal_text(root, text)
+        except SealUnavailable as exc:
+            session.append_event(
+                "prompt",
+                text="",
+                chars=len(text),
+                content_hash=digest,
+                capture="none",
+                seal_warning=str(exc),
+            )
+        else:
+            session.append_event(
+                "prompt",
+                text="",
+                chars=len(text),
+                content_hash=digest,
+                capture="sealed",
+                sealed=sealed,
+            )
     else:
         session.append_event("prompt", text=text)
-    return {}
 
 
 def handle_edit(root: Path, config: Config, payload: dict) -> dict:
@@ -316,12 +391,7 @@ def handle_gate(root: Path, config: Config, payload: dict) -> dict:
 def handle_shell(root: Path, config: Config, payload: dict) -> dict:
     """``beforeShellExecution``: gate one shell command."""
     session = _ensure_session(root, payload, "shell")
-    command = ""
-    for key in ("command", "cmd", "shell_command"):
-        value = payload.get(key)
-        if isinstance(value, str) and value:
-            command = value
-            break
+    command = _shell_command(payload)
     if not command:
         session.append_event(
             "payload_debug", hook="shell", payload=_trim_payload(payload)
@@ -329,7 +399,48 @@ def handle_shell(root: Path, config: Config, payload: dict) -> dict:
         return {"permission": "allow"}
     decision = evaluate_shell(config, load_rules(root), command)
     _record_gate(session, decision, "shell", command.strip()[:200])
+    if decision.permission != "deny":
+        _checkpoint(root, session, PHASE_EXEC_START, _exec_label(config, payload))
     return decision.to_hook_output()
+
+
+def _shell_command(payload: dict) -> str:
+    for key in ("command", "cmd", "shell_command"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
+def _mcp_identifier(payload: dict) -> str:
+    tool = ""
+    for key in ("tool_name", "tool", "name"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            tool = value
+            break
+    server = ""
+    for key in ("server", "server_name", "provider", "namespace"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            server = value
+            break
+    return f"{server}.{tool}" if server else tool
+
+
+def _exec_label(config: Config, payload: dict) -> str | None:
+    """Label of a shell / MCP command window, identical at start and end.
+
+    Commands can carry secrets; their text is kept only when the repository
+    already opted into full capture of agent input.
+    """
+    command = _shell_command(payload)
+    if command:
+        if config.prompt_capture != "full":
+            return "shell"
+        return f"shell: {' '.join(command.split())[:_COMMAND_LABEL_CHARS]}"
+    identifier = _mcp_identifier(payload)
+    return f"mcp: {identifier}" if identifier else None
 
 
 def handle_read(root: Path, config: Config, payload: dict) -> dict:
@@ -351,19 +462,7 @@ def handle_read(root: Path, config: Config, payload: dict) -> dict:
 def handle_mcp(root: Path, config: Config, payload: dict) -> dict:
     """``beforeMCPExecution``: gate MCP tool calls by identifier."""
     session = _ensure_session(root, payload, "mcp")
-    tool = ""
-    for key in ("tool_name", "tool", "name"):
-        value = payload.get(key)
-        if isinstance(value, str) and value:
-            tool = value
-            break
-    server = ""
-    for key in ("server", "server_name", "provider", "namespace"):
-        value = payload.get(key)
-        if isinstance(value, str) and value:
-            server = value
-            break
-    identifier = f"{server}.{tool}" if server else tool
+    identifier = _mcp_identifier(payload)
     if not identifier:
         session.append_event(
             "payload_debug", hook="mcp", payload=_trim_payload(payload)
@@ -371,7 +470,17 @@ def handle_mcp(root: Path, config: Config, payload: dict) -> dict:
         return {"permission": "allow"}
     decision = evaluate_tool(config, load_rules(root), "mcp", identifier)
     _record_gate(session, decision, "mcp", identifier)
+    if decision.permission != "deny":
+        _checkpoint(root, session, PHASE_EXEC_START, f"mcp: {identifier}")
     return decision.to_hook_output()
+
+
+def handle_exec_end(root: Path, config: Config, payload: dict) -> dict:
+    """``afterShellExecution`` / ``afterMCPExecution`` / ``PostToolUse``:
+    close this session's command window (see :mod:`archrev.worktree`)."""
+    session = _ensure_session(root, payload, "exec_end")
+    _checkpoint(root, session, PHASE_EXEC_END, _exec_label(config, payload))
+    return {}
 
 
 def _final_findings(view: dict) -> list[str]:
@@ -393,7 +502,10 @@ def _final_findings(view: dict) -> list[str]:
         if not f.get("via_gate") and f["path"].lower() not in acked
     ]
     if bypassed:
-        listed = ", ".join(f["path"] for f in bypassed[:5])
+        listed = ", ".join(
+            f["path"] + (f" (during {'; '.join(f['during'])})" if f.get("during") else "")
+            for f in bypassed[:5]
+        )
         findings.append(
             f"{len(bypassed)} protected path(s) changed OUTSIDE the edit "
             f"gate (shell/manual): {listed}"
@@ -447,6 +559,9 @@ def handle_finalize(
     last quality run (Claude/Codex ``Stop`` fires every turn).
     """
     session = _ensure_session(root, payload, "finalize")
+    # The turn is over: close any command window whose after-hook never
+    # fired, so later changes by others are not charged to this session.
+    _checkpoint(root, session, PHASE_TURN_END)
     if quality == "if_new_edits":
         # Claude/Codex Stop fires every turn. Skip a full finalize when
         # nothing material has happened since the last one, so the log is
@@ -543,6 +658,7 @@ _HANDLERS = {
     "shell": handle_shell,
     "read": handle_read,
     "mcp": handle_mcp,
+    "exec_end": handle_exec_end,
     "finalize": handle_finalize,
 }
 
@@ -576,7 +692,21 @@ def _dispatch(
             root, config, payload, notify=False, quality="always"
         )
     if action == "edit":
-        return handle_edit(root, config, promote_payload(payload))
+        promoted = promote_payload(payload)
+        name = tool_name_of(promoted)
+        if not (is_shell_tool(name) or is_mcp_tool(name)):
+            return handle_edit(root, config, promoted)
+        # Native PostToolUse after a shell/MCP call closes its command
+        # window. A shell-borne apply_patch also names files: record those
+        # as edits, but never log a path-less command as a capture gap.
+        handle_exec_end(root, config, promoted)
+        if _paths_from_tool_input(
+            promoted.get("tool_input") or promoted.get("toolInput")
+        ):
+            handle_edit(root, config, promoted)
+        return {}
+    if action == "exec_end":
+        return handle_exec_end(root, config, promote_payload(payload))
     if action in ("gate", "shell", "read", "mcp"):
         return _HANDLERS[action](root, config, promote_payload(payload))
     handler = _HANDLERS.get(action)

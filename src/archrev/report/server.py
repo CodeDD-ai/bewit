@@ -38,11 +38,26 @@ def _template() -> str:
     )
 
 
+def _user_prompt_excerpt(prompts: list[dict]) -> str:
+    """Sidebar line: the latest thing the user asked, not the opening prompt.
+
+    ArchRev's own final-review follow-up is also stored as a prompt. It is
+    a note to the agent, so it must not become the session's title.
+    """
+    for event in reversed(prompts):
+        text = str(event.get("text") or "").strip()
+        if not text or text.startswith("ArchRev final review found issues"):
+            continue
+        return text[:160]
+    if any(event.get("capture") == "sealed" for event in prompts):
+        return "(sealed prompt)"
+    return ""
+
+
 def _session_summary(root: Path, session: Session) -> dict:
     """Cheap summary for the sessions list (no git calls)."""
     events = session.events()
     prompts = [e for e in events if e.get("type") == "prompt"]
-    first_prompt = str(prompts[0].get("text", "")) if prompts else ""
     gate_flags = gate_blocks = 0
     for e in events:
         if e.get("type") != "gate":
@@ -51,15 +66,18 @@ def _session_summary(root: Path, session: Session) -> dict:
             gate_blocks += 1
         elif e.get("hits"):
             gate_flags += 1
+    finals = [e for e in events if e.get("type") == "final_check"]
+    open_findings = len((finals[-1].get("findings") or [])) if finals else 0
     meta = session.meta() or {}
     return {
         "id": session.id,
         "started_at": meta.get("started_at"),
         "finalized": session.manifest() is not None,
-        "prompt_excerpt": first_prompt.strip()[:160],
+        "prompt_excerpt": _user_prompt_excerpt(prompts),
         "edits": sum(1 for e in events if e.get("type") == "edit"),
         "flags": gate_flags,
         "blocks": gate_blocks,
+        "open_findings": open_findings,
         "plan_registered": any(
             e.get("type") == "plan_registered" for e in events
         ),
@@ -189,6 +207,53 @@ class _Handler(BaseHTTPRequestHandler):
             pass
         except Exception as exc:  # noqa: BLE001 — keep the viewer alive
             self._send_json(500, {"error": repr(exc)})
+
+    def do_POST(self) -> None:  # noqa: N802 — http.server API
+        """Unseal prompts. Localhost only; plaintext is not persisted."""
+        root: Path = self.server.archrev_root  # type: ignore[attr-defined]
+        client = self.client_address[0]
+        if client not in ("127.0.0.1", "::1"):
+            self._send_json(403, {"error": "unseal is localhost-only"})
+            return
+        if urlparse(self.path).path != "/api/unseal":
+            self._send_json(404, {"error": "not found"})
+            return
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+            raw = self.rfile.read(length) if length else b"{}"
+            body = json.loads(raw.decode("utf-8"))
+        except (ValueError, json.JSONDecodeError):
+            self._send_json(400, {"error": "expected JSON"})
+            return
+        ref = str(body.get("session") or "")
+        passphrase = body.get("passphrase") or None
+        session = SessionStore(root).resolve(ref)
+        if session is None:
+            self._send_json(404, {"error": f"unknown session '{ref}'"})
+            return
+        from archrev.seal import SealUnavailable, open_sealed
+
+        prompts = []
+        try:
+            prompt_index = 0
+            for event in session.events():
+                if event.get("type") != "prompt":
+                    continue
+                blob = event.get("sealed")
+                if event.get("capture") == "sealed" and isinstance(blob, dict):
+                    prompts.append(
+                        {
+                            "index": prompt_index,
+                            "text": open_sealed(
+                                blob, passphrase if passphrase else None
+                            ),
+                        }
+                    )
+                prompt_index += 1
+        except SealUnavailable as exc:
+            self._send_json(400, {"error": str(exc)})
+            return
+        self._send_json(200, {"prompts": prompts})
 
     def log_message(self, fmt: str, *args: object) -> None:
         """Silence per-request logging; the CLI prints the URL once."""

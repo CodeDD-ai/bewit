@@ -124,16 +124,24 @@ def test_tab_edits_tagged_with_human_origin(in_repo: Path):
     assert events[1]["origin"] == "agent"
 
 
+def _shell_write_migration(repo: Path, command: str = "./migrate.sh") -> None:
+    """A protected file changed by this session's shell command, not by an
+    edit tool: the gate never saw it."""
+    run_hook("shell", _payload(command=command))
+    (repo / "db" / "migrations" / "0001_init.sql").write_text(
+        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
+    )
+    run_hook("exec_end", _payload(command=command))
+
+
 def test_final_check_notifies_agent_once(in_repo: Path):
     """A gate bypass surfaces as a follow-up message at session end - once."""
     run_hook("prompt", _payload(prompt="do something"))
-    # Change a protected file WITHOUT an edit event (simulates a shell write).
-    (in_repo / "db" / "migrations" / "0001_init.sql").write_text(
-        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
-    )
+    _shell_write_migration(in_repo)
     out = run_hook("finalize", _payload(status="completed"))
     assert "followup_message" in out
     assert "db/migrations/0001_init.sql" in out["followup_message"]
+    assert "during shell: ./migrate.sh" in out["followup_message"]
 
     # Same findings again: fingerprint guard suppresses a second follow-up.
     assert run_hook("finalize", _payload(status="completed")) == {}
@@ -148,9 +156,7 @@ def test_final_check_notifies_agent_once(in_repo: Path):
 def test_acknowledged_findings_are_not_re_raised(in_repo: Path):
     """`archrev ack` resolves a finding: audited, and no more follow-ups."""
     run_hook("prompt", _payload(prompt="do something"))
-    (in_repo / "db" / "migrations" / "0001_init.sql").write_text(
-        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
-    )
+    _shell_write_migration(in_repo)
     out = run_hook("finalize", _payload(status="completed"))
     assert "followup_message" in out
 
@@ -166,9 +172,7 @@ def test_acknowledged_findings_are_not_re_raised(in_repo: Path):
 
 def test_ack_of_unrelated_target_does_not_suppress(in_repo: Path):
     run_hook("prompt", _payload(prompt="do something"))
-    (in_repo / "db" / "migrations" / "0001_init.sql").write_text(
-        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
-    )
+    _shell_write_migration(in_repo)
     session = SessionStore(in_repo).session("conv-42")
     session.append_event("ack", target="some/other/file.py", note="unrelated")
     out = run_hook("finalize", _payload(status="completed"))
@@ -185,9 +189,8 @@ def test_final_check_can_be_disabled(in_repo: Path):
     (in_repo / ".archrev" / "config.yaml").write_text(
         "final_check: false\n", encoding="utf-8"
     )
-    (in_repo / "db" / "migrations" / "0001_init.sql").write_text(
-        "CREATE TABLE t (id INT, extra TEXT);\n", encoding="utf-8"
-    )
+    run_hook("prompt", _payload(prompt="do something"))
+    _shell_write_migration(in_repo)
     out = run_hook("finalize", _payload(status="completed"))
     assert "followup_message" not in out
 
@@ -201,3 +204,53 @@ def test_edit_paths_from_nested_edits(in_repo: Path):
         ),
     )
     assert out["permission"] == "ask"
+
+
+def test_change_outside_session_commands_is_not_raised(in_repo: Path):
+    """Regression (parallel windows): a protected file changed while none of
+    this session's commands ran belongs to someone else - no follow-up."""
+    run_hook("prompt", _payload(prompt="do something"))
+    run_hook("shell", _payload(command="pytest"))
+    run_hook("exec_end", _payload(command="pytest"))
+    (in_repo / "db" / "migrations" / "0001_init.sql").write_text(
+        "CREATE TABLE t (id INT, by_other_window TEXT);\n", encoding="utf-8"
+    )
+    assert run_hook("finalize", _payload(status="completed")) == {}
+
+
+def test_checkpoint_failure_never_changes_a_gate_decision(in_repo: Path, monkeypatch):
+    """Fail-open is for ArchRev crashes, not for attribution hiccups: a
+    broken checkpoint must not turn an 'ask' into the generic 'allow'."""
+    import archrev.hooks as hooks
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("git exploded")
+
+    monkeypatch.setattr(hooks, "record_checkpoint", boom)
+    (in_repo / ".archrev" / "rules" / "shell.yaml").write_text(
+        '- id: push\n  kind: shell\n  match_command: ["\\\\bgit\\\\s+push\\\\b"]\n'
+        "  action: block\n",
+        encoding="utf-8",
+    )
+    run_hook("prompt", _payload(prompt="ship it"))
+    out = run_hook("shell", _payload(command="git push origin main"))
+    assert out["permission"] == "ask"
+    assert run_hook("exec_end", _payload(command="git push origin main")) == {}
+    log = (in_repo / ".archrev" / "hook-errors.log").read_text(encoding="utf-8")
+    assert "checkpoint:exec_start" in log and "git exploded" in log
+
+
+def test_cursor_after_shell_event_closes_the_window(in_repo: Path):
+    """`archrev hook auto` with Cursor's afterShellExecution name routes to
+    exec_end, the same handler `archrev hook exec_end` uses."""
+    run_hook("prompt", _payload(prompt="go"))
+    run_hook("shell", _payload(command="make"))
+    assert run_hook(
+        "auto", _payload(hook_event_name="afterShellExecution", command="make")
+    ) == {}
+    phases = [
+        e.get("phase")
+        for e in SessionStore(in_repo).session("conv-42").events()
+        if e["type"] == "worktree"
+    ]
+    assert phases == ["start", "exec_start", "exec_end"]

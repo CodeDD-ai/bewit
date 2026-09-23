@@ -46,3 +46,21 @@ def test_export_embeds_diffs(repo: Path):
     assert "__ARCHREV_DATA__" in html
     # The diff itself travels inside the export (JSON-escaped).
     assert "print('changed')" in html
+
+
+def test_sidebar_excerpt_is_the_latest_user_prompt(repo: Path):
+    from archrev.report.server import _session_summary
+
+    session = _session(repo, "sess-excerpt")
+    session.append_event("prompt", text="first question about the gate")
+    session.append_event(
+        "prompt",
+        text="ArchRev final review found issues in this session:\n- drift",
+    )
+    session.append_event("prompt", text="please also fix the viewer")
+    session.append_event(
+        "final_check", findings=["drift"], fingerprint="abc", notified=False
+    )
+    summary = _session_summary(repo, session)
+    assert summary["prompt_excerpt"] == "please also fix the viewer"
+    assert summary["open_findings"] == 1

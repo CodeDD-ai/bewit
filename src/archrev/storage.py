@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -283,6 +284,9 @@ class Session:
     def prompts(self) -> list[dict]:
         return [e for e in self.events() if e.get("type") == "prompt"]
 
+    def event_log_present(self) -> bool:
+        return (self.dir / EVENTS_FILENAME).is_file()
+
 
 class SessionStore:
     """Access point for all sessions in one repository."""
@@ -326,3 +330,24 @@ class SessionStore:
             return exact
         matches = [s for s in self.list_sessions() if s.id.startswith(ref)]
         return matches[0] if len(matches) == 1 else None
+
+    def prune_event_logs(self, keep_days: int) -> list[str]:
+        """Delete local event logs older than ``keep_days``.
+
+        Only finalized sessions are eligible, so a live session is never
+        truncated. Manifests, plans, and reports stay — those are the
+        committed audit tier. Returns the session ids whose logs were removed.
+        """
+        cutoff = time.time() - keep_days * 86400
+        removed: list[str] = []
+        for session in self.list_sessions():
+            if session.id == HUMAN_SESSION_ID:
+                continue
+            log = session.dir / EVENTS_FILENAME
+            if not log.is_file() or session.manifest() is None:
+                continue
+            if session.last_activity() >= cutoff:
+                continue
+            log.unlink()
+            removed.append(session.id)
+        return removed

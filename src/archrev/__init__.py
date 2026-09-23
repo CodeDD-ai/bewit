@@ -7,4 +7,4 @@ renders the full chain as a live timeline that can be reviewed at any
 point in time.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

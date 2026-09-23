@@ -113,7 +113,10 @@ def init(target: Path | None, shim: str, runtimes: tuple[str, ...]) -> None:
     required=False,
     default="auto",
     type=click.Choice(
-        ["auto", "prompt", "edit", "gate", "shell", "read", "mcp", "finalize"]
+        [
+            "auto", "prompt", "edit", "gate", "shell", "read", "mcp",
+            "exec_end", "finalize",
+        ]
     ),
 )
 def hook(event: str) -> None:
@@ -164,8 +167,17 @@ def plan() -> None:
 )
 @click.option("--text", "plan_text", default=None, help="Inline plan text.")
 @click.option("--session", "session_ref", default="latest", show_default=True)
+@click.option(
+    "--amend",
+    is_flag=True,
+    help="Union newly declared files with the previous plan instead of "
+    "replacing it. Use this when a session grows across batches.",
+)
 def plan_register(
-    plan_file: Path | None, plan_text: str | None, session_ref: str
+    plan_file: Path | None,
+    plan_text: str | None,
+    session_ref: str,
+    amend: bool,
 ) -> None:
     """Snapshot the plan (file or --text) into the session record."""
     from archrev.planning import register_plan
@@ -176,7 +188,7 @@ def plan_register(
     session = _resolve_session(root, session_ref)
     text = plan_text if plan_text is not None else plan_file.read_text(encoding="utf-8")
     origin = str(plan_file) if plan_file else "inline"
-    declared = register_plan(session, text, root, origin=origin)
+    declared = register_plan(session, text, root, origin=origin, amend=amend)
     click.echo(f"Plan registered for session {session.id}.")
     click.echo(f"Declared files ({len(declared)}):")
     for path in declared:
@@ -335,9 +347,15 @@ def check_diff_cmd(base: str | None, no_quality: bool) -> None:
 # ---------------------------------------------------------------------------
 
 
-@main.command()
-def rules() -> None:
+@main.group(invoke_without_command=True)
+@click.pass_context
+def rules(ctx: click.Context) -> None:
     """List active rules and any loading problems."""
+    if ctx.invoked_subcommand is None:
+        _print_rules()
+
+
+def _print_rules() -> None:
     from archrev.rules import load_rules
 
     root = _require_root()
@@ -345,7 +363,8 @@ def rules() -> None:
     config = load_config(root)
     click.echo(
         f"enforcement={config.enforcement}  strict_plan_check={config.strict_plan_check}  "
-        f"protected_scan={config.protected_scan}  final_check={config.final_check}"
+        f"protected_scan={config.protected_scan}  final_check={config.final_check}  "
+        f"prompt_capture={config.prompt_capture}  record_scope={config.record_scope}"
     )
     sections = (
         ("Path rules (edits)", ruleset.path_rules),
@@ -374,6 +393,71 @@ def rules() -> None:
         click.secho(f"\nProblems ({len(ruleset.errors)}):", fg="yellow")
         for error in ruleset.errors:
             click.secho(f"  {error}", fg="yellow")
+
+
+def explain_path(root: Path, relpath: str, kind: str) -> str:
+    """Human answer to 'why did this path (not) gate?'."""
+    from archrev.rules import load_rules
+
+    ruleset = load_rules(root)
+    matched = (
+        ruleset.match_read(relpath) if kind == "read" else ruleset.match_path(relpath)
+    )
+    lines = [f"{relpath}  ({kind})"]
+    if not matched:
+        lines.append("  no rule matches.")
+        if kind == "edit":
+            lines.append(
+                "  An edit of this path is not paused, denied, or flagged. "
+                "It can still show up as out-of-plan drift if a plan was "
+                "registered and did not declare it."
+            )
+        else:
+            lines.append("  A read of this path is not gated.")
+        return "\n".join(lines)
+    lines.append(f"  {len(matched)} matching rule(s):")
+    for rule in matched:
+        effect = {
+            "deny": "refused outright",
+            "block": "paused for your approval (denied on Codex, which cannot ask)",
+            "flag": "allowed, recorded, and highlighted",
+        }.get(rule.action, rule.action)
+        lines.append(f"  [{rule.action:5}] {rule.id}: {effect}")
+        if rule.message:
+            lines.append(f"          {rule.message}")
+    if kind == "edit":
+        lines.append(
+            "  Checkpoints: live edit gate; plan-check preview; "
+            "end-of-session protected scan; `archrev check diff` in CI."
+        )
+    else:
+        lines.append(
+            "  Checkpoint: live read gate only (beforeReadFile / PreToolUse Read). "
+            "Reads are not part of the diff scan or CI path check."
+        )
+    return "\n".join(lines)
+
+
+@rules.command(name="explain")
+@click.argument("path")
+@click.option(
+    "--kind",
+    type=click.Choice(["edit", "read"]),
+    default="edit",
+    show_default=True,
+    help="Which rule family to evaluate.",
+)
+def rules_explain(path: str, kind: str) -> None:
+    """Show which rules match PATH and what each checkpoint would do.
+
+    Answers "why was this edit not prompted?" — often the honest answer
+    is that no rule covers the path.
+    """
+    from archrev.gate import relativize
+
+    root = _require_root()
+    rel = relativize(path, root) or path.replace("\\", "/")
+    click.echo(explain_path(root, rel, kind))
 
 
 @main.command()
@@ -406,7 +490,13 @@ def sessions(limit: int) -> None:
     "-o", "--output", type=click.Path(path_type=Path), default=None,
     help="Write to a file instead of stdout.",
 )
-def show(session_ref: str, as_markdown: bool, output: Path | None) -> None:
+@click.option(
+    "--unseal",
+    is_flag=True,
+    help="Decrypt sealed prompts with the local seal key. Asks for a "
+    "passphrase when the key is protected. Plaintext is printed, not stored.",
+)
+def show(session_ref: str, as_markdown: bool, output: Path | None, unseal: bool) -> None:
     """Show the full chain of one session (default: the latest)."""
     from archrev.drift import compute_view
     from archrev.report.render import render_markdown, render_text
@@ -415,12 +505,41 @@ def show(session_ref: str, as_markdown: bool, output: Path | None) -> None:
     root = _require_root()
     session = _resolve_session(root, session_ref)
     view = compute_view(root, load_config(root), load_rules(root), session)
+    if unseal:
+        _unseal_view_prompts(session, view)
     text = render_markdown(view) if as_markdown else render_text(view)
     if output:
         output.write_text(text, encoding="utf-8")
         click.echo(f"Written to {output}")
     else:
         click.echo(text)
+
+
+def _unseal_view_prompts(session: Session, view: dict) -> None:
+    """Replace sealed prompt excerpts in ``view`` with plaintext. Not persisted."""
+    from archrev.seal import KEY_PATH, SealUnavailable, open_sealed
+
+    events = [e for e in session.events() if e.get("type") == "prompt"]
+    sealed = [e for e in events if e.get("capture") == "sealed" and e.get("sealed")]
+    if not sealed:
+        click.echo("No sealed prompts in this session.")
+        return
+    passphrase = None
+    try:
+        blob = json.loads(KEY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        blob = {}
+    if "private_key_sealed" in blob:
+        passphrase = click.prompt("Seal passphrase", hide_input=True)
+    prompts = view.get("prompts") or []
+    for event, prompt in zip(events, prompts):
+        sealed_blob = event.get("sealed")
+        if event.get("capture") != "sealed" or not isinstance(sealed_blob, dict):
+            continue
+        try:
+            prompt["text"] = open_sealed(sealed_blob, passphrase)
+        except SealUnavailable as exc:
+            raise click.ClickException(str(exc)) from exc
 
 
 @main.command()
@@ -624,7 +743,19 @@ def verify(session_ref: str | None, verify_all: bool) -> None:
         click.echo("No sessions recorded yet.")
         return
     broken = 0
+    local_only = 0
     for session in targets:
+        if not session.event_log_present():
+            local_only += 1
+            manifest = session.manifest() or {}
+            head = manifest.get("chain_head")
+            head_note = f" committed chain head {str(head)[:12]}" if head else ""
+            click.secho(
+                f"  local   {session.id}: event log is not in this checkout"
+                f"{head_note} — verify on the author's machine",
+                fg="yellow",
+            )
+            continue
         result = session.verify_chain()
         if result["ok"]:
             note = f" ({result['legacy']} legacy pre-chain event(s))" if result["legacy"] else ""
@@ -657,6 +788,79 @@ def serve(host: str, port: int) -> None:
         run_server(root, host, port)
     except KeyboardInterrupt:
         click.echo("\nStopped.")
+    except OSError as exc:
+        if _port_in_use(exc):
+            raise click.ClickException(
+                f"Port {port} is already in use. A viewer is probably already "
+                f"running at http://{host}:{port}/ — open that, or rerun with "
+                "--port."
+            ) from exc
+        raise
+
+
+def _port_in_use(exc: OSError) -> bool:
+    import errno
+
+    if getattr(exc, "winerror", None) == 10048:
+        return True
+    return exc.errno in (errno.EADDRINUSE, 10048)
+
+
+@main.command()
+@click.option("--keep-days", default=30, show_default=True, type=int)
+def prune(keep_days: int) -> None:
+    """Delete local event logs older than KEEP_DAYS.
+
+    Only finalized sessions are touched. Manifests, plans, and reports stay,
+    so the committed audit tier is unaffected. A live session is never pruned.
+    """
+    root = _require_root()
+    removed = SessionStore(root).prune_event_logs(keep_days)
+    if not removed:
+        click.echo(f"Nothing older than {keep_days} days to prune.")
+        return
+    for session_id in removed:
+        click.echo(f"  pruned  {session_id}")
+    click.echo(f"Removed {len(removed)} local event log(s).")
+
+
+@main.group()
+def seal() -> None:
+    """Encrypt prompts to committed public keys."""
+
+
+@seal.command(name="keygen")
+@click.option("--name", default=None, help="Recipient name (default: OS user).")
+@click.option(
+    "--protect",
+    is_flag=True,
+    help="Prompt for a passphrase that wraps the private key.",
+)
+def seal_keygen(name: str | None, protect: bool) -> None:
+    """Create a seal key and add its public half to this repository.
+
+    The private key is written to ~/.archrev/seal.key and is never committed.
+    The public key is appended to .archrev/recipients.yaml.
+    """
+    import getpass
+
+    from archrev.seal import SealUnavailable, add_recipient, generate_keypair
+
+    root = _require_root()
+    passphrase = None
+    if protect:
+        passphrase = click.prompt(
+            "Passphrase", hide_input=True, confirmation_prompt=True
+        )
+    try:
+        public = generate_keypair(passphrase)
+    except SealUnavailable as exc:
+        raise click.ClickException(str(exc)) from exc
+    recipient = name or getpass.getuser()
+    add_recipient(root, recipient, public)
+    click.secho(f"Public key for '{recipient}' written to .archrev/recipients.yaml", fg="green")
+    click.echo("Private key: ~/.archrev/seal.key (do not commit it).")
+    click.echo("Set prompt_capture: sealed in .archrev/config.yaml to start sealing.")
 
 
 @main.command()

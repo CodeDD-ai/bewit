@@ -37,6 +37,16 @@
         "command": "archrev hook mcp"
       }
     ],
+    "afterShellExecution": [
+      {
+        "command": "archrev hook exec_end"
+      }
+    ],
+    "afterMCPExecution": [
+      {
+        "command": "archrev hook exec_end"
+      }
+    ],
     "afterTabFileEdit": [
       {
         "command": "archrev hook edit"

@@ -16,3 +16,4 @@
 {"ts": "2026-09-18T10:40:19Z", "type": "payload_debug", "hook": "edit", "payload": {}}
 {"ts": "2026-09-18T10:41:39Z", "type": "payload_debug", "hook": "gate", "stdin_len": 17156, "stdin_head": "ï»¿{\"conversation_id\":\"403489ea-bf35-46df-a5a5-269d8f771963\",\"generation_id\":\"448983ec-b2e6-429e-93d8-7980010ae204\",\"model\":\"claude-fable-5\",\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"e:\\\\ArchRev\\\\src\\\\archrev\\\\cli.py\",\"content\":\"\\\"\\\"\\\"ArchRev command-line interface.\\n\\nTwo audiences share this CLI:\\n\\n- **Cursor** invokes ``archrev hook <event>`` (wired by ``archrev init``)\\n  and git invokes"}
 {"ts": "2026-09-18T10:41:39Z", "type": "payload_debug", "hook": "gate", "payload": {}}
+{"ts": "2026-09-23T07:26:10Z", "type": "payload_debug", "hook": "exec_end", "stdin_len": 4, "stdin_head": "{}\r\n", "prev": "genesis", "hash": "5321755489c2934d54416e0d75d0136df4533ad1eb21850ecb151e264f4636f6"}

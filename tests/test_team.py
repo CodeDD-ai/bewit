@@ -3,10 +3,14 @@
 import json
 from pathlib import Path
 
+import yaml
+
+from archrev import __version__
 from archrev.ci import write_gitlab_template
 from archrev.config import load_config
 from archrev.hooks import run_hook
 from archrev.metrics import collect, discover_repos
+from archrev.rules import load_rules
 from archrev.scaffold import init_repo
 from archrev.storage import SessionStore
 
@@ -38,6 +42,15 @@ def test_reinit_upgrades_between_shim_modes(repo: Path):
         assert ours[0]["command"].startswith("uvx archrev ")
 
 
+def test_init_starter_rules_load_without_errors(repo: Path):
+    """Generated rule files must parse; regex backslashes must survive YAML."""
+    init_repo(repo)
+    ruleset = load_rules(repo)
+    assert ruleset.errors == []
+    patterns = {r.id: r.patterns for r in ruleset.rules if r.kind == "shell"}
+    assert patterns["example-no-push"] == ("\\bgit\\s+push\\b",)
+
+
 # -- CI template -------------------------------------------------------------
 
 
@@ -51,6 +64,19 @@ def test_gitlab_template_written_with_jobs(repo: Path):
     assert "archrev:mr-report:" in content
     assert "ArchRev-Session:" in content  # trailer-based session lookup
     assert "local: .gitlab/archrev-ci.yml" in content  # include instructions
+
+
+def test_gitlab_template_pins_install_source(repo: Path):
+    """An unpinned `pip install archrev` would run whatever the index serves."""
+    content = write_gitlab_template(repo).read_text(encoding="utf-8")
+    jobs = yaml.safe_load(content)
+    assert jobs[".archrev:base"]["variables"]["ARCHREV_PIP_SPEC"] == (
+        f"archrev=={__version__}"
+    )
+    for name in ("archrev:rules", "archrev:mr-report"):
+        assert jobs[name]["extends"] == ".archrev:base"
+        assert 'pip install --quiet "$ARCHREV_PIP_SPEC"' in jobs[name]["before_script"]
+    assert "pip install --quiet archrev\n" not in content
 
 
 # -- prompt privacy ----------------------------------------------------------

@@ -118,6 +118,28 @@ class Git:
             return header + "\n".join("+" + line for line in lines) + "\n"
         return None
 
+    def dirty_paths(self) -> list[str] | None:
+        """Paths differing from HEAD (staged, unstaged, deleted) plus untracked.
+
+        Returns ``None`` when git cannot answer, so callers never mistake a
+        failure for a clean tree. ``--no-optional-locks`` keeps the call
+        strictly read-only: a plain ``git status`` may refresh and rewrite
+        the index, racing git commands running in another window.
+        """
+        out = self._run(
+            "--no-optional-locks",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+            "--no-renames",
+        )
+        if out is None:
+            return None
+        # -z entries are "XY <path>" with no quoting; --no-renames guarantees
+        # one path per entry.
+        return [entry[3:] for entry in out.split("\0") if len(entry) > 3]
+
     def untracked_files(self) -> list[str]:
         out = self._run("ls-files", "--others", "--exclude-standard")
         return [ln.strip() for ln in out.splitlines() if ln.strip()] if out else []

@@ -30,6 +30,7 @@ CANONICAL = (
     "shell",
     "read",
     "mcp",
+    "exec_end",
     "finalize",
     "pretool",
     "stop",
@@ -43,8 +44,10 @@ CURSOR_EVENTS = {
     "afterTabFileEdit": "edit",
     "preToolUse": "gate",
     "beforeShellExecution": "shell",
+    "afterShellExecution": "exec_end",
     "beforeReadFile": "read",
     "beforeMCPExecution": "mcp",
+    "afterMCPExecution": "exec_end",
     "stop": "finalize",
 }
 

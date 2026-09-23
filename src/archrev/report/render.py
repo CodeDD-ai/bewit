@@ -25,6 +25,11 @@ def _file_flags(entry: dict) -> str:
     return ", ".join(flags)
 
 
+def _during(entry: dict) -> str:
+    """Which of the session's commands were running when a file changed."""
+    return "; ".join(str(label) for label in entry.get("during") or [])
+
+
 def _drift_line(view: dict) -> str:
     plan = view.get("plan", {})
     if not plan.get("registered"):
@@ -98,6 +103,20 @@ def render_text(view: dict) -> str:
     if other:
         add(f"Other working-tree changes, not from tracked edits ({len(other)})")
         for f in other:
+            during = _during(f)
+            add(f"  {_loc(f.get('added'), f.get('removed')):>9}  {f['path']}"
+                + (f"  (during {during})" if during else ""))
+    foreign = view.get("other_sessions", [])
+    if foreign:
+        add(f"Changes owned by other sessions ({len(foreign)}, excluded from this review)")
+        for f in foreign:
+            owners = ", ".join(f.get("sessions") or [])
+            add(f"  {_loc(f.get('added'), f.get('removed')):>9}  {f['path']}  [{owners}]")
+    background = view.get("background_changes", [])
+    if background:
+        add(f"Background changes, not made by this session ({len(background)}, "
+            "excluded from this review)")
+        for f in background:
             add(f"  {_loc(f.get('added'), f.get('removed')):>9}  {f['path']}")
     outside = view.get("outside_repo", [])
     if outside:
@@ -112,7 +131,9 @@ def render_text(view: dict) -> str:
         add(f"Protected paths changed ({len(findings)})")
         for fnd in findings:
             via = "via gate" if fnd.get("via_gate") else "BYPASSED GATE (shell/manual)"
-            add(f"  [{fnd['action']}] {fnd['path']} ({fnd['rule_id']}, {via})")
+            during = _during(fnd)
+            add(f"  [{fnd['action']}] {fnd['path']} ({fnd['rule_id']}, {via})"
+                + (f" during {during}" if during else ""))
 
     final_checks = view.get("final_checks", [])
     if final_checks:
@@ -219,9 +240,26 @@ def render_markdown(view: dict) -> str:
             f"| {_file_flags(f) or '-'} |"
         )
     for f in view.get("other_changes", []):
+        # Shell commands routinely contain pipes and backticks, which would
+        # split the table cell or break the code span.
+        during = _during(f).replace("|", "\\|").replace("`", "'")
+        note = f"changed outside tracked edits, during `{during}`" if during else (
+            "changed outside tracked edits"
+        )
         add(
             f"| `{f['path']}` | {_loc(f.get('added'), f.get('removed'))} "
-            f"| changed outside tracked edits |"
+            f"| {note} |"
+        )
+    for f in view.get("other_sessions", []):
+        owners = ", ".join(f.get("sessions") or [])
+        add(
+            f"| `{f['path']}` | {_loc(f.get('added'), f.get('removed'))} "
+            f"| owned by another session ({owners}) |"
+        )
+    for f in view.get("background_changes", []):
+        add(
+            f"| `{f['path']}` | {_loc(f.get('added'), f.get('removed'))} "
+            f"| background change, not made by this session |"
         )
     for path in view.get("outside_repo", []):
         add(f"| `{path}` | — | written outside this repository |")
@@ -232,7 +270,9 @@ def render_markdown(view: dict) -> str:
         add("## Protected paths changed")
         for fnd in findings:
             via = "via gate" if fnd.get("via_gate") else "**bypassed gate** (shell/manual)"
-            add(f"- **{fnd['action']}** `{fnd['path']}` ({fnd['rule_id']}, {via})")
+            during = _during(fnd).replace("`", "'")
+            add(f"- **{fnd['action']}** `{fnd['path']}` ({fnd['rule_id']}, {via})"
+                + (f" during `{during}`" if during else ""))
         add("")
 
     final_checks = view.get("final_checks", [])

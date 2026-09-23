@@ -8,9 +8,16 @@ the durable ``manifest.json`` and ``report.md``.
 Definitions:
 
 - **touched**: files recorded by edit events (the agent's tracked edits).
-- **other changes**: files changed in the working tree since session start
-  that have *no* edit event — written by shell commands (``makemigrations``),
-  hand edits, or other sessions. Shown separately, never attributed.
+- **other changes**: files changed with *no* edit event that this session
+  may have written — by its shell commands (``makemigrations``) or MCP
+  tools. With working-tree checkpoints (:mod:`archrev.worktree`) these are
+  exactly the changes made while one of this session's commands ran;
+  sessions recorded without checkpoints fall back to "everything changed
+  since the session started".
+- **other sessions**: changes recorded as edits by a different session.
+- **background changes**: changes outside this session's activity — hand
+  edits, other windows' commands, work that pre-dates the session. Shown
+  for context, excluded from this session's drift and bypass review.
 - **drift**: touched files not declared in the plan (``out_of_plan``) and
   declared files never touched (``unrealized``).
 - **protected findings**: every changed path matching a path rule,
@@ -27,7 +34,8 @@ from archrev.config import Config
 from archrev.gate import rule_hits_for_paths
 from archrev.gitutil import Git
 from archrev.rules import RuleSet
-from archrev.storage import Session, utc_now_iso
+from archrev.storage import HUMAN_SESSION_ID, Session, SessionStore, utc_now_iso
+from archrev.worktree import Replay, fold_live_tail, is_bookkeeping, replay
 
 #: Maximum prompt characters stored in views/manifests (full text stays in events).
 _PROMPT_EXCERPT = 2000
@@ -51,6 +59,86 @@ def _areas(paths: list[str]) -> list[str]:
     return sorted(areas)
 
 
+def _edits_by_other_sessions(
+    root: Path, session_id: str
+) -> dict[str, dict[str, list[str]]]:
+    """Map lowercased path -> {other session id: [edit timestamps]}."""
+    found: dict[str, dict[str, list[str]]] = {}
+    for other in SessionStore(root).list_sessions():
+        if other.id in (session_id, HUMAN_SESSION_ID):
+            continue
+        for event in other.events():
+            path = event.get("path")
+            if event.get("type") != "edit" or not isinstance(path, str) or not path:
+                continue
+            if _is_outside_repo(path):
+                continue
+            stamps = found.setdefault(path.lower(), {}).setdefault(other.id, [])
+            if isinstance(event.get("ts"), str):
+                stamps.append(event["ts"])
+    return found
+
+
+def _count_lines(root: Path, path: str) -> int | None:
+    try:
+        return len(
+            (root / path).read_text(encoding="utf-8", errors="replace").splitlines()
+        )
+    except OSError:
+        return None
+
+
+def _classify_unedited(
+    root: Path,
+    scope: Replay,
+    candidates: list[str],
+    numstat: dict,
+    foreign: dict[str, dict[str, list[str]]],
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Split changes without an edit event in this session into
+    ``(other_changes, other_sessions, background_changes)``.
+
+    With checkpoints, a change is this session's only if it happened inside
+    one of its command windows and no other session recorded an edit of the
+    file during that window. Without checkpoints (older records), every
+    change since the session started is this session's unless another
+    session ever edited the file — the previous behavior.
+    """
+    windows = {p.lower(): w for p, w in scope.windows.items()}
+    own: list[dict] = []
+    owned_elsewhere: list[dict] = []
+    background: list[dict] = []
+    for path in candidates:
+        stat = numstat.get(path)
+        entry: dict = (
+            {"path": path, "added": stat.added, "removed": stat.removed}
+            if stat
+            else {"path": path, "added": None, "removed": None, "untracked": True}
+        )
+        owners = foreign.get(path.lower(), {})
+        if not scope.enabled:
+            if owners:
+                owned_elsewhere.append({**entry, "sessions": list(owners)})
+            else:
+                own.append(entry)
+            continue
+        mine = [
+            w
+            for w in windows.get(path.lower(), [])
+            if not any(w.contains(ts) for stamps in owners.values() for ts in stamps)
+        ]
+        if mine:
+            if entry.get("untracked"):
+                entry["added"], entry["removed"] = _count_lines(root, path), 0
+            entry["during"] = sorted({w.label for w in mine})
+            own.append(entry)
+        elif owners:
+            owned_elsewhere.append({**entry, "sessions": list(owners)})
+        elif not is_bookkeeping(path):
+            background.append(entry)
+    return own, owned_elsewhere, background
+
+
 def compute_view(
     root: Path,
     config: Config,
@@ -64,7 +152,13 @@ def compute_view(
     git = Git(root)
 
     prompts = [
-        {"ts": e.get("ts"), "text": str(e.get("text", ""))[:_PROMPT_EXCERPT]}
+        {
+            "ts": e.get("ts"),
+            "text": str(e.get("text", ""))[:_PROMPT_EXCERPT],
+            "capture": e.get("capture") or "full",
+            "chars": e.get("chars"),
+            "sealed": e.get("capture") == "sealed",
+        }
         for e in events
         if e.get("type") == "prompt"
     ]
@@ -130,15 +224,9 @@ def compute_view(
         if stat is None and path in untracked:
             # git diff never covers untracked files; count a brand-new
             # file's lines directly so the review shows real numbers.
-            try:
-                added = len(
-                    (root / path)
-                    .read_text(encoding="utf-8", errors="replace")
-                    .splitlines()
-                )
-                removed = 0
-            except OSError:
-                pass
+            lines = _count_lines(root, path)
+            if lines is not None:
+                added, removed = lines, 0
         files.append(
             {
                 "path": path,
@@ -158,11 +246,22 @@ def compute_view(
         )
 
     touched_set = {t.lower() for t in touched}
-    other_changes = [
-        {"path": path, "added": stat.added, "removed": stat.removed}
-        for path, stat in sorted(numstat.items())
-        if path.lower() not in touched_set
-    ]
+    # Several sessions (and the human) share one working tree. Checkpoints
+    # bound what this session could have written without an edit event to
+    # the windows in which its own commands ran; everything else belongs
+    # to someone else and must not be raised in this session's review.
+    scope = replay(events)
+    if scope.enabled and git.is_repo():
+        fold_live_tail(root, scope)
+    foreign = _edits_by_other_sessions(root, session.id)
+    changed = set(numstat) | (untracked if scope.enabled else set())
+    other_changes, other_sessions, background_changes = _classify_unedited(
+        root,
+        scope,
+        sorted(p for p in changed if p.lower() not in touched_set),
+        numstat,
+        foreign,
+    )
 
     drift = {
         "out_of_plan": [f["path"] for f in files if not f["in_plan"]] if plan_registered else [],
@@ -171,21 +270,21 @@ def compute_view(
 
     protected_findings: list[dict] = []
     if config.protected_scan:
-        all_changed = sorted(touched_set | {p.lower() for p in numstat})
-        # Re-run matching on original-case paths for readable output.
-        originals = {p.lower(): p for p in [*touched, *numstat]}
-        for hit in rule_hits_for_paths(
-            ruleset, [originals[p] for p in all_changed if p in originals]
-        ):
-            protected_findings.append(
-                {
-                    "path": hit.path,
-                    "rule_id": hit.rule_id,
-                    "action": hit.action,
-                    "message": hit.message,
-                    "via_gate": hit.path.lower() in touched_set,
-                }
-            )
+        # The diff-level backstop covers this session's tracked edits and
+        # its unexplained changes, never other sessions' or background work.
+        during = {c["path"].lower(): c.get("during") for c in other_changes}
+        scanned = {p.lower(): p for p in [*touched, *(c["path"] for c in other_changes)]}
+        for hit in rule_hits_for_paths(ruleset, [scanned[p] for p in sorted(scanned)]):
+            finding = {
+                "path": hit.path,
+                "rule_id": hit.rule_id,
+                "action": hit.action,
+                "message": hit.message,
+                "via_gate": hit.path.lower() in touched_set,
+            }
+            if not finding["via_gate"] and during.get(hit.path.lower()):
+                finding["during"] = during[hit.path.lower()]
+            protected_findings.append(finding)
 
     commits = git.commits_with_session(session.id) if git.is_repo() else []
 
@@ -218,12 +317,18 @@ def compute_view(
         "edits": edits,
         "files": files,
         "outside_repo": outside_repo,
+        "other_sessions": other_sessions,
         "other_changes": other_changes,
+        "background_changes": background_changes,
+        # "checkpoints": attribution bounded to this session's command
+        # windows; "since_start": older records without checkpoints.
+        "attribution": "checkpoints" if scope.enabled else "since_start",
         "drift": drift,
         "protected_findings": protected_findings,
         "commits": commits,
         "areas": _areas(touched),
         "event_count": len(events),
+        "chain_head": events[-1].get("hash") if events else None,
         # Tamper evidence: hash-chain verification over the event log.
         "chain": session.verify_chain(),
     }

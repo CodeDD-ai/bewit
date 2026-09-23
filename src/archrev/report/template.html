@@ -15,12 +15,13 @@
   body {
     margin: 0; background: var(--bg); color: var(--text);
     font: 14px/1.5 system-ui, "Segoe UI", sans-serif;
+    height: 100vh; overflow: hidden; display: flex; flex-direction: column;
   }
   code, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12.5px; }
   header {
     display: flex; align-items: center; gap: 12px; padding: 10px 18px;
     background: var(--panel); border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 5;
+    flex: none; z-index: 5;
   }
   header .logo { font-weight: 700; font-size: 16px; letter-spacing: .4px; }
   header .logo span { color: var(--accent); }
@@ -37,9 +38,20 @@
   .badge.block { color: var(--block); }
   .badge.human { color: var(--human); }
   .badge.neutral { color: var(--muted); }
-  .layout { display: grid; grid-template-columns: 320px 1fr; min-height: calc(100vh - 49px); }
+  .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr; }
   .layout.single { grid-template-columns: 1fr; }
-  #sidebar { border-right: 1px solid var(--border); background: var(--panel); overflow-y: auto; }
+  #sidebar, #main { min-height: 0; overflow-y: auto; }
+  #sidebar { border-right: 1px solid var(--border); background: var(--panel); }
+  .side-tools {
+    display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 12px;
+    border-bottom: 1px solid var(--border); position: sticky; top: 0;
+    background: var(--panel); z-index: 1;
+  }
+  button.session-card {
+    display: block; width: 100%; text-align: left; color: inherit; font: inherit;
+    background: transparent; border: none; border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
   .session-card { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; }
   .session-card:hover { background: var(--panel-2); }
   .session-card.active { background: var(--panel-2); border-left: 3px solid var(--accent); padding-left: 11px; }
@@ -48,8 +60,37 @@
   .session-card .excerpt { color: var(--text); font-size: 12.5px; margin: 4px 0; overflow: hidden;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .session-card .badges { display: flex; gap: 6px; flex-wrap: wrap; }
-  #main { padding: 20px 26px 60px; overflow-y: auto; max-width: 1120px; }
-  h2.session-title { margin: 0 0 2px; font-size: 18px; }
+  #main { padding: 16px 26px 48px; }
+  h2.session-title { margin: 0 0 2px; font-size: 18px; font-weight: 650; }
+  .session-id { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+  .tabs {
+    display: flex; gap: 2px; position: sticky; top: 0; z-index: 3;
+    background: var(--bg); border-bottom: 1px solid var(--border); margin: 8px 0 14px;
+  }
+  .tabs button {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    color: var(--muted); padding: 8px 12px; cursor: pointer; font: inherit;
+  }
+  .tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+  .tabs button:hover { color: var(--text); }
+  button.chip { font: inherit; color: inherit; cursor: pointer; }
+  .chapter { border-bottom: 1px dashed var(--border); }
+  button.chapter-head {
+    display: flex; gap: 12px; align-items: baseline; width: 100%; text-align: left;
+    background: transparent; color: inherit; font: inherit; border: none;
+    padding: 10px 2px; cursor: pointer;
+  }
+  button.chapter-head:hover { background: var(--panel-2); }
+  button.chapter-head .title {
+    flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .chapter-body { padding: 0 4px 14px 8px; }
+  .chapter-body .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .review-note {
+    border-left: 3px solid var(--flag); padding: 4px 0 4px 10px; margin: 8px 0;
+    color: var(--muted);
+  }
+  .file-batch { margin: 8px 0 4px; }
   .meta-line { color: var(--muted); font-size: 12.5px; margin-bottom: 14px; }
   .meta-line b { color: var(--text); font-weight: 600; }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 6px; }
@@ -136,17 +177,25 @@
   tr.file-row td:first-child::before { content: "▸ "; color: var(--muted); }
   tr.file-row.open td:first-child::before { content: "▾ "; }
   tr.diff-row td { padding: 0; background: #12151b; }
+  td.mono, .timeline .detail { overflow-wrap: anywhere; }
   pre.diff {
-    margin: 0; padding: 10px 14px; overflow-x: auto; max-height: 420px; overflow-y: auto;
+    margin: 0; padding: 10px 14px; max-height: 420px; overflow: auto;
+    white-space: normal; overflow-wrap: anywhere;
     font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 12px; line-height: 1.45;
   }
-  pre.diff .dl-add { color: var(--pass); }
-  pre.diff .dl-del { color: var(--block); }
+  pre.diff .line { display: block; white-space: pre-wrap; }
+  pre.diff .dl-add { color: var(--pass); background: rgba(76, 195, 138, .1); }
+  pre.diff .dl-del { color: var(--block); background: rgba(239, 83, 80, .12); }
   pre.diff .dl-hunk { color: var(--accent); }
   pre.diff .dl-meta { color: var(--muted); }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    #sidebar { max-height: 34vh; border-right: none; border-bottom: 1px solid var(--border); }
+    .chapter-body { padding-left: 8px; }
+  }
   .empty { color: var(--muted); font-style: italic; }
   #error-banner {
-    display: none; background: #3a1f22; color: #ffb4ab; padding: 8px 18px;
+    display: none; flex: none; background: #3a1f22; color: #ffb4ab; padding: 8px 18px;
     border-bottom: 1px solid var(--block); font-size: 13px;
   }
   #placeholder { color: var(--muted); padding: 60px; text-align: center; }
@@ -171,7 +220,6 @@
 const EXPORT = window.__ARCHREV_DATA__ || null;
 const POLL_MS = 2500;
 const FILTER_KINDS = ["prompt", "plan", "check", "gate", "edit", "human"];
-const TIMELINE_BATCH = 80;
 
 let selectedId = null;
 let currentView = null;
@@ -179,8 +227,9 @@ let lastRenderKey = "";
 // UI state survives re-renders: search text, active kind filters, selected
 // summary chip, expanded diff rows, timeline page count, fetched diffs.
 const ui = {
-  q: "", kinds: new Set(), chip: null, expanded: new Set(),
-  timelineShown: TIMELINE_BATCH, diffs: new Map(),
+  q: "", kinds: new Set(), chip: null, expanded: new Set(), diffs: new Map(),
+  tab: "record", openChapters: new Set(), chapterCount: 0,
+  side: "all", showOlder: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -221,32 +270,73 @@ function matchesSearch(...fields) {
 
 /* ---------------- sessions sidebar (live mode only) ---------------- */
 
+function isReviewNote(text) {
+  return String(text || "").startsWith("ArchRev final review found issues");
+}
+
+function isBookkeeping(path) {
+  const normalized = String(path || "").replace(/\\/g, "/");
+  return normalized.includes(".archrev/sessions/")
+    || normalized.endsWith(".archrev/hook-errors.log");
+}
+
+function isOlderSession(id) {
+  return id === "unknown" || String(id).startsWith("smoke");
+}
+
+function sessionVisible(session) {
+  if (isOlderSession(session.id) && !ui.showOlder) return false;
+  if (ui.side === "human") return session.id === "human";
+  if (ui.side === "review")
+    return (session.open_findings || 0) > 0 || (session.blocks || 0) > 0;
+  return true;
+}
+
+let latestState = null;
+
 function renderSidebar(state) {
+  latestState = state;
   $("root-path").textContent = state.root || "";
-  const items = state.sessions.map((s) => {
+  const visible = state.sessions.filter(sessionVisible);
+  const older = state.sessions.filter((s) => isOlderSession(s.id)).length;
+  const tools = `
+    <div class="side-tools">
+      <button type="button" class="filter-chip ${ui.side === "all" ? "on" : ""}" data-side="all">All</button>
+      <button type="button" class="filter-chip ${ui.side === "review" ? "on" : ""}" data-side="review">Needs review</button>
+      <button type="button" class="filter-chip ${ui.side === "human" ? "on" : ""}" data-side="human">Human</button>
+      ${older ? `<button type="button" class="filter-chip ${ui.showOlder ? "on" : ""}" data-side="older">${ui.showOlder ? "Hide" : "Show"} older (${older})</button>` : ""}
+    </div>`;
+  const items = visible.map((s) => {
     const isHuman = s.id === "human";
     const badges = [];
     if (isHuman) badges.push(badge("human", "human"));
     else if (s.finalized) badges.push(badge("finalized", "neutral"));
-    else badges.push(badge("live", "live"));
+    else badges.push(badge("in progress", "live"));
+    if (s.open_findings) badges.push(badge(`${s.open_findings} open`, "block", "Findings the last final review still wants resolved."));
     if (s.plan_registered) badges.push(badge("plan", "pass"));
     if (s.checked) badges.push(badge("checked", "pass"));
-    if (s.blocks) badges.push(badge(`${s.blocks} gated`, "block"));
-    if (s.flags) badges.push(badge(`${s.flags} flagged`, "flag"));
+    if (s.blocks) badges.push(badge(`${s.blocks} gated`, "block", "Edits or commands the gate paused or refused."));
     if (!isHuman) badges.push(badge(`${s.edits} edits`, "neutral"));
     const excerpt = isHuman
-      ? "Human changes (committed without agent session attribution)"
+      ? "Files committed without an agent session"
       : (s.prompt_excerpt || "(no prompt captured)");
     return `
-      <div class="session-card ${s.id === selectedId ? "active" : ""}" data-id="${esc(s.id)}">
+      <button type="button" class="session-card ${s.id === selectedId ? "active" : ""}" data-id="${esc(s.id)}">
         <div><span class="sid mono">${esc(shortId(s.id))}</span>
              <span class="when"> · ${esc(fmtTs(s.started_at))}</span></div>
         <div class="excerpt">${esc(excerpt)}</div>
         <div class="badges">${badges.join("")}</div>
-      </div>`;
+      </button>`;
   });
-  $("sidebar").innerHTML = items.join("") ||
-    `<div id="placeholder">No sessions yet.<br>Start an agent conversation.</div>`;
+  $("sidebar").innerHTML = tools + (items.join("") ||
+    `<div id="placeholder">No sessions in this filter.</div>`);
+  for (const el of document.querySelectorAll(".side-tools [data-side]")) {
+    el.addEventListener("click", () => {
+      if (el.dataset.side === "older") ui.showOlder = !ui.showOlder;
+      else ui.side = el.dataset.side;
+      renderSidebar(latestState);
+    });
+  }
   for (const el of document.querySelectorAll(".session-card")) {
     el.addEventListener("click", () => {
       if (selectedId !== el.dataset.id) {
@@ -254,7 +344,9 @@ function renderSidebar(state) {
         ui.expanded.clear();
         ui.diffs.clear();
         ui.chip = null;
-        ui.timelineShown = TIMELINE_BATCH;
+        ui.q = "";
+        ui.openChapters = new Set();
+        ui.chapterCount = 0;
         lastRenderKey = "";
         refreshSession();
       }
@@ -299,12 +391,27 @@ function chipData(view) {
                  label: `outside repo <b>${outside.length}</b>`,
                  title: "Files the session wrote outside this repository (other repos, editor-internal saves). Recorded for audit, excluded from plan drift.",
                  items: outside });
-  const bypass = (view.protected_findings || []).filter((f) => !f.via_gate);
+  const foreign = view.other_sessions || [];
+  if (foreign.length)
+    chips.push({ id: "other-sessions", cls: "",
+                 label: `other sessions <b>${foreign.length}</b>`,
+                 title: "Working-tree changes recorded as edits in a different session. Excluded from this session's drift and gate-bypass review.",
+                 items: foreign.map((f) => `${f.path}  (${(f.sessions || []).join(", ")})`) });
+  const background = (view.background_changes || []).filter((f) => !isBookkeeping(f.path));
+  if (background.length)
+    chips.push({ id: "background", cls: "",
+                 label: `background <b>${background.length}</b>`,
+                 title: "Working-tree changes made while none of this session's commands ran (hand edits, other windows, work that pre-dates the session). Excluded from this session's drift and gate-bypass review.",
+                 items: background.map((f) => f.path) });
+  const acked = new Set((view.acks || []).map((a) => String(a.target || "").toLowerCase()));
+  const bypass = (view.protected_findings || []).filter(
+    (f) => !f.via_gate && !acked.has(String(f.path || "").toLowerCase()));
   if (bypass.length)
     chips.push({ id: "bypass", cls: "bad",
                  label: `protected changes bypassing gate <b>${bypass.length}</b>`,
                  title: "Protected paths changed without passing the edit gate (shell or manual writes). Click to list.",
-                 items: bypass.map((f) => `${f.path}  (${f.rule_id})`) });
+                 items: bypass.map((f) => `${f.path}  (${f.rule_id})`
+                   + ((f.during || []).length ? `  during ${f.during.join("; ")}` : "")) });
   const quality = view.quality_checks || [];
   if (quality.length) {
     const latest = new Map();
@@ -346,40 +453,64 @@ function renderChipDetail(view) {
 
 /* ---------------- timeline ---------------- */
 
-function timelineItems(view) {
+function uniquePromptEntries(view) {
+  const out = [];
+  (view.prompts || []).forEach((p, i) => {
+    const prev = out[out.length - 1];
+    if (prev && prev.p.ts === p.ts && (prev.p.text || "") === (p.text || "")) return;
+    out.push({ p, i });
+  });
+  return out;
+}
+
+function headingText(view) {
+  if (view.id === "human") return "Human changes";
+  const prompts = (view.prompts || []).filter(
+    (p) => !isReviewNote(p.text) && String(p.text || "").trim());
+  if (prompts.length)
+    return prompts[prompts.length - 1].text.trim().split("\n")[0].slice(0, 110);
+  if ((view.prompts || []).some((p) => p.sealed)) return "Sealed prompt";
+  return "No prompt captured";
+}
+
+function collectEvents(view) {
   const items = [];
-  for (const p of view.prompts || [])
-    items.push({ ts: p.ts, kind: "prompt", cat: "prompt", what: "Prompt submitted",
-                 detail: (p.text || "").split("\n")[0].slice(0, 160) });
+  (view.prompts || []).forEach((p, index) => {
+    const review = isReviewNote(p.text);
+    items.push({
+      ts: p.ts, kind: review ? "final" : "prompt", cat: "prompt", review,
+      promptIndex: index, text: p.text || "", sealed: !!p.sealed,
+      what: review ? "ArchRev review note" : "Prompt",
+      detail: p.sealed && !p.text ? "(sealed)" : (p.text || ""),
+    });
+  });
   for (const r of (view.plan || {}).revisions || [])
     items.push({ ts: r.ts, kind: "plan", cat: "plan", what: "Plan registered",
-                 detail: `${(r.declared_files || []).length} file(s) declared (${r.origin || "inline"})` });
+                 detail: `${(r.declared_files || []).length} file(s) declared`,
+                 files: r.declared_files || [] });
   for (const c of view.checks || [])
     items.push({ ts: c.ts, kind: "check", cat: "check",
-                 what: `Plan check — ${c.ok ? "OK" : "NOT OK"}`,
+                 what: `Plan check — ${c.ok ? "passed" : "not passed"}`,
                  detail: (c.prompt_rules || []).map((r) => `${r.rule_id}: ${r.verdict}`).join(", ") });
   for (const f of view.final_checks || [])
     items.push({ ts: f.ts, kind: (f.findings || []).length ? "final" : "check", cat: "check",
                  what: (f.findings || []).length
-                   ? `Final review — ${f.findings.length} finding(s)${f.notified ? ", agent notified" : ""}`
+                   ? `Final review — ${f.findings.length} finding(s)`
                    : "Final review — clean",
                  detail: (f.findings || []).join(" | ") });
   for (const a of view.acks || [])
     items.push({ ts: a.ts, kind: "check", cat: "check",
-                 what: `Finding acknowledged: ${a.target || ""}`,
-                 detail: a.note || "" });
+                 what: `Acknowledged ${a.target || ""}`, detail: a.note || "" });
   for (const q of view.quality_checks || []) {
     const status = q.ok === true ? "passed" : q.ok === false ? "FAILED" : "could not run";
     items.push({ ts: q.ts, kind: q.ok === false ? "final" : "check", cat: "check",
                  what: `Quality check ${q.rule_id} — ${status}`,
-                 detail: q.ok === false
-                   ? (q.message || (q.output || "").split("\n").filter(Boolean).slice(-1)[0] || "")
-                   : `${(q.files || []).length} file(s) checked` });
+                 detail: q.ok === false ? (q.message || "") : `${(q.files || []).length} file(s)` });
   }
   for (const h of view.human_changes || [])
     items.push({ ts: h.ts, kind: "human", cat: "human",
-                 what: `Human changes recorded (${(h.files || []).length} file(s))`,
-                 detail: (h.files || []).join(", ") });
+                 what: `Human commit (${(h.files || []).length} file(s))`,
+                 detail: (h.files || []).filter((p) => !isBookkeeping(p)).join(", ") });
   for (const g of view.gate_events || []) {
     const kind = g.permission === "allow" ? "gate-flag" : `gate-${g.permission}`;
     const subject = { edit: "Edit", shell: "Shell command", read: "File read",
@@ -389,26 +520,92 @@ function timelineItems(view) {
                  `${subject} denied`;
     const where = (g.paths && g.paths.length) ? g.paths.join(", ") : (g.target || "");
     items.push({ ts: g.ts, kind, cat: "gate", what,
-                 detail: where + "  [" +
-                         (g.hits || []).map((h) => `${h.action}:${h.rule_id}`).join(", ") + "]" });
+                 detail: where + ((g.hits || []).length
+                   ? "  [" + (g.hits || []).map((h) => `${h.action}:${h.rule_id}`).join(", ") + "]"
+                   : "") });
   }
-  for (const e of view.edits || [])
+  for (const e of view.edits || []) {
+    if (isBookkeeping(e.path)) continue;
     items.push({ ts: e.ts, kind: "edit", cat: "edit",
-                 what: e.origin === "tab" ? "File edited (tab / human-assisted)" : "File edited",
+                 what: e.origin === "tab" ? "File edited (tab)" : "File edited",
                  detail: e.path, diffPath: e.path });
+  }
   items.sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
-  return items.filter((t) =>
-    (ui.kinds.size === 0 || ui.kinds.has(t.cat)) && matchesSearch(t.what, t.detail));
+  return items;
+}
+
+function coalesceEdits(events) {
+  const out = [];
+  let batch = null;
+  const flush = () => { if (batch) { out.push(batch); batch = null; } };
+  for (const event of events) {
+    if (event.cat === "edit") {
+      if (!batch) batch = { ts: event.ts, cat: "edit", kind: "edit", what: "Files changed", files: [] };
+      const prior = batch.files.find((f) => f.path === event.diffPath);
+      if (prior) prior.count += 1;
+      else batch.files.push({ path: event.diffPath, count: 1 });
+    } else {
+      flush();
+      out.push(event);
+    }
+  }
+  flush();
+  return out;
+}
+
+function buildChapters(view) {
+  const events = [];
+  for (const event of collectEvents(view)) {
+    const prev = events[events.length - 1];
+    // Hooks have recorded the same submission twice. One chapter is enough.
+    if (prev && event.cat === "prompt" && prev.cat === "prompt"
+        && event.ts === prev.ts && event.text === prev.text) continue;
+    events.push(event);
+  }
+  const chapters = [];
+  let current = null;
+  for (const event of events) {
+    if (event.cat === "prompt" && !event.review) {
+      if (current) chapters.push(current);
+      const line = (event.text || "Prompt").trim().split("\n")[0].slice(0, 140) || "Prompt";
+      current = { title: line, ts: event.ts, prompt: event, events: [] };
+    } else if (!current) {
+      current = {
+        title: view.id === "human" ? "Human changes" : "Before the first prompt",
+        ts: event.ts || view.started_at, prompt: null, events: [event],
+      };
+    } else {
+      current.events.push(event);
+    }
+  }
+  if (current) chapters.push(current);
+  if (!chapters.length)
+    chapters.push({
+      title: view.id === "human" ? "Human changes" : "Nothing recorded yet",
+      ts: view.started_at, prompt: null, events: [],
+    });
+  for (const chapter of chapters) chapter.events = coalesceEdits(chapter.events);
+  return chapters;
+}
+
+function eventVisible(event) {
+  const files = (event.files || []).map((f) => f.path).join(" ");
+  const catOk = ui.kinds.size === 0 || ui.kinds.has(event.cat);
+  return catOk && matchesSearch(event.what, event.detail, event.text, files);
 }
 
 /* ---------------- diffs ---------------- */
 
 function renderDiffText(text) {
   return text.split("\n").map((line) => {
-    const cls = line.startsWith("+") ? "dl-add" : line.startsWith("-") ? "dl-del" :
-                line.startsWith("@@") ? "dl-hunk" : line.startsWith("diff ") || line.startsWith("index ") ? "dl-meta" : "";
-    return `<span class="${cls}">${esc(line)}</span>`;
-  }).join("\n");
+    let cls = "line";
+    if (line.startsWith("@@")) cls += " dl-hunk";
+    else if (line.startsWith("diff ") || line.startsWith("index ") || line.startsWith("---") || line.startsWith("+++"))
+      cls += " dl-meta";
+    else if (line.startsWith("+")) cls += " dl-add";
+    else if (line.startsWith("-")) cls += " dl-del";
+    return `<div class="${cls}">${esc(line) || " "}</div>`;
+  }).join("");
 }
 
 async function loadDiff(path) {
@@ -444,6 +641,7 @@ async function toggleDiff(row, path, forceOpen) {
   row.after(diffRow);
   const text = await loadDiff(path);
   diffRow.querySelector("pre").innerHTML = renderDiffText(text);
+  diffRow.scrollIntoView({ block: "nearest" });
 }
 
 async function toggleInlineDiff(li, path) {
@@ -461,7 +659,7 @@ async function toggleInlineDiff(li, path) {
 
 function filterChipHtml() {
   return FILTER_KINDS.map((k) =>
-    `<span class="filter-chip ${ui.kinds.has(k) ? "on" : ""}" data-kind="${k}">${k}</span>`
+    `<button type="button" class="filter-chip ${ui.kinds.has(k) ? "on" : ""}" data-kind="${k}">${k}</button>`
   ).join("");
 }
 
@@ -496,121 +694,51 @@ function fileNotes(view, f) {
 
 function renderSession(view) {
   currentView = view;
-  const searchable = (path) => matchesSearch(path);
-
-  const fileRows = (view.files || []).filter((f) => searchable(f.path)).map((f) =>
-    `<tr class="file-row" data-path="${esc(f.path)}"><td class="mono">${esc(f.path)}</td>
-     <td class="loc">${locHtml(f.added, f.removed)}</td><td>${fileNotes(view, f).join(" ") || "—"}</td></tr>`);
-  const otherRows = (view.other_changes || []).filter((f) => searchable(f.path)).map((f) =>
-    `<tr class="file-row" data-path="${esc(f.path)}"><td class="mono">${esc(f.path)}</td>
-     <td class="loc">${locHtml(f.added, f.removed)}</td>
-     <td>${badge("outside tracked edits", "neutral", "Changed in the working tree with no edit event: shell command, hand edit, or another session.")}</td></tr>`);
-
-  const checkBlocks = (view.checks || []).map((c) => {
-    const preview = (c.path_findings || []).map((f) =>
-      `<li>${badge(f.action, f.action === "flag" ? "flag" : "block")}
-       <span class="mono">${esc(f.path)}</span> <span class="badge neutral">${esc(f.rule_id)}</span></li>`);
-    const attests = (c.prompt_rules || []).map((r) => {
-      const cls = r.verdict === "pass" ? "pass" : r.verdict === "fail" ? "block" : "flag";
-      return `<li>${badge(r.verdict, cls)} <b>${esc(r.rule_id)}</b> — ${esc(r.policy)}</li>`;
-    });
-    return `<p><b>${esc(fmtTs(c.ts))}</b> — ${c.ok ? badge("OK", "pass") : badge("NOT OK", "block")}</p>
-      ${preview.length ? `<div class="section-hint">Gate preview — declared files that WILL trigger rules when edited (nothing has happened yet):</div>
-      <ul>${preview.join("")}</ul>` : ""}
-      ${attests.length ? `<div class="section-hint">Policy attestations — the agent's self-reported verdicts against prompt rules (evidence, not proof):</div>
-      <ul>${attests.join("")}</ul>` : ""}
-      ${!preview.length && !attests.length ? "<p class='empty'>no rules evaluated</p>" : ""}`;
-  });
-
-  const progress = (view.plan || {}).progress || [];
-  const revisions = ((view.plan || {}).revisions || []);
-  const planHtml = view.plan && view.plan.registered ? `
-    <div class="section-hint">
-      ${progress.filter((p) => p.touched).length}/${progress.length} declared files touched so far
-      · ${revisions.length} revision(s)</div>
-    <ul class="plan-progress">
-      ${progress.map((p) => `<li class="${p.touched ? "done" : "pending"}">
-        <span class="tick">${p.touched ? "✓" : "○"}</span><span class="mono">${esc(p.path)}</span></li>`).join("")}
-    </ul>
-    ${revisions.map((r, i) => `
-      <div class="revision">
-        <details ${i === revisions.length - 1 ? "open" : ""}>
-          <summary>revision ${i + 1} of ${revisions.length} — ${esc(fmtTs(r.ts))}
-            (${(r.declared_files || []).length} files, ${esc(r.origin || "inline")})</summary>
-          <div class="plan-text">${esc(r.text || "(text not captured — registered before v0.2)")}</div>
-        </details>
-      </div>`).join("")}`
-    : "<p class='empty'>Not registered — drift against the plan cannot be measured.</p>";
-
-  const commits = (view.commits || []).map((c) =>
-    `<li><span class="mono">${esc(c.sha.slice(0, 10))}</span> ${esc(c.subject)}
-     <span class="when">(${esc(c.date || "")})</span></li>`);
-
-  const allTimeline = timelineItems(view);
-  const shown = allTimeline.slice(0, ui.timelineShown);
-  const remaining = allTimeline.length - shown.length;
+  const chapters = buildChapters(view);
+  if (chapters.length !== ui.chapterCount) {
+    ui.openChapters.add(String(chapters.length - 1));
+    ui.chapterCount = chapters.length;
+  }
+  const userPrompts = uniquePromptEntries(view).filter(({ p }) => !isReviewNote(p.text)).length;
+  const lists = visibleFileLists(view);
+  const fileCount = lists.files.length + lists.other.length
+    + lists.foreign.length + lists.background.length;
+  const sealed = (view.prompts || []).some((p) => p.sealed);
 
   $("main").innerHTML = `
-    <h2 class="session-title mono">${esc(view.id)}</h2>
+    <div class="session-id mono">${esc(view.id)}</div>
+    <h2 class="session-title">${esc(headingText(view))}</h2>
     <div class="meta-line">
       started <b>${esc(fmtTs(view.started_at))}</b> ·
-      ${view.finalized ? "finalized" : "live"}
+      ${view.id === "human" ? "ledger" : view.finalized ? "finalized" : "in progress"}
       ${view.runtime ? ` · ${esc(view.runtime)}` : ""}
       ${view.branch ? ` · branch <b class="mono">${esc(view.branch)}</b>` : ""} ·
-      base <span class="mono">${esc((view.head_sha || "").slice(0, 10) || "—")}</span> ·
-      areas: ${esc((view.areas || []).join(", ") || "—")}
+      base <span class="mono">${esc((view.head_sha || "").slice(0, 10) || "—")}</span>
     </div>
     <div class="chips">${chipData(view).map((c) => `
-      <div class="chip ${c.cls} ${c.items !== null ? "clickable" : ""} ${ui.chip === c.id ? "selected" : ""}"
-           data-chip="${c.id}" ${c.title ? `title="${esc(c.title)}"` : ""}>${c.label}</div>`).join("")}
+      <button type="button" class="chip ${c.cls} ${c.items !== null ? "clickable" : ""} ${ui.chip === c.id ? "selected" : ""}"
+           data-chip="${c.id}" ${c.title ? `title="${esc(c.title)}"` : ""}>${c.label}</button>`).join("")}
     </div>
     <div id="chip-detail"></div>
+    ${sealed ? `<form id="unseal-form" class="toolbar">
+      <input type="password" id="unseal-pass" placeholder="Seal passphrase (empty if the key is unprotected)" autocomplete="off">
+      <button type="submit">Unseal prompts</button>
+      <span class="hint">Decrypted in this tab only. Nothing is written back.</span>
+    </form>` : ""}
+    <nav class="tabs">
+      ${tabButton("record", "Record", chapters.length)}
+      ${tabButton("prompts", "Prompts", userPrompts)}
+      ${tabButton("files", "Files", fileCount)}
+      ${tabButton("plan", "Plan", (view.plan || {}).registered ? ((view.plan || {}).revisions || []).length : 0)}
+      ${tabButton("rules", "Rules", (view.checks || []).length)}
+    </nav>
     <div class="toolbar">
-      <input type="search" id="search-box" placeholder="Search events and files…" value="${esc(ui.q)}">
-      ${filterChipHtml()}
+      <input type="search" id="search-box" placeholder="Search this section…" value="${esc(ui.q)}">
+      ${ui.tab === "record" ? filterChipHtml() : ""}
     </div>
+    <section class="card">${panelHtml(view, chapters)}</section>`;
 
-    <section class="card"><h3>Prompts</h3>
-      ${(view.prompts || []).map((p) =>
-        `<div class="when">${esc(fmtTs(p.ts))}</div><div class="prompt-text">${esc(p.text)}</div>`).join("")
-        || "<p class='empty'>No prompt captured.</p>"}
-    </section>
-
-    <section class="card"><h3>Plan
-      <span class="badge neutral">every registration kept as a revision</span></h3>
-      ${planHtml}
-    </section>
-
-    <section class="card"><h3>Rule verdicts</h3>
-      ${checkBlocks.join("<hr style='border-color:var(--border)'>") || "<p class='empty'>No plan check recorded.</p>"}
-    </section>
-
-    <section class="card"><h3>Timeline
-      <span class="badge neutral">click an edit to see its diff</span></h3>
-      <ul class="timeline">
-        ${shown.map((t, i) => `
-          <li data-idx="${i}"><span class="ts mono">${esc(fmtTs(t.ts))}</span>
-              <span class="dot ${t.kind}"></span>
-              <span class="body"><span class="what ${t.diffPath ? "expandable" : ""}"
-                ${t.diffPath ? `data-diff-path="${esc(t.diffPath)}"` : ""}>${esc(t.what)}</span>
-              <div class="detail mono">${esc(t.detail || "")}</div></span></li>`).join("")
-          || "<li class='empty'>No matching events.</li>"}
-      </ul>
-      ${remaining > 0 ? `<button class="show-more" id="timeline-more">Show ${Math.min(remaining, TIMELINE_BATCH)} more (${remaining} hidden)</button>` : ""}
-    </section>
-
-    <section class="card"><h3>Files <span class="badge neutral">click a row for the diff · hover chips for rule details</span></h3>
-      <table><thead><tr><th>File</th><th>LOC</th><th>Notes</th></tr></thead>
-      <tbody>${fileRows.join("") + otherRows.join("") ||
-        "<tr><td colspan='3' class='empty'>No matching changes.</td></tr>"}</tbody></table>
-    </section>
-
-    <section class="card"><h3>Commits</h3>
-      <ul>${commits.join("") || "<li class='empty'>No linked commits (yet). Commit with the ArchRev git hook installed to link.</li>"}</ul>
-    </section>`;
-
-  // Summary chips: click to drill into the underlying items.
-  for (const chip of document.querySelectorAll(".chip.clickable")) {
+  for (const chip of document.querySelectorAll("#main .chip.clickable")) {
     chip.addEventListener("click", () => {
       ui.chip = ui.chip === chip.dataset.chip ? null : chip.dataset.chip;
       renderSession(currentView);
@@ -618,43 +746,232 @@ function renderSession(view) {
   }
   renderChipDetail(view);
 
-  // Toolbar: search re-renders locally (no server round-trip needed).
+  for (const tab of document.querySelectorAll("#main .tabs button")) {
+    tab.addEventListener("click", () => {
+      ui.tab = tab.dataset.tab;
+      renderSession(currentView);
+    });
+  }
+  for (const head of document.querySelectorAll(".chapter-head")) {
+    head.addEventListener("click", () => {
+      const key = head.dataset.chapter;
+      if (ui.openChapters.has(key)) ui.openChapters.delete(key);
+      else ui.openChapters.add(key);
+      renderSession(currentView);
+    });
+  }
+
+  const unseal = $("unseal-form");
+  if (unseal) unseal.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const res = await fetch("/api/unseal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session: view.id,
+        passphrase: ($("unseal-pass") || {}).value || "",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.error || "Could not unseal prompts.");
+      return;
+    }
+    for (const item of data.prompts || []) {
+      const node = document.querySelector(`.prompt-text[data-prompt="${item.index}"]`);
+      if (node) node.textContent = item.text;
+    }
+  });
+
   const search = $("search-box");
   search.addEventListener("input", () => {
     ui.q = search.value;
-    ui.timelineShown = TIMELINE_BATCH;
     const pos = search.selectionStart;
     renderSession(currentView);
     const again = $("search-box");
     again.focus();
     again.setSelectionRange(pos, pos);
   });
-  for (const chip of document.querySelectorAll(".filter-chip")) {
+  for (const chip of document.querySelectorAll("#main .filter-chip")) {
     chip.addEventListener("click", () => {
       const kind = chip.dataset.kind;
       if (ui.kinds.has(kind)) ui.kinds.delete(kind); else ui.kinds.add(kind);
-      ui.timelineShown = TIMELINE_BATCH;
       renderSession(currentView);
     });
   }
-  // Timeline: paged rendering + expandable edit diffs.
-  const more = $("timeline-more");
-  if (more) more.addEventListener("click", () => {
-    ui.timelineShown += TIMELINE_BATCH;
-    renderSession(currentView);
-  });
-  for (const what of document.querySelectorAll(".timeline .what.expandable")) {
-    what.addEventListener("click", () =>
-      toggleInlineDiff(what.closest("li"), what.dataset.diffPath));
-  }
-  // Files: diff expansion; restore previously expanded rows.
   for (const row of document.querySelectorAll("tr.file-row")) {
     const path = row.dataset.path;
-    row.addEventListener("click", () => toggleDiff(row, path, false));
+    const toggle = () => toggleDiff(row, path, false);
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+    });
     if (ui.expanded.has(path)) toggleDiff(row, path, true);
   }
 }
 
+function tabButton(id, label, count) {
+  return `<button type="button" class="${ui.tab === id ? "on" : ""}" data-tab="${id}">${label}${count ? ` <b>${count}</b>` : ""}</button>`;
+}
+
+function visibleFileLists(view) {
+  const keep = (f) => !isBookkeeping(f.path) && matchesSearch(f.path, (f.sessions || []).join(" "));
+  return {
+    files: (view.files || []).filter(keep),
+    other: (view.other_changes || []).filter(keep),
+    foreign: (view.other_sessions || []).filter(keep),
+    background: (view.background_changes || []).filter(keep),
+  };
+}
+
+function panelHtml(view, chapters) {
+  if (ui.tab === "prompts") return promptsPanel(view);
+  if (ui.tab === "files") return filesPanel(view);
+  if (ui.tab === "plan") return planPanel(view);
+  if (ui.tab === "rules") return rulesPanel(view);
+  return recordPanel(view, chapters);
+}
+
+function recordPanel(view, chapters) {
+  const html = chapters.map((chapter, index) => {
+    const events = chapter.events.filter(eventVisible);
+    const headHit = matchesSearch(chapter.title, chapter.prompt && chapter.prompt.text);
+    const prompted = !ui.kinds.size || ui.kinds.has("prompt");
+    if ((ui.q || ui.kinds.size) && !headHit && !events.length) return "";
+    if (ui.kinds.size && !events.length && !(prompted && headHit && chapter.prompt)) return "";
+    const key = String(index);
+    const open = ui.q ? true : ui.openChapters.has(key);
+    const bodyEvents = ui.kinds.size ? events : (ui.q && !headHit ? events : chapter.events);
+    const fileCount = bodyEvents.filter((e) => e.cat === "edit")
+      .reduce((n, e) => n + e.files.length, 0);
+    return `<article class="chapter">
+      <button type="button" class="chapter-head" data-chapter="${key}">
+        <span class="ts mono">${esc(fmtTs(chapter.ts))}</span>
+        <span class="title">${esc(chapter.title)}</span>
+        <span class="when">${fileCount ? fileCount + " files" : ""} ${open ? "▾" : "▸"}</span>
+      </button>
+      ${open ? `<div class="chapter-body">${chapterBody(chapter, bodyEvents)}</div>` : ""}
+    </article>`;
+  }).join("");
+  return html || "<p class='empty'>Nothing in this record matches.</p>";
+}
+
+function chapterBody(chapter, events) {
+  const prompt = chapter.prompt
+    ? `<div class="prompt-text" data-prompt="${chapter.prompt.promptIndex}">${esc(chapter.prompt.text) || (chapter.prompt.sealed ? "(sealed)" : "(empty)")}</div>`
+    : "";
+  const rest = events.map((event) => {
+    if (event.cat === "edit") {
+      const rows = event.files.map((f) =>
+        `<tr class="file-row" tabindex="0" role="button" data-path="${esc(f.path)}">
+          <td class="mono">${esc(f.path)}${f.count > 1 ? ` <span class="when">×${f.count}</span>` : ""}</td>
+          <td></td><td></td></tr>`).join("");
+      return `<div class="file-batch"><div class="what">Files changed <b>${event.files.length}</b></div>
+        <table><tbody>${rows}</tbody></table></div>`;
+    }
+    return `<div class="${event.review ? "review-note" : ""}">
+      <span class="dot ${event.kind}"></span> <b>${esc(event.what)}</b>
+      <span class="when">${esc(fmtTs(event.ts))}</span>
+      ${event.detail ? `<div class="detail mono">${esc(String(event.detail).slice(0, 700))}</div>` : ""}
+    </div>`;
+  }).join("");
+  return prompt + (rest || "<p class='empty'>No further events in this stretch.</p>");
+}
+
+function promptsPanel(view) {
+  const prompts = uniquePromptEntries(view).reverse()
+    .filter(({ p }) => matchesSearch(p.text, fmtTs(p.ts)));
+  if (!prompts.length) return "<p class='empty'>No prompt captured.</p>";
+  const newestUser = prompts.find(({ p }) => !isReviewNote(p.text));
+  return prompts.map(({ p, i }) => {
+    const review = isReviewNote(p.text);
+    const title = review
+      ? "ArchRev review note"
+      : (p.text || (p.sealed ? "(sealed)" : "(empty)")).trim().split("\n")[0].slice(0, 120);
+    const open = newestUser && newestUser.i === i ? "open" : "";
+    return `<details ${open} class="${review ? "review-note" : ""}">
+      <summary>${esc(fmtTs(p.ts))} — ${esc(title)}</summary>
+      <div class="prompt-text" data-prompt="${i}">${esc(p.text) || (p.sealed ? "(sealed)" : "(empty)")}</div>
+    </details>`;
+  }).join("");
+}
+
+function filesPanel(view) {
+  const { files, other, foreign, background } = visibleFileLists(view);
+  const row = (f, notes) =>
+    `<tr class="file-row" tabindex="0" role="button" data-path="${esc(f.path)}">
+      <td class="mono">${esc(f.path)}</td>
+      <td class="loc">${locHtml(f.added, f.removed)}</td><td>${notes}</td></tr>`;
+  const rows = [
+    ...files.map((f) => row(f, fileNotes(view, f).join(" ") || "—")),
+    ...other.map((f) => row(f, badge("outside tracked edits", "neutral",
+      (f.during || []).length
+        ? `Changed with no edit event while this session ran: ${f.during.join("; ")}`
+        : "In the working tree with no edit event in this session."))),
+    ...foreign.map((f) => row(f, badge(`other session`, "neutral", (f.sessions || []).join(", ")))),
+    ...background.map((f) => row(f, badge("background", "neutral",
+      "Changed while none of this session's commands ran (hand edit, another window, or pre-existing)."))),
+  ];
+  if (!rows.length) return "<p class='empty'>No file changes to show.</p>";
+  return `<p class="section-hint">Click a row for the diff since the session started. Session bookkeeping is hidden.</p>
+    <table><thead><tr><th>File</th><th>LOC</th><th>Notes</th></tr></thead>
+    <tbody>${rows.join("")}</tbody></table>`;
+}
+
+function planPanel(view) {
+  const plan = view.plan || {};
+  if (!plan.registered)
+    return "<p class='empty'>No plan registered. Drift against a plan cannot be measured.</p>";
+  const progress = plan.progress || [];
+  const revisions = plan.revisions || [];
+  const done = progress.filter((p) => p.touched).length;
+  const revHtml = revisions.map((revision, i) => {
+    const previous = new Set((i ? revisions[i - 1].declared_files || [] : []).map((p) => p.toLowerCase()));
+    const current = revision.declared_files || [];
+    const currentSet = new Set(current.map((p) => p.toLowerCase()));
+    const added = current.filter((p) => !previous.has(p.toLowerCase()));
+    const removed = (i ? revisions[i - 1].declared_files || [] : []).filter((p) => !currentSet.has(p.toLowerCase()));
+    const delta = [added.length ? `+${added.length}` : "", removed.length ? `−${removed.length}` : ""].filter(Boolean).join(" ");
+    return `<div class="revision"><details ${i === revisions.length - 1 ? "open" : ""}>
+      <summary>revision ${i + 1} of ${revisions.length} — ${esc(fmtTs(revision.ts))}
+        · ${current.length} files${delta ? ` · ${esc(delta)}` : ""}</summary>
+      ${added.length ? `<div class="section-hint">Added ${added.map((p) => `<span class="mono">${esc(p)}</span>`).join(", ")}</div>` : ""}
+      ${removed.length ? `<div class="section-hint">Dropped ${removed.map((p) => `<span class="mono">${esc(p)}</span>`).join(", ")}</div>` : ""}
+      <div class="plan-text">${esc(revision.text || "(text not captured — registered before v0.2)")}</div>
+    </details></div>`;
+  }).join("");
+  return `<div class="section-hint">${done}/${progress.length} declared files touched · ${revisions.length} revision(s). Each line is the change from the previous registration.</div>
+    <ul class="plan-progress">${progress.map((p) => `<li class="${p.touched ? "done" : "pending"}">
+      <span class="tick">${p.touched ? "✓" : "○"}</span><span class="mono">${esc(p.path)}</span></li>`).join("")}</ul>
+    ${revHtml}`;
+}
+
+function rulesPanel(view) {
+  const checks = (view.checks || []).map((c) => {
+    const attests = (c.prompt_rules || []).map((r) => {
+      const cls = r.verdict === "pass" ? "pass" : r.verdict === "fail" ? "block" : "flag";
+      return `<li>${badge(r.verdict, cls)} <b>${esc(r.rule_id)}</b> — ${esc(r.policy)}</li>`;
+    }).join("");
+    return `<p><b>${esc(fmtTs(c.ts))}</b> — ${c.ok ? badge("passed", "pass") : badge("not passed", "block")}</p>
+      ${attests ? `<ul>${attests}</ul>` : "<p class='empty'>No prompt rules on this check.</p>"}`;
+  }).join("");
+  const quality = (view.quality_checks || []).map((q) => {
+    const status = q.ok === true ? "passed" : q.ok === false ? "FAILED" : "could not run";
+    return `<li>${esc(q.rule_id)} — ${esc(status)}</li>`;
+  }).join("");
+  const acks = (view.acks || []).map((a) =>
+    `<li><span class="mono">${esc(a.target)}</span> — ${esc(a.note || "")}</li>`).join("");
+  const commits = (view.commits || []).map((c) =>
+    `<li><span class="mono">${esc((c.sha || "").slice(0, 10))}</span> ${esc(c.subject)}
+     <span class="when">(${esc(c.date || "")})</span></li>`).join("");
+  if (!checks && !quality && !acks && !commits)
+    return "<p class='empty'>No plan check, quality result, acknowledgment, or linked commit.</p>";
+  return `
+    ${checks ? `<h3>Plan checks</h3>${checks}` : ""}
+    ${quality ? `<h3>Quality checks</h3><ul>${quality}</ul>` : ""}
+    ${acks ? `<h3>Acknowledgments</h3><ul>${acks}</ul>` : ""}
+    ${commits ? `<h3>Commits</h3><ul>${commits}</ul>` : ""}`;
+}
 /* ---------------- data flow ---------------- */
 
 function showError(message) {
@@ -668,7 +985,8 @@ function viewRenderKey(view) {
   // search box is never interrupted by the poll cycle.
   const loc = (view.files || []).reduce((n, f) => n + (f.added || 0) + (f.removed || 0), 0);
   return [view.id, view.event_count, view.finalized, loc,
-          (view.commits || []).length, (view.other_changes || []).length].join("|");
+          (view.commits || []).length, (view.other_changes || []).length,
+          (view.background_changes || []).length].join("|");
 }
 
 async function refreshState() {
@@ -709,7 +1027,8 @@ if (EXPORT) {
   $("sidebar").remove();
   renderSession(EXPORT.session);
 } else {
-  $("mode-badge").textContent = "live";
+  $("mode-badge").textContent = "watching";
+  $("mode-badge").title = "This page refreshes every few seconds. Capture does not depend on it.";
   $("mode-badge").classList.add("live");
   refreshState();
   setInterval(refreshState, POLL_MS);

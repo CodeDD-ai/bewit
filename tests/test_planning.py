@@ -88,6 +88,21 @@ def test_plan_revisions_keep_their_text(repo: Path):
     assert session.plan_text().startswith("v2:")
 
 
+def test_amend_unions_declared_files(repo: Path):
+    """--amend must not drop files declared by earlier revisions."""
+    session = SessionStore(repo).session("s-amend")
+    session.ensure_meta(None)
+    first = register_plan(session, "Touch `app/main.py`.", repo)
+    second = register_plan(
+        session, "Also touch `app/api/views.py`.", repo, amend=True
+    )
+    assert first == ["app/main.py"]
+    assert second == ["app/main.py", "app/api/views.py"]
+    latest = session.last_event("plan_registered")
+    assert latest["amend"] is True
+    assert latest["declared_files"] == ["app/main.py", "app/api/views.py"]
+
+
 def test_check_plan_fails_on_unattested_rules(repo: Path):
     session = SessionStore(repo).session("s2")
     session.ensure_meta(None)
