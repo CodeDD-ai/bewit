@@ -35,7 +35,7 @@ from archrev.gate import rule_hits_for_paths
 from archrev.gitutil import Git
 from archrev.rules import RuleSet
 from archrev.storage import HUMAN_SESSION_ID, Session, SessionStore, utc_now_iso
-from archrev.worktree import Replay, fold_live_tail, is_bookkeeping, replay
+from archrev.worktree import Replay, fold_live_tail, is_runtime_noise, replay
 
 #: Maximum prompt characters stored in views/manifests (full text stays in events).
 _PROMPT_EXCERPT = 2000
@@ -51,6 +51,37 @@ def _is_outside_repo(path: str) -> bool:
     return bool(
         re.match(r"^([A-Za-z]:[/\\]|[/\\])", path) or path.startswith("..")
     )
+
+
+_PERMISSION_RANK = {"allow": 0, "ask": 1, "deny": 2}
+
+
+def _summarize_reads(events: list[dict]) -> list[dict]:
+    """One entry per file read: attempts, strictest decision, reporting hooks.
+
+    Raw per-read events stay in the log; the view keeps manifests small
+    while still answering "what did the agent read, and was it stopped".
+    """
+    by_path: dict[str, dict] = {}
+    for e in events:
+        if e.get("type") != "read":
+            continue
+        path = str(e.get("path") or "")
+        entry = by_path.setdefault(
+            path.lower(),
+            {"path": path, "count": 0, "permission": "allow",
+             "via": [], "first_ts": e.get("ts")},
+        )
+        entry["count"] += 1
+        permission = str(e.get("permission") or "allow")
+        if _PERMISSION_RANK.get(permission, 0) > _PERMISSION_RANK.get(
+            entry["permission"], 0
+        ):
+            entry["permission"] = permission
+        via = e.get("via")
+        if isinstance(via, str) and via not in entry["via"]:
+            entry["via"].append(via)
+    return sorted(by_path.values(), key=lambda r: r["path"].lower())
 
 
 def _areas(paths: list[str]) -> list[str]:
@@ -134,7 +165,7 @@ def _classify_unedited(
             own.append(entry)
         elif owners:
             owned_elsewhere.append({**entry, "sessions": list(owners)})
-        elif not is_bookkeeping(path):
+        elif not is_runtime_noise(path):
             background.append(entry)
     return own, owned_elsewhere, background
 
@@ -199,6 +230,7 @@ def compute_view(
     # record of who acknowledged what, when, and why stays in the log.
     acks = [e for e in events if e.get("type") == "ack"]
     quality_checks = [e for e in events if e.get("type") == "quality_check"]
+    reads = _summarize_reads(events)
 
     all_touched = session.touched_files()
     # Paths outside the repository root (other repos, Cursor's own chat
@@ -314,6 +346,7 @@ def compute_view(
         "acks": acks,
         "quality_checks": quality_checks,
         "gate_events": gate_events,
+        "reads": reads,
         "edits": edits,
         "files": files,
         "outside_repo": outside_repo,

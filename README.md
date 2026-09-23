@@ -2,602 +2,104 @@
 
 **Session provenance and architecture-rule enforcement for AI coding agents.**
 
-Git records *what* changed. ArchRev records *why* — and makes sure the agent
-followed your architecture rules while changing it.
+Git records *what* changed. ArchRev records *why* — the prompt, the plan,
+and whether the agent followed your architecture rules — as plain files in
+the repository.
 
-When an AI agent implements a feature, the intent (prompt), the plan, and the
-reasoning normally vanish the moment the chat window closes. ArchRev captures
-each agent session as plain files inside your repository, validates plans
-against architect-defined rules *before* implementation, gates edits to
-protected paths *during* implementation, and links the resulting commits back
-to the session — so weeks later you can still answer: *which prompt and plan
-produced this line, was the plan checked against our rules, and did the
-implementation drift from it?*
+- **No daemon.** The agent runtime calls ArchRev from hooks. Each call
+  appends to a log and exits.
+- **No database.** JSON, JSONL, and markdown under `.archrev/`, reviewed
+  in merge requests like any other change.
+- **Fails open.** A broken ArchRev never blocks the editor or a commit.
+  Degradation is recorded, not silent.
 
-- **No daemon.** The agent runtime invokes ArchRev per event via hooks;
-  each invocation appends to an event log and exits. Nothing runs in the
-  background.
-- **No database.** Everything is plain JSON/JSONL/markdown under `.archrev/`,
-  versioned with your code and reviewable in merge requests.
-- **Fails open.** A broken ArchRev never blocks your editor or your commits.
-  Degradation is recorded and visible, never silent.
-
----
+Rules are policy plus an audit trail, not a sandbox. An allowed process can
+still do what the operating system allows. For hard containment, run the
+agent in a network-isolated environment.
 
 ## Setup
 
-Requirements: Python 3.11+, git, and at least one supported agent runtime
-([Cursor](https://cursor.com), [Claude Code](https://code.claude.com), or
-[Codex](https://developers.openai.com/codex)).
+Python 3.11+, git, and one of [Cursor](https://cursor.com),
+[Claude Code](https://code.claude.com), or
+[Codex](https://developers.openai.com/codex).
 
 ```powershell
-# 1. Install the CLI so it is on PATH (hooks and git invoke plain `archrev`)
-uv tool install archrev        # or: pipx install archrev
-# from a source checkout:      uv tool install --editable path/to/ArchRev
+uv tool install archrev          # or: pipx install archrev
+# from a checkout:  uv tool install --editable path/to/ArchRev
 
-# 2. Install into your repository (idempotent, merge-safe)
 cd your-repo
-archrev init             # wires Cursor + Claude Code + Codex
-# archrev init --runtime cursor          # one runtime only
-# archrev init --shim uvx                # zero-install team wiring (below)
+archrev init                     # Cursor + Claude Code + Codex
+# archrev init --runtime cursor
+# archrev init --shim uvx        # teammates need uv, not a local install
 ```
 
-`archrev init` creates:
+`archrev init` is idempotent. It creates `.archrev/config.yaml`, starter
+rules, `sessions/`, runtime hook files, an agent protocol file (`AGENTS.md`
+and the Cursor/Claude equivalents), and a `prepare-commit-msg` hook that
+adds `ArchRev-Session:` trailers. Commit `.archrev/` — that directory is
+the audit record.
 
-| File | Purpose |
-| --- | --- |
-| `.archrev/config.yaml` | enforcement mode, strict mode, exemptions |
-| `.archrev/rules/00-starter-rules.yaml` | disabled example rules to copy from |
-| `.archrev/sessions/` | one directory per agent session (the record) |
-| `.cursor/hooks.json` | Cursor events → `archrev hook <event>` (merged, never overwritten) |
-| `.cursor/rules/archrev.mdc` | instructs the agent to register and check its plan |
-| `.claude/settings.json` | Claude Code lifecycle hooks → `archrev hook` |
-| `.claude/rules/archrev.md` | same protocol, loaded by Claude Code |
-| `.codex/hooks.json` | Codex lifecycle hooks → `archrev hook` (must be trusted, see below) |
-| `AGENTS.md` | same protocol for Codex and other AGENTS.md readers |
-| `.git/hooks/prepare-commit-msg` | adds `ArchRev-Session:` trailers to commits |
+Codex ignores project hooks until each developer trusts them with `/hooks`.
+Cursor and Claude Code load project hooks without that step.
 
-Start an agent conversation and you will see
-`.archrev/sessions/<session-id>/` appear. Commit the `.archrev` directory —
-it is the audit record and is designed to be reviewed in MRs.
-
-## Agent runtimes (Cursor, Claude Code, Codex)
-
-Rules, session logs, plan checks, quality gates, git trailers, CI, and
-`archrev index` are runtime-agnostic. What differs is the **adapter**: how
-events are wired, how payloads are parsed, and how deny/ask/follow-up is
-returned.
-
-| Need | Cursor | Claude Code | Codex |
-| --- | --- | --- | --- |
-| Prompt | `beforeSubmitPrompt` | `UserPromptSubmit` | `UserPromptSubmit` |
-| Gate (path/tool/shell/read/MCP) | split events | one `PreToolUse` (fan-out by tool) | one `PreToolUse` |
-| Edit capture | `afterFileEdit` | `PostToolUse` (`Edit`/`Write`) | `PostToolUse` (`apply_patch`) |
-| Command finished (session scoping) | `afterShellExecution`, `afterMCPExecution` | `PostToolUse` (`Bash`, `mcp__*`) | `PostToolUse` (shell tools) |
-| Final review nag | `stop` → `followup_message` | `Stop` → `decision: block` | `Stop` → `decision: block` |
-| Durable finalize | (same `stop`) | `SessionEnd` | `SessionEnd` |
-| `block` rule | pause (`ask`) | pause (`ask`) | **deny** (Codex cannot ask; returning `ask` would fail-open) |
-| Human tab edits | `afterTabFileEdit` | git trailer only | git trailer only |
-
-`archrev hook` with no event argument reads `hook_event_name` from stdin, so
-Claude and Codex share one command. Cursor still uses explicit
-`archrev hook prompt|gate|...` for stable stdout shape.
-
-**Codex trust:** project hooks are skipped until each developer reviews
-them with `/hooks`. Committed `.codex/hooks.json` is not enough on its
-own — this is a Codex requirement, not an ArchRev one. Claude Code and
-Cursor load project hooks without that extra step.
-
-**Claude/Codex Stop vs SessionEnd:** `Stop` fires every turn, so ArchRev
-debounces it (no duplicate `session_stop` flood) and uses it only to nag
-about findings after material work. `SessionEnd` always writes the
-manifest and runs quality checks, including protected-path changes made
-via shell that never produced an edit event.
-
-## How rules work
-
-Rules are YAML files in `.archrev/rules/`. Two kinds:
-
-### Path rules — machine-enforced at edit time
-
-```yaml
-- id: protect-typedb-schema
-  kind: path
-  match: ["type-db/**/*.tql"]        # globstar globs, case-insensitive;
-  action: block                      # patterns without "/" match any depth
-  message: "TypeDB schema change requires explicit approval."
-
-- id: flag-infrastructure
-  kind: path
-  match: ["k8s/**", "Dockerfile*", "docker-compose*.yml"]
-  action: flag
-  message: "Infrastructure change - highlighted for review."
-  applies_to: ["deploy/**"]          # optional monorepo scoping
-```
-
-- **`block`** — the edit pauses and Cursor asks *you* for approval, showing
-  the rule's message. The agent is told not to work around the gate.
-- **`flag`** — the edit proceeds, but is recorded, shown to the agent, and
-  highlighted in the session review.
-
-### Read, shell, MCP, and tool rules — gating beyond edits
-
-The same engine gates what agents may **read**, which **shell commands**
-they may run, and which **MCP servers / tools** they may use at all:
-
-```yaml
-- id: no-secret-reads
-  kind: read                       # gates beforeReadFile
-  match: ["dev-secrets/**", ".env", ".env.*"]
-  action: deny
-  message: "Agents may not read secrets or environment files."
-
-- id: no-push
-  kind: shell                      # gates beforeShellExecution
-  match_command: ["\\bgit\\s+push\\b"]   # case-insensitive regexes
-  action: block
-  message: "Pushing requires explicit approval."
-
-- id: flag-installs
-  kind: shell
-  match_command: ["\\b(pip|uv pip|npm|pnpm|yarn)\\s+(install|add)\\b"]
-  action: flag
-  message: "Dependency installation - recorded for review."
-
-- id: no-web-mcp
-  kind: mcp                        # gates beforeMCPExecution
-  match_tool: ["web|fetch|search"]
-  action: deny
-  message: "Internet-facing MCP tools are not permitted here."
-
-- id: no-subagents
-  kind: tool                       # gates preToolUse by tool name
-  match_tool: ["^Task$"]
-  action: deny
-  message: "Subagents are not permitted in this repository."
-```
-
-All machine-enforced kinds support three actions:
-
-- **`deny`** — hard stop; the agent is refused outright with the message.
-- **`block`** — pause; *you* approve or decline in Cursor's dialog.
-- **`flag`** — allow, record, and highlight in the session review.
-
-> **Approval caveat:** `block` translates to Cursor's *ask* permission. If
-> your Cursor settings auto-approve that category of action (e.g. edits are
-> set to auto-accept), the pause is resolved silently — the event is still
-> recorded and highlighted in the review, but the agent is not visibly
-> interrupted. When you need a stop that no editor setting can wave
-> through, use **`deny`**.
-
-**Enforcement honesty:** these rules gate the agent's *attempts* at the
-tool layer and record every attempt, allowed or denied — they are policy
-plus audit, not a sandbox. An allowed process can still do whatever the
-OS permits (an approved script may open network connections). For hard
-containment, run agent sessions inside network-isolated containers; the
-container is the wall, ArchRev is the policy and the evidence.
-
-### Check rules — real quality gates over changed code
-
-Where path/shell/tool rules gate *names*, `check` rules gate *content* by
-delegating to a real analyzer — Semgrep, ESLint, Ruff, pytest, or any
-script (including an LLM-judge wrapper):
-
-```yaml
-- id: endpoint-validation
-  kind: check
-  match: ["api/**/*.py"]                 # which changed files trigger it
-  command: "semgrep scan --config .archrev/checks/endpoints.yaml --error --quiet {files}"
-  action: block                          # block | flag (post-hoc; no deny)
-  message: "New/changed endpoints must validate input."
-  timeout: 60
-```
-
-- `{files}` is replaced with the session's matched changed files; exit
-  code 0 = pass. Output is captured as evidence in the event log.
-- Checks run **at session end** (failures with `action: block` become
-  final-review findings the agent must resolve or you `ack`) and in
-  **`archrev check diff`** (exits 1 on block failures — CI-ready).
-- Rules whose globs match no changed file are skipped, so sessions only
-  pay for the checks they trigger.
-- A check that cannot run (missing tool, timeout) is recorded as an
-  *error*, never a failure — ArchRev stays fail-open.
-- Three honesty tiers, all visible in the review: **verified** (check
-  rules, machine verdicts), **gated** (path/shell/tool rules), and
-  **attested** (prompt rules, agent self-reported).
-
-### Prompt rules — policies the agent attests during planning
-
-```yaml
-- id: api-rate-limit
-  kind: prompt
-  policy: "Every new API endpoint must specify rate limiting and authorization."
-```
-
-Prompt rules are evaluated by the agent itself (guided by
-`.cursor/rules/archrev.mdc`): it runs `archrev check plan
---attest api-rate-limit=pass ...` and the verdicts are recorded as evidence.
-They are attestations, not proofs — the timeline makes missing or failed
-attestations impossible to overlook.
-
-## How rules are assessed and enforced
-
-Four checkpoints, from planning to commit:
-
-```
-prompt ──> plan ──> check ──> edits ──> stop ──> commit
-            │         │         │         │         │
-            │   [2] check plan  │   [4] finalize    │
-      [1] plan register   [3] edit gate       [5] git trailer
-```
-
-1. **Plan registration** (`archrev plan register <file|--text ...>`): the
-   agent snapshots its plan into the session; file paths the plan declares
-   are extracted for drift measurement.
-2. **Plan check** (`archrev check plan`): declared files are matched against
-   path rules (a preview of what will gate), and the agent records a
-   pass/fail attestation for every prompt rule. Exits non-zero on failure.
-3. **Live gates** (automatic): every agent file edit is matched against
-   path rules (`preToolUse`), file reads against read rules
-   (`beforeReadFile`), shell commands against shell rules
-   (`beforeShellExecution`), and MCP/tool usage against mcp/tool rules —
-   `deny` refuses, `block` pauses for your approval, `flag` records. With
-   `strict_plan_check: true`, the *first* edit of a session is denied until
-   a **passing** plan check exists: **no validated plan, no code.**
-4. **Finalization + final review** (automatic, `stop` hook): writes
-   `manifest.json` and `report.md` with per-file line counts (`git diff
-   --numstat` since session start), **drift** (files touched but not
-   planned, files planned but never touched), and a **protected-path scan**
-   of the full diff — which catches protected files changed *around* the
-   gate, e.g. by shell commands like `manage.py makemigrations`. The scan
-   is **session-scoped** (see [Parallel sessions](#parallel-sessions-in-one-checkout)):
-   only changes this session could have made are raised. When
-   material findings exist (gate bypasses, a failed plan check, out-of-plan
-   drift), the **agent receives a follow-up message** listing them, so every
-   implementation ends with an explicit rule review instead of a silent
-   manifest. The same findings are raised at most once (fingerprint guard +
-   hook loop limit), and `final_check: false` turns the notification off.
-   Legitimate findings are resolved with an **audited acknowledgment**:
-
-   ```powershell
-   archrev ack .cursor/hooks.json --note "hooks rewired by archrev init, user-approved"
-   archrev ack plan-check --note "policy X intentionally waived for this hotfix"
-   ```
-
-   Acknowledged targets stop being re-raised, but the ack itself is a
-   hash-chained event showing what was acknowledged, when, and why —
-   resolved, never erased. (Honesty note: an agent *could* run `ack`
-   itself; the event log and timeline make any self-acknowledgment
-   plainly visible, and the protected-path scan result in the manifest is
-   unaffected.)
-5. **Commit linking** (automatic, git hook): staged files are matched against
-   recent sessions and `ArchRev-Session: <id>` trailers are appended, even
-   when you commit hours after the session ended.
-
-Enforcement is configurable in `.archrev/config.yaml`:
-
-```yaml
-enforcement: on      # on | monitor (record, never stop) | off
-strict_plan_check: false
-protected_scan: true
-final_check: true    # notify the agent of open findings at session end
-prompt_capture: full # full | excerpt | none | sealed
-record_scope: audit   # audit (gitignore the event log) | full
-```
-
-With strict mode on, only a **passing** plan check unlocks edits — a check
-with failed or unattested policies keeps the gate closed until the agent
-resolves them with you and re-checks.
-
-The gate exempts only `.archrev/sessions/**` (ArchRev's own bookkeeping)
-and `*.plan.md`. ArchRev's governance files — `.archrev/config.yaml`, the
-rules directory, Cursor/Claude/Codex hook wiring, and agent protocol files
-— are deliberately *not* exempt: `archrev init` ships an enabled
-`archrev-self-protection` rule that pauses any agent edit to them, so an
-agent cannot silently switch enforcement off.
-
-## Human changes are part of the record
-
-Agent edits are captured live by hooks; human edits are captured at their
-natural checkpoints, so the audit log stays complete:
-
-- **Tab completions** (human-driven, editor-assisted) are captured via the
-  `afterTabFileEdit` hook and tagged `origin: tab` in the session — the
-  timeline shows them distinctly from agent edits.
-- **Hand edits** never pass through hooks, so they are recorded at **commit
-  time**: the git hook attributes every staged file to recent agent
-  sessions; files no session touched are appended to a reserved `human`
-  session ledger (`.archrev/sessions/human/`). Every committed change is
-  therefore either linked to an agent session or explicitly marked human —
-  nothing is silently unattributed. (Only active once agent sessions exist,
-  so purely manual repositories generate no noise.)
-
-## Parallel sessions in one checkout
-
-Several Cursor windows, a Claude/Codex terminal, and your own hand edits
-routinely share one working tree, so "the diff since the session started"
-mixes everybody's work. ArchRev attributes each change to the session
-that could have made it:
-
-- **Edits through agent tools** belong to the session whose hook recorded
-  them. Another session sees them as *other sessions*.
-- **Changes without an edit event** (shell writes, MCP side effects) belong
-  to a session only if they happened **while one of its own commands was
-  running**. Each session records working-tree checkpoints (content
-  fingerprints of dirty files) when it starts, before and after each of
-  its shell/MCP commands, and at each prompt and stop. The review names
-  the command, e.g. `db/x.sql (during shell: python manage.py makemigrations)`.
-- **Everything else** is a *background change*: hand edits, another
-  window's commands, or work that pre-dates the session. It shows up in
-  the files list but is never raised as this session's gate bypass or
-  sent to its agent for acknowledgment.
-
-If the after-command hooks are not wired (older installs: re-run
-`archrev init` to add them), a command window stays open until the
-session's next checkpoint. Attribution then errs toward more review for
-the session, never toward silence. Sessions recorded before checkpoints
-existed keep the previous since-start attribution (`"attribution":
-"since_start"` in the manifest).
-
-## Tamper-evident audit log
-
-Every event carries a hash over its content plus the previous event's hash.
-Editing, reordering, or deleting any event breaks the chain:
-
-```powershell
-archrev verify           # latest session
-archrev verify --all     # every session; exits 1 on any break
-```
-
-The timeline shows an *event chain: intact / BROKEN* chip per session. This
-is tamper-*evidence*, not tamper-*proofing* — a determined attacker can
-rewrite the whole chain, but cannot quietly alter history that exported
-reports or reviewed MRs already reference.
-
-## How to review — at any point in time
-
-**Live, while the agent works** (the second-monitor view):
-
-```powershell
-archrev serve        # http://127.0.0.1:4177
-```
-
-A local, auto-refreshing timeline per session: prompt, plan, rule verdicts,
-every edit with line counts, gate pauses and flags highlighted inline, drift
-chips ("planned 6, touched 9, 3 out-of-plan"), and linked commits. **Click
-any file row to expand its full diff** (new files included), **filter the
-timeline by event type** (prompt / plan / check / gate / edit / human), and
-**search** across events and files. It is a pure viewer — stopping it never
-affects capture.
-
-**From the terminal:**
+## Daily commands
 
 ```powershell
 archrev sessions                 # recent sessions
-archrev show                     # full chain of the latest session
-archrev show <id> --md -o r.md   # markdown report (MR descriptions)
-archrev trace src/api/views.py   # which sessions touched this file?
-archrev trace 1a2b3c4d           # which session produced this commit?
-archrev rules                    # active rules + config + loading problems
-archrev check diff               # scan current git changes against rules (CI-ready)
-archrev index <paths...>         # cross-repo oversight metrics (read-only)
-```
-
-**As a shareable artifact:**
-
-```powershell
+archrev show                     # latest session
+archrev show <id> --md -o r.md   # markdown for an MR description
+archrev trace src/api/views.py   # sessions that touched this file
+archrev trace 1a2b3c4d           # session behind a commit
+archrev rules                    # active rules and config
+archrev rules explain <path>     # which rules match, and where they fire
+archrev check diff               # current changes vs rules (CI-ready; exit 1 on block)
+archrev serve                    # live timeline at http://127.0.0.1:4177
 archrev export <session>         # one self-contained HTML file
+archrev verify --all             # tamper-evidence check; exit 1 on a break
+archrev ack <path|plan-check> --note "why"
 ```
 
-Exports embed the per-file diffs (size-capped), so the expandable diff view
-works offline too.
+The agent protocol (installed into the repo) is: register a plan, attest
+prompt rules with `archrev check plan`, and do not route around a paused
+or denied edit. With `strict_plan_check: true`, the first edit is denied
+until that check passes.
 
-Every session directory also contains a durable `report.md`, regenerated at
-finalization — readable in any git UI, forever.
+## Rules, briefly
 
-## Team rollout — making adoption a no-brainer
+Rules are YAML files in `.archrev/rules/`. Machine-enforced kinds (`path`,
+`read`, `shell`, `mcp`, `tool`) use `deny` (hard stop), `block` (pause for
+approval; on Codex this is a deny, because Codex cannot ask), or `flag`
+(allow and highlight). `check` rules run a real analyzer at session end
+and in `archrev check diff`. `prompt` rules are attested by the agent;
+they are evidence, not proof.
 
-The design goal: **one person wires a repo once; everyone else just pulls.**
-Nothing to install per developer, nothing to start each morning, and the
-enforcement backstop lives in CI where adoption is not optional.
+Examples, the five checkpoints, and config knobs:
+**[docs/rules.md](docs/rules.md)**.
 
-### Zero-install wiring (`--shim uvx`)
-
-```powershell
-archrev init --shim uvx
-```
-
-Hook commands are written as `uvx archrev ...` instead of `archrev ...`.
-[uv](https://docs.astral.sh/uv/)'s tool runner fetches and caches ArchRev
-on first invocation, so teammates need **no ArchRev installation at all**
-— uv itself is the only prerequisite. Commit the hook wiring
-(`.cursor/`, `.claude/`, `.codex/`), `.archrev/`, and the rules once;
-from then on, onboarding a developer is `git pull` (Codex still needs
-`/hooks` trust per machine). Re-running `init` with a different `--shim` upgrades the
-existing wiring in place (never duplicates entries), so switching modes
-later is safe.
-
-### CI enforcement (`archrev ci gitlab`)
-
-```powershell
-archrev ci gitlab        # writes .gitlab/archrev-ci.yml
-```
-
-Generates a GitLab CI template with two merge-request jobs, then prints
-the `include:` snippet for your `.gitlab-ci.yml`:
-
-- **`archrev:rules`** (required): runs `archrev check diff` against the MR
-  target branch — path rules *and* `check`-rule quality gates over the
-  changed files — plus `archrev verify --all` so committed session logs
-  arrive with intact tamper-evidence chains. Fails the pipeline on
-  block-level findings.
-- **`archrev:mr-report`** (best-effort, `allow_failure`): resolves the
-  session behind the MR's head commit via its `ArchRev-Session:` trailer
-  and renders the markdown session report. With `ARCHREV_GITLAB_TOKEN`
-  set (project access token, `api` scope, masked variable) the report is
-  posted as an MR comment; without it, it lands in the job artifacts.
-
-Both jobs install `ARCHREV_PIP_SPEC`, which defaults to the exact release
-that generated the template (`archrev==<version>`). To install from a
-private index or a git URL pinned to a commit, override it as a project
-CI/CD variable. Do not replace it with a bare `archrev`: an unpinned
-install runs whatever the index serves under that name, with access to
-the pipeline's variables.
-
-This is the layer that needs zero developer adoption: even a laptop with
-hooks disabled cannot merge changes that violate block-level rules, and
-reviewers see the session provenance next to the diff.
-
-### Prompt privacy (`prompt_capture`)
-
-Prompts are the most sensitive artifact ArchRev stores — they may contain
-secrets, credentials, or half-formed reasoning nobody intended to commit.
-Before a team rollout, decide consciously what enters the (git-versioned)
-record via `.archrev/config.yaml`:
-
-| Mode | What is stored |
-| --- | --- |
-| `full` (default) | the whole prompt text — best provenance |
-| `excerpt` | first 200 characters plus total length |
-| `none` | no text; only length and a SHA-256 content hash |
-| `sealed` | ciphertext only. `archrev seal keygen` writes a private key to `~/.archrev/seal.key` (optional passphrase) and the public key to `.archrev/recipients.yaml`. Add an org escrow key there only as an explicit decision. Decrypt with `archrev show --unseal` or the passphrase field in the localhost viewer. Plaintext is never written back. If sealing cannot run, capture falls back to `none` — never to plaintext. |
-
-The exact prompt is useful when you are reconstructing a decision ("what was the agent told?"). It is not useful as a permanent copy of scratch thinking. `sealed` keeps the reconstruction possible for the people who hold a key, and keeps it out of everyone else's `git log`.
-
-### What gets committed (`record_scope`)
-
-| Mode | Committed | Local only |
-| --- | --- | --- |
-| `audit` (default for new `archrev init`) | `manifest.json`, `plan.md`, `report.md`. The manifest stores the event-log chain head. | `events.jsonl` (gitignored). `archrev verify` on a checkout without the log says so, instead of pretending the chain is empty. |
-| `full` | the event log too | — |
-
-`archrev prune --keep-days 30` deletes event logs of finalized sessions older than that. It does not touch manifests. `archrev plan register --amend` unions new file declarations with the previous plan instead of replacing it. `archrev rules explain <path>` prints which rules match a path and which checkpoint would fire — including an explicit "no rule matches".
-
-### Cross-repo oversight (`archrev index`)
-
-```powershell
-archrev index E:\checkouts          # or several repo roots
-archrev index --json                # machine-readable, for dashboards
-```
-
-Pull-based by design: session records already travel with git, so
-org-level visibility is a *read* over whatever is checked out — no agents
-streaming telemetry, no server to run, nothing developers can forget to
-start. Per repository and in total, it reports: sessions and plan
-discipline (registered plans, passing checks), **drift rate** (out-of-plan
-share of touched files), gate pressure (pauses / denials / flags),
-**gate bypasses**, quality-check failures, acknowledgments, human-change
-events, and broken event chains. Rows with bypasses or chain breaks are
-highlighted. A lead reviews a team's repos with one command; a platform
-team feeds `--json` into whatever dashboard already exists.
-
-## Storage format
+## Storage
 
 ```
 .archrev/
   config.yaml
   rules/*.yaml
-  sessions/<conversation-id>/
-    meta.json        session start: id, timestamp, git HEAD, optional runtime
-    events.jsonl     append-only event stream (the audit truth)
-    plan.md          registered plan snapshot
-    manifest.json    finalized summary: files, LOC, drift, verdicts, commits
-    report.md        human-readable report
+  sessions/<id>/
+    meta.json       id, start time, git HEAD, runtime
+    events.jsonl    append-only hash-chained log (the audit truth)
+    plan.md         latest registered plan
+    manifest.json   derived summary: files, drift, verdicts, reads, commits
+    report.md       derived markdown report
 ```
 
-The JSONL event log is the source of truth; everything else is derived and
-can be regenerated. Since v0.2 every event carries `prev`/`hash` fields
-forming the tamper-evidence chain (`archrev verify`); records from earlier
-versions remain readable and are reported as pre-chain legacy events. Because it all lives in git, provenance survives ArchRev
-itself: even without the tool, the record is plain text in your history.
+Events carry `prev` and `hash`. Older logs without those fields still
+read. `record_scope: audit` (the default for a new `archrev init`)
+gitignores `events.jsonl` and commits the manifest, plan, and report.
+Field-level detail: **[docs/guide.md](docs/guide.md#storage-format)**.
 
-Session scoping adds `worktree` checkpoint events (additive; older logs
-without them stay valid and use since-start attribution):
+## Further reading
 
-```json
-{"type": "worktree", "phase": "exec_start", "label": "shell: pytest",
- "changed": {"db/x.sql": "3f2a9c01d4e5b6a7", "gone.py": "-"}}
-```
-
-`phase` is `start`, `exec_start`, `exec_end`, `turn_start`, or `turn_end`.
-`changed` holds content fingerprints relative to the session's previous
-checkpoint (`-` marks a deleted file); the `start` event holds the full
-baseline of pre-existing changes. Command text is stored in `label` only
-with `prompt_capture: full`; otherwise the label is just `shell`. The
-manifest gains `background_changes`, an `attribution` mode
-(`checkpoints` | `since_start`), and a `during` list on unexplained
-changes and protected findings.
-
-## Honest limitations (v0.5)
-
-- Live capture requires a runtime with lifecycle hooks. Cursor, Claude
-  Code, and Codex are wired; Aider/Cline/Copilot Chat get the protocol
-  file plus CI, not in-editor gates.
-- Codex `block` rules are enforced as `deny` because Codex does not honor
-  `permissionDecision: ask` (returning ask fails the hook and allows the
-  tool). Claude Code and Cursor can still pause for approval.
-- Codex project hooks are skipped until trusted via `/hooks`.
-- Prompt-rule verdicts are agent self-attestations — recorded and surfaced,
-  not independently verified.
-- `block` rules on Cursor still depend on approval settings being visible
-  (see the approval caveat above); `deny` is the setting-independent hard
-  stop.
-- Human tab-completion capture (`afterTabFileEdit`) is Cursor-only; on
-  Claude/Codex, human edits land in the commit-time `human` ledger.
-- Human hand-edits are captured at commit time (the `human` ledger), not
-  live; between commits they appear in the finalize diff as background
-  changes.
-- Session scoping cannot separate a hand edit saved *while* one of this
-  session's commands is running from that command's own writes; such a
-  change is attributed to the session (resolve it with `archrev ack`).
-  Timestamps have one-second resolution, so another session's edit event
-  in the same second as this session's command window counts as theirs.
-- `plan register` / `check plan` bind to the most recently active session.
-  The shell hook right before the command marks its own session active,
-  which makes this reliable in practice; pass `--session` to be explicit.
-- `sealed` prompts are only as private as the recipient set. A public key
-  in `.archrev/recipients.yaml` can read every sealed prompt. There is no
-  per-prompt access control.
-- `record_scope: audit` means `archrev verify` on a colleague's checkout
-  cannot recompute the chain; it can only show the committed chain head.
-  The log has to be verified where it was written.
-- If hooks are disabled or the CLI leaves PATH, capture stops silently by
-  design (fail-open); `archrev sessions` shows the gap.
-
-## Roadmap — improvements by audience
-
-Held in evidence from dogfooding sessions (2026-09-18); strikethrough as
-they land.
-
-**For a CTO (making this adoptable across an org):**
-
-- Central, versioned rule packs shared across repos rather than per-repo YAML.
-- ~~Tamper-evident event logs (hash-chained JSONL)~~ — shipped in v0.2
-  (`archrev verify`).
-- ~~A cross-repo index with the metrics that matter: drift rate,
-  gate-override rate, failed-attestation trends per team~~ — shipped in
-  v0.3 (`archrev index`); per-team trend lines over time still open.
-- ~~CI enforcement: `archrev check diff` as a required GitLab job; MR
-  descriptions auto-populated from session reports~~ — shipped in v0.3
-  (`archrev ci gitlab`).
-- A documented containment story (ArchRev policy + network-isolated
-  containers) for the security review any rollout triggers.
-  (Related, shipped in v0.3 though not on the original list: zero-install
-  team wiring via `archrev init --shim uvx` and prompt-privacy controls
-  via `prompt_capture`. Shipped in v0.4: Claude Code and Codex hook
-  adapters — `archrev init --runtime claude|codex`.)
-
-**For an engineer (daily quality of life):**
-
-- An MCP server so agents query rules and session history natively instead
-  of shelling out.
-- A faster hook runtime (small compiled shim or `python -S` trimming) to
-  make gating cost invisible.
-- Structured plans (frontmatter file lists) instead of regex extraction.
-- Session labels (`archrev annotate`) so the sessions list reads like a
-  changelog.
-- An IDE panel so the timeline lives next to the code instead of a browser
-  tab.
+- **[docs/rules.md](docs/rules.md)** — rule kinds, examples, enforcement
+- **[docs/guide.md](docs/guide.md)** — runtimes, review, parallel sessions,
+  team rollout, limitations, roadmap
 
 ## Development
 

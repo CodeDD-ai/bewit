@@ -93,6 +93,13 @@ def render_text(view: dict) -> str:
             + (f"  [{hits}]" if hits else ""))
     add("")
 
+    reads = view.get("reads", [])
+    add(f"Files read ({len(reads)})")
+    for r in reads:
+        add(f"  {r.get('permission', 'allow'):>5}  {r['path']}"
+            f"  (x{r.get('count', 1)}, via {', '.join(r.get('via') or ['?'])})")
+    add("")
+
     files = view.get("files", [])
     add(f"Files touched ({len(files)})")
     for f in files:
@@ -264,6 +271,26 @@ def render_markdown(view: dict) -> str:
     for path in view.get("outside_repo", []):
         add(f"| `{path}` | — | written outside this repository |")
     add("")
+
+    reads = view.get("reads", [])
+    if reads:
+        denied = sum(1 for r in reads if r.get("permission") != "allow")
+        add("## Files read")
+        add("")
+        add(f"<details><summary>{len(reads)} file(s) read, "
+            f"{denied} stopped by a read rule</summary>")
+        add("")
+        add("| File | Reads | Decision | Reported by |")
+        add("| --- | --- | --- | --- |")
+        for r in reads:
+            decision = r.get("permission", "allow")
+            if decision != "allow":
+                decision = f"**{decision}**"
+            add(f"| `{r['path']}` | {r.get('count', 1)} | {decision} "
+                f"| {', '.join(r.get('via') or ['?'])} |")
+        add("")
+        add("</details>")
+        add("")
 
     findings = view.get("protected_findings", [])
     if findings:

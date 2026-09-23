@@ -214,6 +214,8 @@ def test_claude_change_after_bash_finished_is_background(repo: Path, monkeypatch
     assert manifest["other_changes"][0]["during"] == ["shell: ./gen.sh"]
     background = [c["path"] for c in manifest["background_changes"]]
     assert "db/migrations/0001_init.sql" in background
+    assert ".archrev/fingerprint-cache.json" not in background
+    assert not any(p.startswith(".archrev/sessions/") for p in background)
     assert manifest["protected_findings"] == []
 
 

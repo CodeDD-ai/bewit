@@ -9,18 +9,21 @@ Layout under the repository root::
         manifest.json  finalized summary written on session stop
         report.md      human-readable report regenerated at finalization
 
-Appends are single ``write()`` calls on files opened in append mode, which
-is atomic enough for the hook concurrency model (hooks for one session are
-serialized by Cursor; distinct sessions write to distinct directories).
-Corrupt lines are skipped on read rather than failing the whole session.
+Appends are a single ``write()`` of one line, serialized by a per-session
+lock so parallel tool calls cannot fork the hash chain. Distinct sessions
+lock distinct files. Corrupt lines are skipped on read rather than failing
+the whole session.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -51,6 +54,27 @@ META_FILENAME = "meta.json"
 MANIFEST_FILENAME = "manifest.json"
 PLAN_FILENAME = "plan.md"
 REPORT_FILENAME = "report.md"
+
+
+#: Parsed event logs, keyed by path. Invalidated when size or mtime changes.
+#: One hook process reads the same log many times (finalize, drift, replay);
+#: the viewer polls it. The cached list is shared and must not be mutated.
+_EVENT_CACHE: dict[str, tuple[int, int, list[dict]]] = {}
+_EVENT_CACHE_MAX = 64
+
+#: In-process companions to the cross-process file lock. Windows locks are
+#: per-process, so threads in one hook-host process also need this.
+_THREAD_LOCKS: dict[str, threading.Lock] = {}
+_THREAD_LOCKS_GUARD = threading.Lock()
+
+
+def _thread_lock(key: str) -> threading.Lock:
+    with _THREAD_LOCKS_GUARD:
+        lock = _THREAD_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _THREAD_LOCKS[key] = lock
+        return lock
 
 
 def utc_now_iso() -> str:
@@ -130,27 +154,105 @@ class Session:
 
     # -- events ---------------------------------------------------------
 
+    def _lock_path(self) -> Path:
+        """Per-session lock under ``.archrev/locks/`` (gitignored runtime noise)."""
+        return self.dir.parent.parent / "locks" / f"{self.id}.lock"
+
+    @contextmanager
+    def _append_lock(self):
+        """Serialize appends. Lock failure yields anyway: losing an event is worse."""
+        thread = _thread_lock(str(self.dir.resolve()))
+        with thread:
+            fh = None
+            locked = False
+            try:
+                path = self._lock_path()
+                path.parent.mkdir(parents=True, exist_ok=True)
+                fh = open(path, "a+b")
+                if os.name == "nt":
+                    import msvcrt
+
+                    if fh.seek(0, 2) == 0:
+                        fh.write(b"\0")
+                        fh.flush()
+                    fh.seek(0)
+                    deadline = time.monotonic() + 5
+                    while True:
+                        try:
+                            msvcrt.locking(fh.fileno(), msvcrt.LK_NBLCK, 1)
+                            locked = True
+                            break
+                        except OSError:
+                            if time.monotonic() >= deadline:
+                                break
+                            time.sleep(0.01)
+                else:
+                    import fcntl
+
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+                    locked = True
+            except OSError:
+                fh = None
+            try:
+                yield
+            finally:
+                if fh is not None:
+                    try:
+                        if locked and os.name == "nt":
+                            import msvcrt
+
+                            fh.seek(0)
+                            msvcrt.locking(fh.fileno(), msvcrt.LK_UNLCK, 1)
+                        elif locked:
+                            import fcntl
+
+                            fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                    except OSError:
+                        pass
+                    fh.close()
+
     def _last_hash(self) -> str:
-        """Hash of the most recent event, or GENESIS for an empty log."""
+        """Hash of the most recent event, or GENESIS for an empty log.
+
+        The previous implementation read only the last 16 KiB. A single
+        event larger than that (a full prompt, a long plan) made the next
+        append chain from GENESIS and ``archrev verify`` reported a break.
+        """
         path = self.dir / EVENTS_FILENAME
         try:
             with open(path, "rb") as fh:
                 fh.seek(0, 2)
                 size = fh.tell()
-                fh.seek(max(0, size - 16384))
-                tail = fh.read().decode("utf-8", "replace")
+                if size == 0:
+                    return GENESIS
+                pos = size
+                buf = b""
+                while pos > 0:
+                    step = min(65536, pos)
+                    pos -= step
+                    fh.seek(pos)
+                    buf = fh.read(step) + buf
+                    stripped = buf.rstrip(b"\r\n")
+                    parts = stripped.split(b"\n")
+                    # The first slice may be a partial line when the read
+                    # started mid-line. Every later slice is complete.
+                    start = 0 if pos == 0 else 1
+                    if pos > 0 and len(parts) <= 1:
+                        continue
+                    for raw in reversed(parts[start:]):
+                        raw = raw.strip()
+                        if not raw:
+                            continue
+                        try:
+                            event = json.loads(raw.decode("utf-8"))
+                        except (json.JSONDecodeError, UnicodeDecodeError):
+                            continue
+                        if isinstance(event, dict):
+                            return str(event.get("hash") or GENESIS)
+                    if len(buf) > 64 * 1024 * 1024:
+                        break
         except OSError:
             return GENESIS
-        for line in reversed(tail.strip().splitlines()):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(event, dict):
-                return str(event.get("hash") or GENESIS)
         return GENESIS
 
     def append_event(self, event_type: str, **data: object) -> dict:
@@ -165,14 +267,20 @@ class Session:
         hashes exist.
         """
         self.dir.mkdir(parents=True, exist_ok=True)
-        prev = self._last_hash()
-        event: dict = {"ts": utc_now_iso(), "type": event_type, **data, "prev": prev}
-        event["hash"] = event_hash(event)
-        line = json.dumps(event, ensure_ascii=False)
-        with open(
-            self.dir / EVENTS_FILENAME, "a", encoding="utf-8", newline="\n"
-        ) as fh:
-            fh.write(line + "\n")
+        with self._append_lock():
+            prev = self._last_hash()
+            event: dict = {
+                "ts": utc_now_iso(),
+                "type": event_type,
+                **data,
+                "prev": prev,
+            }
+            event["hash"] = event_hash(event)
+            line = json.dumps(event, ensure_ascii=False)
+            with open(
+                self.dir / EVENTS_FILENAME, "a", encoding="utf-8", newline="\n"
+            ) as fh:
+                fh.write(line + "\n")
         return event
 
     def verify_chain(self) -> dict:
@@ -205,13 +313,25 @@ class Session:
         }
 
     def events(self) -> list[dict]:
-        """All events in append order; corrupt lines are skipped."""
+        """All events in append order; corrupt lines are skipped.
+
+        The parsed list is cached until the file's size or mtime changes.
+        Callers must not mutate the returned list or its dicts.
+        """
         path = self.dir / EVENTS_FILENAME
-        out: list[dict] = []
+        try:
+            st = path.stat()
+        except OSError:
+            return []
+        key = str(path.resolve())
+        hit = _EVENT_CACHE.get(key)
+        if hit is not None and hit[0] == st.st_mtime_ns and hit[1] == st.st_size:
+            return hit[2]
         try:
             text = path.read_text(encoding="utf-8")
         except OSError:
-            return out
+            return []
+        out: list[dict] = []
         for line in text.splitlines():
             line = line.strip()
             if not line:
@@ -222,6 +342,17 @@ class Session:
                 continue
             if isinstance(item, dict):
                 out.append(item)
+        try:
+            st_after = path.stat()
+        except OSError:
+            return out
+        if (
+            st_after.st_mtime_ns == st.st_mtime_ns
+            and st_after.st_size == st.st_size
+        ):
+            if len(_EVENT_CACHE) >= _EVENT_CACHE_MAX:
+                _EVENT_CACHE.pop(next(iter(_EVENT_CACHE)))
+            _EVENT_CACHE[key] = (st.st_mtime_ns, st.st_size, out)
         return out
 
     def has_event(self, event_type: str) -> bool:

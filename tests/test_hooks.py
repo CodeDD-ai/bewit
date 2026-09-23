@@ -81,6 +81,96 @@ def test_read_tools_not_gated_by_edit_rules(in_repo: Path):
     assert out["permission"] == "ask"
 
 
+def test_cursor_pretool_read_enforces_read_rules(in_repo: Path):
+    """Regression: Cursor agent reads often skip beforeReadFile; preToolUse
+    must still enforce ``read`` rules (e.g. deny-secret-reads)."""
+    (in_repo / ".archrev" / "rules" / "secrets.yaml").write_text(
+        """
+- id: no-env
+  kind: read
+  match: [".env", ".env.*"]
+  action: deny
+  message: "No .env reads."
+""",
+        encoding="utf-8",
+    )
+    out = run_hook(
+        "gate",
+        _payload(tool_name="Read", tool_input={"file_path": ".env"}),
+    )
+    assert out["permission"] == "deny"
+    assert "No .env reads." in out["user_message"]
+    events = [
+        e
+        for e in SessionStore(in_repo).session("conv-42").events()
+        if e.get("type") == "gate" and e.get("kind") == "read"
+    ]
+    assert len(events) == 1
+    assert events[0]["permission"] == "deny"
+
+
+def test_grep_is_gated_as_a_read(in_repo: Path):
+    """Grep returns file contents, so a read deny must apply to it."""
+    (in_repo / ".archrev" / "rules" / "secrets.yaml").write_text(
+        '- id: no-env\n  kind: read\n  match: [".env"]\n  action: deny\n'
+        '  message: "No .env reads."\n',
+        encoding="utf-8",
+    )
+    out = run_hook(
+        "gate",
+        _payload(tool_name="Grep", tool_input={"path": ".env", "pattern": "KEY"}),
+    )
+    assert out["permission"] == "deny"
+    assert "No .env reads." in out["user_message"]
+
+
+def test_every_read_is_logged_with_reporting_hook(in_repo: Path):
+    """Allowed reads are part of the audit trail too, tagged with the hook
+    that reported them, so a missing event proves the runtime skipped us."""
+    (in_repo / ".archrev" / "rules" / "secrets.yaml").write_text(
+        '- id: no-env\n  kind: read\n  match: [".env"]\n  action: deny\n',
+        encoding="utf-8",
+    )
+    assert run_hook(
+        "gate", _payload(tool_name="Read", tool_input={"path": "app/main.py"})
+    ) == {"permission": "allow"}
+    assert run_hook("read", _payload(file_path=str(in_repo / "app" / "main.py"))) == {
+        "permission": "allow"
+    }
+    run_hook("read", _payload(file_path=".env"))
+
+    session = SessionStore(in_repo).session("conv-42")
+    reads = [e for e in session.events() if e["type"] == "read"]
+    assert [(e["path"], e["permission"], e["via"]) for e in reads] == [
+        ("app/main.py", "allow", "preToolUse"),
+        ("app/main.py", "allow", "beforeReadFile"),
+        (".env", "deny", "beforeReadFile"),
+    ]
+    assert reads[0]["tool"] == "Read"
+    assert reads[2]["rules"] == ["no-env"]
+    # Only the policy hit is a gate event; routine reads stay out of gate metrics.
+    gates = [e for e in session.events() if e["type"] == "gate"]
+    assert [g["target"] for g in gates] == [".env"]
+
+    run_hook("finalize", _payload(status="completed"))
+    summary = {r["path"]: r for r in session.manifest()["reads"]}
+    assert summary["app/main.py"]["count"] == 2
+    assert summary["app/main.py"]["via"] == ["preToolUse", "beforeReadFile"]
+    assert summary[".env"]["permission"] == "deny"
+    report = (session.dir / "report.md").read_text(encoding="utf-8")
+    assert "## Files read" in report and "`.env`" in report
+
+
+def test_read_without_path_leaves_debug_evidence(in_repo: Path):
+    assert run_hook("read", _payload(some_new_field="x")) == {"permission": "allow"}
+    debug = [
+        e for e in SessionStore(in_repo).session("conv-42").events()
+        if e["type"] == "payload_debug"
+    ]
+    assert debug and debug[0]["hook"] == "read"
+    assert debug[0]["via"] == "beforeReadFile"
+
+
 def test_gate_without_paths_allows(in_repo: Path):
     out = run_hook("gate", _payload(tool_name="Shell", tool_input={"command": "ls"}))
     assert out == {"permission": "allow"}

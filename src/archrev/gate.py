@@ -3,8 +3,9 @@
 Invoked from the ``preToolUse`` hook before Cursor executes a file-editing
 tool. Decision policy, in order:
 
-1. Paths exempt by configuration (ArchRev data, Cursor config, plan files)
-   are always allowed — the gate must never block its own bookkeeping.
+1. Paths exempt by configuration (session bookkeeping and plan files, plus
+   any ``exempt`` globs) are always allowed — the gate must never block
+   its own bookkeeping.
 2. Strict mode: if ``strict_plan_check`` is on and this session has not
    recorded a plan check yet, the edit is denied with instructions to the
    agent to register and check a plan first ("no validated plan, no code").
@@ -21,6 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import unquote
 
 from archrev import globmatch
 from archrev.config import Config
@@ -74,6 +76,9 @@ _STRICT_FAILED_CHECK_MESSAGE = (
 
 def relativize(path: str, root: Path) -> str:
     """Best-effort repo-relative normalized path for matching and storage."""
+    # A file URI (file:///e%3A/repo/.env) must not slip past path rules.
+    if path[:7].lower() == "file://":
+        path = unquote(path[7:])
     norm = globmatch.normalize(path)
     root_norm = globmatch.normalize(str(root))
     if root_norm and norm.lower().startswith(root_norm.lower() + "/"):
@@ -238,7 +243,7 @@ def evaluate_read(
         return GateDecision(permission="allow")
     hits: list[RuleHit] = []
     for rel in (relativize(p, root) for p in paths):
-        if not rel:
+        if not rel or globmatch.matches_any(config.exempt, rel):
             continue
         for rule in ruleset.match_read(rel):
             hits.append(

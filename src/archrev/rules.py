@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -87,7 +88,11 @@ class Rule:
 
     def pattern_matches(self, text: str) -> bool:
         """True when any regex pattern matches ``text`` (case-insensitive)."""
-        return any(re.search(p, text, re.IGNORECASE) for p in self.patterns)
+        for pattern in self.patterns:
+            compiled = _compile_pattern(pattern)
+            if compiled is not None and compiled.search(text):
+                return True
+        return False
 
 
 @dataclass
@@ -290,12 +295,46 @@ def _parse_rule(raw: object, source: str, errors: list[str]) -> Rule | None:
     )
 
 
+@lru_cache(maxsize=512)
+def _compile_pattern(pattern: str) -> re.Pattern[str] | None:
+    """Compile a rule regex once. ``None`` when the pattern is invalid."""
+    try:
+        return re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        return None
+
+
+#: Parsed rule sets, keyed by the rules directory. Invalidated when any
+#: rules file's name, size, or mtime changes. Hooks reload rules on every
+#: event; within one process (and across a viewer's polls) that is wasted.
+_RULES_CACHE: dict[str, tuple[tuple[tuple[str, int, int], ...], RuleSet]] = {}
+
+
 def load_rules(root: Path) -> RuleSet:
     """Load every rule beneath ``.archrev/rules/``; never raises."""
-    ruleset = RuleSet()
     rules_dir = archrev_dir(root) / "rules"
     if not rules_dir.is_dir():
-        return ruleset
+        return RuleSet()
+    signature: list[tuple[str, int, int]] = []
+    for path in sorted(rules_dir.glob("*.y*ml")):
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        signature.append((path.name, st.st_mtime_ns, st.st_size))
+    sig = tuple(signature)
+    key = str(rules_dir.resolve())
+    cached = _RULES_CACHE.get(key)
+    if cached is not None and cached[0] == sig:
+        return cached[1]
+    ruleset = _load_rules_from(rules_dir)
+    _RULES_CACHE[key] = (sig, ruleset)
+    return ruleset
+
+
+def _load_rules_from(rules_dir: Path) -> RuleSet:
+    """Parse ``rules_dir`` with no cache."""
+    ruleset = RuleSet()
 
     seen_ids: dict[str, str] = {}
     for path in sorted(rules_dir.glob("*.y*ml")):

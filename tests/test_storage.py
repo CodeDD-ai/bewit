@@ -1,4 +1,5 @@
 import json
+import threading
 from pathlib import Path
 
 from archrev.storage import GENESIS, SessionStore, sanitize_session_id
@@ -87,6 +88,35 @@ def test_legacy_unhashed_events_tolerated(tmp_path: Path):
     assert result["ok"] is True
     assert result["legacy"] == 1
     assert result["checked"] == 1
+
+
+def test_chain_survives_events_larger_than_the_old_tail_window(tmp_path: Path):
+    """A prompt bigger than 16 KiB must not break the hash of the next event."""
+    session = SessionStore(tmp_path).session("s")
+    session.append_event("prompt", text="x" * 50_000)
+    session.append_event("edit", path="a.py")
+    events = session.events()
+    assert events[1]["prev"] == events[0]["hash"]
+    assert session.verify_chain()["ok"] is True
+
+
+def test_parallel_appends_stay_one_chain(tmp_path: Path):
+    store = SessionStore(tmp_path)
+
+    def worker(index: int) -> None:
+        session = store.session("s")
+        for n in range(15):
+            session.append_event("edit", path=f"t{index}-{n}.py")
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+    session = store.session("s")
+    assert len(session.events()) == 60
+    assert session.verify_chain()["ok"] is True
 
 
 def test_resolve_prefix_and_latest(tmp_path: Path):

@@ -81,6 +81,9 @@ def test_files_placeholder_substitution(repo: Path):
     results = run_checks(repo, load_rules(repo), ["app/main.py"])
     assert results[0]["ok"] is True
     assert "app/main.py" in results[0]["output"]
+    spaced = run_checks(repo, load_rules(repo), ["app/my file.py"])
+    assert spaced[0]["ok"] is True
+    assert "my file.py" in spaced[0]["output"]
 
 
 def test_unrunnable_check_is_error_not_failure(repo: Path):

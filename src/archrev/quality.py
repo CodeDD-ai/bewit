@@ -25,6 +25,8 @@ breaks the session over its own tooling (fail-open).
 
 from __future__ import annotations
 
+import os
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -43,10 +45,22 @@ def _matched_files(rule: Rule, files: list[str]) -> list[str]:
     ]
 
 
+def _quote_arg(text: str) -> str:
+    """Quote one path for the shell that ``subprocess`` will actually use.
+
+    On Windows that shell is ``cmd.exe``. POSIX ``shlex.quote`` (single
+    quotes) is not quoting there, so a path with spaces was split and a
+    path with quotes could break out of the command.
+    """
+    if os.name == "nt":
+        return subprocess.list2cmdline([text])
+    return shlex.quote(text)
+
+
 def _build_command(rule: Rule, matched: list[str]) -> str:
     if "{files}" not in rule.command:
         return rule.command
-    quoted = " ".join(f'"{f}"' for f in matched)
+    quoted = " ".join(_quote_arg(f) for f in matched)
     return rule.command.replace("{files}", quoted)
 
 

@@ -10,6 +10,8 @@ dist/
 
 # ArchRev runtime noise (session records themselves ARE committed)
 .archrev/hook-errors.log
+.archrev/fingerprint-cache.json
+.archrev/locks/
 
 # Editors / OS
 .idea/

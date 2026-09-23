@@ -47,7 +47,7 @@ def attribute_staged(root: Path) -> tuple[list[str], list[str]]:
             continue
         activity = session.last_activity()
         if activity < cutoff:
-            continue  # list is sorted desc; everything after is older
+            break  # list is sorted desc; everything after is older
         touched = {p.lower() for p in session.touched_files()}
         overlap = touched & set(staged)
         if overlap:

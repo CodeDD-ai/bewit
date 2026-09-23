@@ -362,10 +362,14 @@ def handle_gate(root: Path, config: Config, payload: dict) -> dict:
             if decision.permission != "allow":
                 return decision.to_hook_output()
 
-    # Path (edit) rules apply only to tools that MODIFY files. Read-style
-    # tools also carry file paths through preToolUse, but gating them here
-    # produced false "ask" prompts on plain reads (observed live); reads
-    # are governed by `read` rules via beforeReadFile instead. An empty
+    # Read tools: enforce ``read`` rules here. Cursor often routes agent
+    # reads only through ``preToolUse`` (not ``beforeReadFile``), so relying
+    # on the read hook alone leaves secret denies unwired. Edit/path rules
+    # must still not apply to reads (StrReplace pipelines read first).
+    if tool_name and is_read_tool(tool_name):
+        return handle_read(root, config, payload, via="preToolUse")
+
+    # Path (edit) rules apply only to tools that MODIFY files. An empty
     # tool name is treated as an edit, erring toward protection.
     if tool_name and not _EDIT_TOOL_RE.search(tool_name):
         return {"permission": "allow"}
@@ -443,8 +447,16 @@ def _exec_label(config: Config, payload: dict) -> str | None:
     return f"mcp: {identifier}" if identifier else None
 
 
-def handle_read(root: Path, config: Config, payload: dict) -> dict:
-    """``beforeReadFile``: gate file reads (e.g. secrets)."""
+def handle_read(
+    root: Path, config: Config, payload: dict, via: str = "beforeReadFile"
+) -> dict:
+    """Gate file reads (e.g. secrets) and record every read attempt.
+
+    ``via`` names the runtime hook that reported the read. Every read is
+    logged, allowed ones included, so the trail shows which hook fired for
+    which file; a read of a known file with no event means the runtime
+    never consulted ArchRev.
+    """
     session = _ensure_session(root, payload, "read")
     raw_path = ""
     for key in _PATH_KEYS:
@@ -453,9 +465,21 @@ def handle_read(root: Path, config: Config, payload: dict) -> dict:
             raw_path = value
             break
     if not raw_path:
+        session.append_event(
+            "payload_debug", hook="read", via=via, payload=_trim_payload(payload)
+        )
         return {"permission": "allow"}
+    target = relativize(raw_path, root)
     decision = evaluate_read(config, load_rules(root), [raw_path], root)
-    _record_gate(session, decision, "read", relativize(raw_path, root))
+    session.append_event(
+        "read",
+        path=target,
+        permission=decision.permission,
+        via=via,
+        tool=tool_name_of(payload),
+        rules=[h.rule_id for h in decision.hits],
+    )
+    _record_gate(session, decision, "read", target)
     return decision.to_hook_output()
 
 
@@ -670,8 +694,7 @@ def handle_pretool(root: Path, config: Config, payload: dict) -> dict:
     name = tool_name_of(payload)
     if is_shell_tool(name):
         outputs.append(handle_shell(root, config, payload))
-    if is_read_tool(name):
-        outputs.append(handle_read(root, config, payload))
+    # Read rules run inside handle_gate for read tools; do not evaluate twice.
     if is_mcp_tool(name):
         outputs.append(handle_mcp(root, config, payload))
     return merge_hook_outputs(outputs)

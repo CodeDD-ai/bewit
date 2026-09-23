@@ -304,28 +304,60 @@ class InitResult:
 
 _EVENTS_GITIGNORE_LINE = ".archrev/sessions/*/events.jsonl"
 
+#: Local runtime files. Never part of the audit record.
+_RUNTIME_GITIGNORE_LINES = (
+    ".archrev/hook-errors.log",
+    ".archrev/fingerprint-cache.json",
+    ".archrev/locks/",
+)
 
-def _ensure_audit_gitignore(root: Path, result: InitResult) -> None:
-    """Keep raw event logs out of git when the repo is in audit scope."""
-    if load_config(root).record_scope != "audit":
-        return
+
+def _append_gitignore_lines(
+    root: Path, lines: tuple[str, ...], comment: str, result: InitResult
+) -> None:
+    """Append any of ``lines`` that are not already in ``.gitignore``."""
     path = root / ".gitignore"
     try:
         existing = path.read_text(encoding="utf-8") if path.exists() else ""
     except OSError as exc:
         result.warnings.append(f"{path}: could not read ({exc})")
         return
-    if _EVENTS_GITIGNORE_LINE in existing:
+    present = set(existing.splitlines())
+    missing = [line for line in lines if line not in present]
+    if not missing:
         result.skipped.append(str(path))
         return
-    block = (
-        "\n# ArchRev audit tier: the full event log stays on the authoring "
-        "machine.\n# Manifests, plans, and reports under .archrev/sessions/ "
-        "stay committed.\n"
-        f"{_EVENTS_GITIGNORE_LINE}\n"
-    )
-    path.write_text(existing.rstrip() + block, encoding="utf-8", newline="\n")
+    block = "\n" + comment.rstrip() + "\n" + "\n".join(missing) + "\n"
+    try:
+        path.write_text(existing.rstrip() + block, encoding="utf-8", newline="\n")
+    except OSError as exc:
+        result.warnings.append(f"{path}: could not write ({exc})")
+        return
     result.created.append(str(path))
+
+
+def _ensure_runtime_gitignore(root: Path, result: InitResult) -> None:
+    """Keep hook locks, the fingerprint cache, and the error log untracked."""
+    _append_gitignore_lines(
+        root,
+        _RUNTIME_GITIGNORE_LINES,
+        "# ArchRev runtime files (not part of the session record).",
+        result,
+    )
+
+
+def _ensure_audit_gitignore(root: Path, result: InitResult) -> None:
+    """Keep raw event logs out of git when the repo is in audit scope."""
+    if load_config(root).record_scope != "audit":
+        return
+    _append_gitignore_lines(
+        root,
+        (_EVENTS_GITIGNORE_LINE,),
+        "# ArchRev audit tier: the full event log stays on the authoring "
+        "machine.\n# Manifests, plans, and reports under .archrev/sessions/ "
+        "stay committed.",
+        result,
+    )
 
 
 def _write_if_absent(path: Path, content: str, result: InitResult) -> None:
@@ -546,6 +578,7 @@ def init_repo(
     result = InitResult()
     base = root / ARCHREV_DIRNAME
     _write_if_absent(base / "config.yaml", _CONFIG_TEMPLATE, result)
+    _ensure_runtime_gitignore(root, result)
     _ensure_audit_gitignore(root, result)
     _write_if_absent(base / "rules" / "00-starter-rules.yaml", _STARTER_RULES, result)
     _write_if_absent(

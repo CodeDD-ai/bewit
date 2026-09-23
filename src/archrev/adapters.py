@@ -63,7 +63,10 @@ NATIVE_EVENTS = {
 _EVENT_MAP = {**CURSOR_EVENTS, **NATIVE_EVENTS}
 
 _SHELL_TOOL_RE = re.compile(r"^(bash|shell|exec_command)$", re.IGNORECASE)
-_READ_TOOL_RE = re.compile(r"^(read|read_file)$", re.IGNORECASE)
+# Grep returns file contents, so a secret-read deny must cover it. A grep
+# with no path still searches the workspace; that is the documented
+# "not a sandbox" limit, not something a path rule can see.
+_READ_TOOL_RE = re.compile(r"^(read|read_file|grep)$", re.IGNORECASE)
 _MCP_TOOL_RE = re.compile(r"(^mcp__)|(^mcp$)", re.IGNORECASE)
 _PATCH_FILE_RE = re.compile(
     r"(?m)^\*\*\* (?:Add|Update|Delete|Move|Rename) File: (.+)$"

@@ -1,3 +1,5 @@
+import os
+import time
 from pathlib import Path
 
 from archrev.gitutil import Git
@@ -21,6 +23,16 @@ def test_sessions_for_staged_matches_overlap(repo: Path):
     git(repo, "add", "app/main.py")
 
     assert sessions_for_staged(repo) == ["sess-one"]
+
+
+def test_expired_sessions_are_not_linked(repo: Path):
+    session = _session_with_edit(repo, "sess-old", "app/main.py")
+    log = session.dir / "events.jsonl"
+    old = time.time() - 20 * 86400
+    os.utime(log, (old, old))
+    (repo / "app" / "main.py").write_text("print('old')\n", encoding="utf-8")
+    git(repo, "add", "app/main.py")
+    assert sessions_for_staged(repo) == []
 
 
 def test_add_trailers_appends_once(repo: Path):

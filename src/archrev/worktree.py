@@ -42,6 +42,7 @@ holds the full baseline.
 from __future__ import annotations
 
 import hashlib
+import json
 import stat
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -73,7 +74,72 @@ def is_bookkeeping(path: str) -> bool:
     return path.replace("\\", "/").lower().startswith(_BOOKKEEPING_PREFIX)
 
 
-def _fingerprint(path: Path) -> str | None:
+def is_runtime_noise(path: str) -> bool:
+    """Bookkeeping and ArchRev runtime files are not session changes.
+
+    Do not use ``str.lstrip("./")`` here: it eats the leading dot of
+    ``.archrev/...`` and the bookkeeping prefix stops matching.
+    """
+    norm = path.replace("\\", "/").lower()
+    while norm.startswith("./"):
+        norm = norm[2:]
+    return (
+        is_bookkeeping(norm)
+        or norm == ".archrev/fingerprint-cache.json"
+        or norm.startswith(".archrev/locks/")
+    )
+
+
+_FP_CACHE_NAME = "fingerprint-cache.json"
+_FP_CACHE_MAX = 4096
+
+
+@dataclass
+class _FpCache:
+    entries: dict[str, str] = field(default_factory=dict)
+    dirty: bool = False
+
+
+def _fp_cache_path(root: Path) -> Path:
+    return root / ".archrev" / _FP_CACHE_NAME
+
+
+def _load_fp_cache(root: Path) -> _FpCache:
+    try:
+        raw = json.loads(_fp_cache_path(root).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return _FpCache()
+    if not isinstance(raw, dict):
+        return _FpCache()
+    entries = {
+        key: value
+        for key, value in raw.items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+    return _FpCache(entries=entries)
+
+
+def _save_fp_cache(root: Path, cache: _FpCache) -> None:
+    if not cache.dirty:
+        return
+    if len(cache.entries) > _FP_CACHE_MAX:
+        overflow = len(cache.entries) - _FP_CACHE_MAX // 2
+        for old in list(cache.entries)[:overflow]:
+            del cache.entries[old]
+    path = _fp_cache_path(root)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps(cache.entries, ensure_ascii=False),
+            encoding="utf-8",
+        )
+    except OSError:
+        return
+
+
+def _fingerprint(
+    path: Path, cache: _FpCache | None = None, cache_key: str | None = None
+) -> str | None:
     """Content fingerprint; ``None`` for non-regular or unreadable paths."""
     try:
         info = path.stat()
@@ -85,6 +151,12 @@ def _fingerprint(path: Path) -> str | None:
         return None  # submodule checkouts and other directories
     if info.st_size > _HASH_LIMIT_BYTES:
         return f"size:{info.st_size}:{info.st_mtime_ns}"
+    token = None
+    if cache is not None and cache_key:
+        token = f"{cache_key}\0{info.st_size}\0{info.st_mtime_ns}"
+        hit = cache.entries.get(token)
+        if hit:
+            return hit
     digest = hashlib.blake2b(digest_size=8)
     try:
         with open(path, "rb") as fh:
@@ -92,7 +164,11 @@ def _fingerprint(path: Path) -> str | None:
                 digest.update(chunk)
     except OSError:
         return None
-    return digest.hexdigest()
+    value = digest.hexdigest()
+    if cache is not None and token:
+        cache.entries[token] = value
+        cache.dirty = True
+    return value
 
 
 def snapshot(root: Path, carried: Iterable[str] = ()) -> dict[str, str] | None:
@@ -105,13 +181,15 @@ def snapshot(root: Path, carried: Iterable[str] = ()) -> dict[str, str] | None:
     dirty = Git(root).dirty_paths()
     if dirty is None:
         return None
+    cache = _load_fp_cache(root)
     result: dict[str, str] = {}
     for rel in dict.fromkeys([*dirty, *carried]):
-        if not rel or is_bookkeeping(rel):
+        if not rel or is_runtime_noise(rel):
             continue
-        fingerprint = _fingerprint(root / rel)
+        fingerprint = _fingerprint(root / rel, cache, rel.replace("\\", "/"))
         if fingerprint is not None:
             result[rel] = fingerprint
+    _save_fp_cache(root, cache)
     return result
 
 

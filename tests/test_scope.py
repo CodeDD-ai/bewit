@@ -22,9 +22,10 @@ def test_init_audit_scope_gitignores_event_logs(tmp_path: Path):
     git(tmp_path, "config", "commit.gpgsign", "false")
     init_repo(tmp_path)
     assert load_config(tmp_path).record_scope == "audit"
-    assert ".archrev/sessions/*/events.jsonl" in (
-        tmp_path / ".gitignore"
-    ).read_text(encoding="utf-8")
+    gitignore = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+    assert ".archrev/sessions/*/events.jsonl" in gitignore
+    assert ".archrev/fingerprint-cache.json" in gitignore
+    assert ".archrev/locks/" in gitignore
 
 
 def test_invalid_record_scope_falls_back_to_full(repo: Path):

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from archrev.config import Config, load_config
-from archrev.gate import evaluate_edit, relativize
+from archrev.gate import evaluate_edit, evaluate_read, relativize
 from archrev.rules import load_rules
 from archrev.storage import SessionStore
 
@@ -129,6 +129,27 @@ def test_enforcement_off_disables_rules(repo: Path):
 def test_relativize_handles_absolute_and_relative(repo: Path):
     assert relativize(str(repo / "app" / "main.py"), repo) == "app/main.py"
     assert relativize("app\\main.py", repo) == "app/main.py"
+
+
+def test_read_rules_skip_exempt_paths(repo: Path):
+    (repo / ".archrev" / "rules" / "reads.yaml").write_text(
+        '- id: read-all\n  kind: read\n  match: ["**"]\n  action: deny\n',
+        encoding="utf-8",
+    )
+    rules = load_rules(repo)
+    denied = evaluate_read(Config(), rules, [".env"], repo)
+    assert denied.permission == "deny"
+    allowed = evaluate_read(
+        Config(), rules, [".archrev/sessions/s/events.jsonl"], repo
+    )
+    assert allowed.permission == "allow"
+    assert not allowed.hits
+
+
+def test_relativize_decodes_file_uris(repo: Path):
+    uri = "file:///" + str(repo / ".env").replace("\\", "/").replace(":", "%3A", 1)
+    assert relativize(uri, repo) == ".env"
+    assert relativize("FILE://" + str(repo / "app" / "main.py"), repo) == "app/main.py"
 
 
 def test_config_exempt_extends_defaults(repo: Path):

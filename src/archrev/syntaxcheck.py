@@ -21,7 +21,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     for path in paths:
         try:
-            source = open(path, encoding="utf-8").read()
+            with open(path, encoding="utf-8") as fh:
+                source = fh.read()
         except OSError as exc:
             print(f"{path}: {exc}", file=sys.stderr)
             return 1
