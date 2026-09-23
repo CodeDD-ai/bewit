@@ -1,0 +1,1006 @@
+{
+  "id": "6ea0a1f7-f42e-4c63-8669-298387ff70b5",
+  "started_at": "2026-09-23T07:25:14Z",
+  "head_sha": "6517f5668df563a26d84dff16fd432a23fb9ac24",
+  "finalized": true,
+  "generated_at": "2026-09-23T08:48:09Z",
+  "prompts": [
+    {
+      "ts": "2026-09-23T07:25:14Z",
+      "text": "Can you review in E:/CodeDD what rule set for archrav would make sense, and how strongly enforced they should be? \nCreate a rule set and then lets implement it. ",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    },
+    {
+      "ts": "2026-09-23T07:25:14Z",
+      "text": "Can you review in E:/CodeDD what rule set for archrav would make sense, and how strongly enforced they should be? \nCreate a rule set and then lets implement it. ",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    }
+  ],
+  "branch": "master",
+  "runtime": "cursor",
+  "checks": [
+    {
+      "ts": "2026-09-23T08:13:59Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        ".archrev/config.yaml",
+        ".archrev/rules/90-archrev-self-protection.yaml",
+        ".archrev/rules/10-codedd-paths.yaml",
+        ".archrev/rules/20-codedd-boundaries.yaml",
+        ".archrev/rules/30-codedd-checks.yaml",
+        ".archrev/rules/40-codedd-policies.yaml",
+        ".archrev/checks/toolgate.py",
+        ".archrev/checks/endpoint_security.py",
+        ".archrev/checks/raw_html.py",
+        ".cursor/hooks.json",
+        ".claude/settings.json",
+        ".claude/rules/archrev.md",
+        ".codex/hooks.json",
+        "AGENTS.md"
+      ],
+      "path_findings": [
+        {
+          "path": ".archrev/config.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/90-archrev-self-protection.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/10-codedd-paths.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/20-codedd-boundaries.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/30-codedd-checks.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/40-codedd-policies.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".cursor/hooks.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".claude/settings.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".claude/rules/archrev.md",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".codex/hooks.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "AGENTS.md",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "1db299cba49474bda925fa7f6238f5715f0e24c6305eb325b5605af887faddbd",
+      "hash": "3a34e53fd9c64737bac575ac2d7a2e9a3dde7f1e4ee9e11cc74947e317aee2a0"
+    },
+    {
+      "ts": "2026-09-23T08:36:05Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        ".archrev/config.yaml",
+        ".archrev/rules/90-archrev-self-protection.yaml",
+        ".archrev/rules/10-codedd-paths.yaml",
+        ".archrev/rules/20-codedd-boundaries.yaml",
+        ".archrev/rules/30-codedd-checks.yaml",
+        ".archrev/rules/40-codedd-policies.yaml",
+        ".archrev/checks/toolgate.py",
+        ".archrev/checks/endpoint_security.py",
+        ".archrev/checks/raw_html.py",
+        ".cursor/hooks.json",
+        ".claude/settings.json",
+        ".claude/rules/archrev.md",
+        ".codex/hooks.json",
+        "AGENTS.md",
+        ".archrev/rules/00-starter-rules.yaml",
+        "src/archrev/scaffold.py",
+        "src/archrev/ci.py",
+        "tests/test_team.py",
+        ".gitlab/archrev-ci.yml",
+        "django/django_codedd/view_functions/update_loc_budget.py",
+        "django/django_codedd/view_functions/demo/try_demo.py",
+        "django/django_codedd/view_functions/dashboard/invite_organization_members.py",
+        "django/django_codedd/view_functions/dashboard/scalability_kpi_complete_fix.py",
+        "django/auditor/auditing_functions/functions/step_5/complexity/shell.py",
+        "django/auditor/auditing_functions/functions/step_5/dependency_processor/dependency_data_acquisition.py",
+        "django/auditor/auditing_functions/functions/step_6/architecture_analysis/archetype_classifier.py",
+        "django/tests/unit/auditing_functions/test_dependency_helpers.py",
+        "src/landingpage/security/Security.js",
+        "src/components/ScoreExplanationModal.js",
+        "src/components/ArchitectureMetricModal.js",
+        "src/audit/files/Files.js",
+        "README.md"
+      ],
+      "path_findings": [
+        {
+          "path": ".archrev/config.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/90-archrev-self-protection.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/10-codedd-paths.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/20-codedd-boundaries.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/30-codedd-checks.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/40-codedd-policies.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".cursor/hooks.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".claude/settings.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".claude/rules/archrev.md",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".codex/hooks.json",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "AGENTS.md",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".archrev/rules/00-starter-rules.yaml",
+          "rule_id": "archrev-self-protection",
+          "action": "block",
+          "message": "ArchRev governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "62c08fc89242ba756f5697f2207d0dbfb0882cd988fbb6c6426ed7b8abb273c2",
+      "hash": "1ec8306199c3aa0e0904345dd9428e72a8b55e211c453bb510121493eb696ca7"
+    }
+  ],
+  "final_checks": [],
+  "human_changes": [],
+  "acks": [],
+  "quality_checks": [
+    {
+      "ts": "2026-09-23T08:48:08Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must parse (syntax check writes no bytecode).",
+      "files": [
+        "src/archrev/scaffold.py",
+        "src/archrev/ci.py",
+        "tests/test_team.py"
+      ],
+      "command": "python -m archrev.syntaxcheck \"src/archrev/scaffold.py\" \"src/archrev/ci.py\" \"tests/test_team.py\"",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "1c661c82421bb6161953cafb16fd631853c90c1526b98b2a20dc48f055e88587",
+      "hash": "02ad2d0b286f250119cd046449087fa45aba6b33e41c35109a762c146e911b39"
+    },
+    {
+      "ts": "2026-09-23T08:48:08Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must parse (syntax check writes no bytecode).",
+      "files": [
+        "src/archrev/scaffold.py",
+        "src/archrev/ci.py",
+        "tests/test_team.py"
+      ],
+      "command": "python -m archrev.syntaxcheck \"src/archrev/scaffold.py\" \"src/archrev/ci.py\" \"tests/test_team.py\"",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "02ad2d0b286f250119cd046449087fa45aba6b33e41c35109a762c146e911b39",
+      "hash": "27358255348636e5eb9a2d45f890cd71c13c89e5e0efd504531645cb12497630"
+    }
+  ],
+  "gate_events": [
+    {
+      "ts": "2026-09-23T08:23:51Z",
+      "type": "gate",
+      "kind": "shell",
+      "target": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp",
+      "permission": "ask",
+      "paths": [],
+      "hits": [
+        {
+          "rule_id": "push-needs-approval",
+          "action": "block",
+          "path": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp"
+        },
+        {
+          "rule_id": "flag-dependency-installs",
+          "action": "flag",
+          "path": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp"
+        },
+        {
+          "rule_id": "flag-destructive-git",
+          "action": "block",
+          "path": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp"
+        }
+      ],
+      "prev": "d8db6e43e9a0a25765c61a5587eb546da8c98863750c25533d47362f56b4e17b",
+      "hash": "12d0dd851e4dfdbf16b4a181470acb3bb9ce57c696d1278a44e620eac4e25fa0"
+    },
+    {
+      "ts": "2026-09-23T08:24:11Z",
+      "type": "gate",
+      "kind": "shell",
+      "target": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp",
+      "permission": "ask",
+      "paths": [],
+      "hits": [
+        {
+          "rule_id": "push-needs-approval",
+          "action": "block",
+          "path": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp"
+        },
+        {
+          "rule_id": "flag-dependency-installs",
+          "action": "flag",
+          "path": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp"
+        },
+        {
+          "rule_id": "flag-destructive-git",
+          "action": "block",
+          "path": "cd E:\\CodeDD; $py = Get-ChildItem \"$env:APPDATA\\uv\\tools\\archrev\\Scripts\\python.exe\" -ErrorAction SilentlyContinue; if (-not $py) { $py = \"python\" }; @'\nfrom pathlib import Path\nfrom archrev.rules imp"
+        }
+      ],
+      "prev": "0dfa177fd6ac2a1d56c1a2c6f6b3188dde568bc189c4dc7ee4cc6956d9c8e44e",
+      "hash": "ea5bfe1e2f0090f6eb9e9c77474082b142c1d22dbd27361a03994ce1f984050c"
+    }
+  ],
+  "edits": [
+    {
+      "ts": "2026-09-23T08:14:54Z",
+      "path": "E:/CodeDD/.archrev/config.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:14:56Z",
+      "path": "E:/CodeDD/.archrev/rules/90-archrev-self-protection.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:15:50Z",
+      "path": "E:/CodeDD/.archrev/rules/10-codedd-paths.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:15:59Z",
+      "path": "E:/CodeDD/.archrev/rules/10-codedd-paths.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:17:46Z",
+      "path": "E:/CodeDD/.archrev/rules/20-codedd-boundaries.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:19:53Z",
+      "path": "E:/CodeDD/.archrev/checks/toolgate.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:21:11Z",
+      "path": "E:/CodeDD/.archrev/checks/endpoint_security.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:21:28Z",
+      "path": "E:/CodeDD/.archrev/checks/raw_html.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:22:14Z",
+      "path": "E:/CodeDD/.archrev/rules/30-codedd-checks.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:22:15Z",
+      "path": "E:/CodeDD/.archrev/rules/40-codedd-policies.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:23:23Z",
+      "path": "E:/CodeDD/.archrev/rules/00-starter-rules.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:23:25Z",
+      "path": "E:/CodeDD/.archrev/rules/00-starter-rules.yaml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:17Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:21Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:23Z",
+      "path": "src/archrev/scaffold.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:40Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:42Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:45Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:47Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:36:58Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:37:02Z",
+      "path": "src/archrev/ci.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:37:10Z",
+      "path": "tests/test_team.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:37:12Z",
+      "path": "tests/test_team.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:37:15Z",
+      "path": "tests/test_team.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:37:41Z",
+      "path": "README.md",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:41:09Z",
+      "path": "E:/CodeDD/.gitlab/archrev-ci.yml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:41:11Z",
+      "path": "E:/CodeDD/.gitlab/archrev-ci.yml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:41:41Z",
+      "path": "E:/CodeDD/.gitlab-ci.yml",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:43:13Z",
+      "path": "E:/CodeDD/django/django_codedd/view_functions/update_loc_budget.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:43:21Z",
+      "path": "E:/CodeDD/django/django_codedd/view_functions/dashboard/invite_organization_members.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:43:30Z",
+      "path": "E:/CodeDD/django/django_codedd/view_functions/dashboard/invite_organization_members.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:43:51Z",
+      "path": "E:/CodeDD/django/django_codedd/view_functions/demo/try_demo.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:44:20Z",
+      "path": "E:/CodeDD/django/auditor/auditing_functions/functions/step_5/complexity/shell.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:44:43Z",
+      "path": "E:/CodeDD/django/auditor/auditing_functions/functions/step_5/dependency_processor/dependency_data_acquisition.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:45:02Z",
+      "path": "E:/CodeDD/django/auditor/auditing_functions/functions/step_6/architecture_analysis/archetype_classifier.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:45:03Z",
+      "path": "E:/CodeDD/django/django_codedd/view_functions/dashboard/scalability_kpi_complete_fix.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:45:23Z",
+      "path": "E:/CodeDD/django/tests/unit/auditing_functions/test_dependency_helpers.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:45:25Z",
+      "path": "E:/CodeDD/django/tests/unit/auditing_functions/test_dependency_helpers.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:46:01Z",
+      "path": "E:/CodeDD/django/django_codedd/view_functions/update_loc_budget.py",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:46:58Z",
+      "path": "E:/CodeDD/src/landingpage/security/Security.js",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:46:59Z",
+      "path": "E:/CodeDD/src/components/ScoreExplanationModal.js",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:47:01Z",
+      "path": "E:/CodeDD/src/landingpage/security/Security.js",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:47:01Z",
+      "path": "E:/CodeDD/src/components/ArchitectureMetricModal.js",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:47:02Z",
+      "path": "E:/CodeDD/src/audit/files/Files.js",
+      "tool": "",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-23T08:47:04Z",
+      "path": "E:/CodeDD/src/landingpage/security/Security.js",
+      "tool": "",
+      "origin": "agent"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/archrev/scaffold.py",
+      "added": 64,
+      "removed": 6,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/ci.py",
+      "added": 26,
+      "removed": 13,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "tests/test_team.py",
+      "added": 26,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "README.md",
+      "added": 85,
+      "removed": 9,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    }
+  ],
+  "outside_repo": [
+    "E:/CodeDD/.archrev/config.yaml",
+    "E:/CodeDD/.archrev/rules/90-archrev-self-protection.yaml",
+    "E:/CodeDD/.archrev/rules/10-codedd-paths.yaml",
+    "E:/CodeDD/.archrev/rules/20-codedd-boundaries.yaml",
+    "E:/CodeDD/.archrev/checks/toolgate.py",
+    "E:/CodeDD/.archrev/checks/endpoint_security.py",
+    "E:/CodeDD/.archrev/checks/raw_html.py",
+    "E:/CodeDD/.archrev/rules/30-codedd-checks.yaml",
+    "E:/CodeDD/.archrev/rules/40-codedd-policies.yaml",
+    "E:/CodeDD/.archrev/rules/00-starter-rules.yaml",
+    "E:/CodeDD/.gitlab/archrev-ci.yml",
+    "E:/CodeDD/.gitlab-ci.yml",
+    "E:/CodeDD/django/django_codedd/view_functions/update_loc_budget.py",
+    "E:/CodeDD/django/django_codedd/view_functions/dashboard/invite_organization_members.py",
+    "E:/CodeDD/django/django_codedd/view_functions/demo/try_demo.py",
+    "E:/CodeDD/django/auditor/auditing_functions/functions/step_5/complexity/shell.py",
+    "E:/CodeDD/django/auditor/auditing_functions/functions/step_5/dependency_processor/dependency_data_acquisition.py",
+    "E:/CodeDD/django/auditor/auditing_functions/functions/step_6/architecture_analysis/archetype_classifier.py",
+    "E:/CodeDD/django/django_codedd/view_functions/dashboard/scalability_kpi_complete_fix.py",
+    "E:/CodeDD/django/tests/unit/auditing_functions/test_dependency_helpers.py",
+    "E:/CodeDD/src/landingpage/security/Security.js",
+    "E:/CodeDD/src/components/ScoreExplanationModal.js",
+    "E:/CodeDD/src/components/ArchitectureMetricModal.js",
+    "E:/CodeDD/src/audit/files/Files.js"
+  ],
+  "other_sessions": [
+    {
+      "path": ".archrev/rules/10-archrev-repo.yaml",
+      "added": 2,
+      "removed": 2,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "added": 10,
+      "removed": 0,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae"
+      ]
+    },
+    {
+      "path": "pyproject.toml",
+      "added": 3,
+      "removed": 2,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/__init__.py",
+      "added": 1,
+      "removed": 1,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/adapters.py",
+      "added": 3,
+      "removed": 0,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/cli.py",
+      "added": 211,
+      "removed": 7,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/config.py",
+      "added": 14,
+      "removed": 5,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/drift.py",
+      "added": 139,
+      "removed": 34,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/gitutil.py",
+      "added": 22,
+      "removed": 0,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/hooks.py",
+      "added": 156,
+      "removed": 26,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/planning.py",
+      "added": 23,
+      "removed": 4,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/report/render.py",
+      "added": 43,
+      "removed": 3,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/report/server.py",
+      "added": 67,
+      "removed": 2,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/report/template.html",
+      "added": 488,
+      "removed": 169,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/seal.py",
+      "added": 270,
+      "removed": 0,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/storage.py",
+      "added": 25,
+      "removed": 0,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/syntaxcheck.py",
+      "added": 37,
+      "removed": 0,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "src/archrev/worktree.py",
+      "added": 247,
+      "removed": 0,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae"
+      ]
+    },
+    {
+      "path": "tests/test_adapters.py",
+      "added": 36,
+      "removed": 2,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "tests/test_hooks.py",
+      "added": 66,
+      "removed": 13,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "tests/test_planning.py",
+      "added": 15,
+      "removed": 0,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "tests/test_report.py",
+      "added": 18,
+      "removed": 0,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "tests/test_scope.py",
+      "added": 126,
+      "removed": 0,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "tests/test_seal.py",
+      "added": 84,
+      "removed": 0,
+      "sessions": [
+        "403489ea-bf35-46df-a5a5-269d8f771963"
+      ]
+    },
+    {
+      "path": "tests/test_worktree_scope.py",
+      "added": 276,
+      "removed": 0,
+      "sessions": [
+        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae"
+      ]
+    }
+  ],
+  "other_changes": [],
+  "background_changes": [],
+  "attribution": "checkpoints",
+  "drift": {
+    "out_of_plan": [],
+    "unrealized": [
+      ".archrev/config.yaml",
+      ".archrev/rules/90-archrev-self-protection.yaml",
+      ".archrev/rules/10-codedd-paths.yaml",
+      ".archrev/rules/20-codedd-boundaries.yaml",
+      ".archrev/rules/30-codedd-checks.yaml",
+      ".archrev/rules/40-codedd-policies.yaml",
+      ".archrev/checks/toolgate.py",
+      ".archrev/checks/endpoint_security.py",
+      ".archrev/checks/raw_html.py",
+      ".cursor/hooks.json",
+      ".claude/settings.json",
+      ".claude/rules/archrev.md",
+      ".codex/hooks.json",
+      "AGENTS.md",
+      ".archrev/rules/00-starter-rules.yaml",
+      ".gitlab/archrev-ci.yml",
+      "django/django_codedd/view_functions/update_loc_budget.py",
+      "django/django_codedd/view_functions/demo/try_demo.py",
+      "django/django_codedd/view_functions/dashboard/invite_organization_members.py",
+      "django/django_codedd/view_functions/dashboard/scalability_kpi_complete_fix.py",
+      "django/auditor/auditing_functions/functions/step_5/complexity/shell.py",
+      "django/auditor/auditing_functions/functions/step_5/dependency_processor/dependency_data_acquisition.py",
+      "django/auditor/auditing_functions/functions/step_6/architecture_analysis/archetype_classifier.py",
+      "django/tests/unit/auditing_functions/test_dependency_helpers.py",
+      "src/landingpage/security/Security.js",
+      "src/components/ScoreExplanationModal.js",
+      "src/components/ArchitectureMetricModal.js",
+      "src/audit/files/Files.js"
+    ]
+  },
+  "protected_findings": [],
+  "commits": [],
+  "areas": [
+    "README.md",
+    "src",
+    "tests"
+  ],
+  "event_count": 138,
+  "chain_head": "27358255348636e5eb9a2d45f890cd71c13c89e5e0efd504531645cb12497630",
+  "chain": {
+    "ok": true,
+    "checked": 139,
+    "legacy": 0,
+    "break_at": null
+  },
+  "plan": {
+    "registered": true,
+    "declared_files": [
+      ".archrev/config.yaml",
+      ".archrev/rules/90-archrev-self-protection.yaml",
+      ".archrev/rules/10-codedd-paths.yaml",
+      ".archrev/rules/20-codedd-boundaries.yaml",
+      ".archrev/rules/30-codedd-checks.yaml",
+      ".archrev/rules/40-codedd-policies.yaml",
+      ".archrev/checks/toolgate.py",
+      ".archrev/checks/endpoint_security.py",
+      ".archrev/checks/raw_html.py",
+      ".cursor/hooks.json",
+      ".claude/settings.json",
+      ".claude/rules/archrev.md",
+      ".codex/hooks.json",
+      "AGENTS.md",
+      ".archrev/rules/00-starter-rules.yaml",
+      "src/archrev/scaffold.py",
+      "src/archrev/ci.py",
+      "tests/test_team.py",
+      ".gitlab/archrev-ci.yml",
+      "django/django_codedd/view_functions/update_loc_budget.py",
+      "django/django_codedd/view_functions/demo/try_demo.py",
+      "django/django_codedd/view_functions/dashboard/invite_organization_members.py",
+      "django/django_codedd/view_functions/dashboard/scalability_kpi_complete_fix.py",
+      "django/auditor/auditing_functions/functions/step_5/complexity/shell.py",
+      "django/auditor/auditing_functions/functions/step_5/dependency_processor/dependency_data_acquisition.py",
+      "django/auditor/auditing_functions/functions/step_6/architecture_analysis/archetype_classifier.py",
+      "django/tests/unit/auditing_functions/test_dependency_helpers.py",
+      "src/landingpage/security/Security.js",
+      "src/components/ScoreExplanationModal.js",
+      "src/components/ArchitectureMetricModal.js",
+      "src/audit/files/Files.js",
+      "README.md"
+    ]
+  },
+  "finalized_at": "2026-09-23T08:48:09Z"
+}
