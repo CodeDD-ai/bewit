@@ -819,7 +819,7 @@ function timelinePanel(view, turns) {
       findings ? badge("findings raised", "warn") : "",
     ].join("");
     const prompt = turn.prompt ? (() => {
-      const text = turn.prompt.text || (turn.prompt.sealed ? "(sealed)" : "");
+      const text = promptDisplay(turn.prompt.text) || (turn.prompt.sealed ? "(sealed)" : "");
       const long = text.split("\n").length > 5 || text.length > 500;
       const full = ui.fullPrompts.has(index);
       return `<div class="prompt-box ${long && !full ? "clamped" : ""}">${esc(text)}</div>

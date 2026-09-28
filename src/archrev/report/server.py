@@ -25,6 +25,7 @@ from __future__ import annotations
 import errno
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -66,6 +67,10 @@ def _template() -> str:
     )
 
 
+#: Wrapper tags the agent UI puts around pasted text; hidden in the viewer.
+_PASTED_TAG = re.compile(r"</?pasted_content\b[^>]*>")
+
+
 def _user_prompt_excerpt(prompts: list[dict]) -> str:
     """Sidebar line: the latest thing the user asked, not the opening prompt.
 
@@ -73,7 +78,7 @@ def _user_prompt_excerpt(prompts: list[dict]) -> str:
     a note to the agent, so it must not become the session's title.
     """
     for event in reversed(prompts):
-        text = str(event.get("text") or "").strip()
+        text = _PASTED_TAG.sub("", str(event.get("text") or "")).strip()
         if not text or text.startswith("ArchRev final review found issues"):
             continue
         return text[:160]

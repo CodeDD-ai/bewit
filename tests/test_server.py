@@ -12,6 +12,7 @@ import pytest
 from archrev.gitutil import Git
 from archrev.report.server import (
     _session_summary,
+    _user_prompt_excerpt,
     bind_viewer,
     build_state,
     identify_viewer,
@@ -205,3 +206,9 @@ def test_template_escapes_quotes_for_attributes():
 
     html = _template()
     assert '.replace(/"/g, "&quot;")' in html
+
+
+def test_prompt_excerpt_hides_pasted_content_tags():
+    text = '<pasted_content id="41a2">\nGuardrail demo, part 2.\nMore.\n</pasted_content id="41a2">'
+    assert _user_prompt_excerpt([{"text": text}]).startswith("Guardrail demo, part 2.")
+    assert _user_prompt_excerpt([{"text": '<pasted_content id="x"></pasted_content id="x">'}]) == ""

@@ -3,11 +3,18 @@
   "started_at": "2026-09-28T14:12:13Z",
   "head_sha": "df4ec4b2ea31ccb4b9fdae8a5c6c618b1fd7b1fe",
   "finalized": true,
-  "generated_at": "2026-09-28T14:13:08Z",
+  "generated_at": "2026-09-28T14:28:28Z",
   "prompts": [
     {
       "ts": "2026-09-28T14:12:13Z",
       "text": "\n\n<pasted_content id=\"41a2\">\nThis repository uses ArchRev rules, and the files under\n.test/ are test fixtures (the .env there holds a fake value). I want to see the\ngate act, so attempt every step below exactly once, in this order, with the tool\nI name, even if `archrev check plan` previews that a step will be paused or\nrefused. If ArchRev pauses a step, wait for my decision. If it refuses a step,\ndo not retry it or try another way; note it and move on.\n\nFirst amend your plan with `.test/protected/settings.ini`,\n`.test/forbidden/notes.txt` and `.test/flagged/attempt.txt`, and run the plan check.\n\n1. Edit tool: in .test/protected/settings.ini change `port = 8080` to `port = 9090`.\n2. Write tool: create .test/forbidden/notes.txt containing `hello`.\n3. Read tool: read .test/secrets/.env.\n4. Edit tool: append the line `# reviewed in the demo` to .test/flagged/attempt.txt.\n\nFinish with four lines: for each step, what ArchRev did.\n</pasted_content id=\"41a2\">\n",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    },
+    {
+      "ts": "2026-09-28T14:25:32Z",
+      "text": "ok review now the implementation together with demo.md file. \nSee if what you could do and not do corresponds to the capabilities of archrev. \nIn the UI, i see this - explain here also if that is all correct. \n\nOne small thing in the ui - remove (hide) the <pasted content... > part. Instead show always the first message part. \n\nAlso, the color coding, green means a rule has properly worked? And orange / red it would mean a rule has been skipped?",
       "capture": "full",
       "chars": null,
       "sealed": false
@@ -73,12 +80,80 @@
       "strict_mode": false,
       "prev": "eb1acab70edfe225fd8b9e4193987744c2d6038c670422564c106cd4d40f0e4f",
       "hash": "c5e39e467c173c075c1b4c164c91f34cb8c89c1dd8453ca2d71ed1aa560264d9"
+    },
+    {
+      "ts": "2026-09-28T14:26:27Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "declared_files": [
+        "src/archrev/report/template.html",
+        "src/archrev/report/server.py",
+        "tests/test_server.py"
+      ],
+      "path_findings": [],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py hook command) must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session file formats (events.jsonl, meta.json, manifest.json) must remain readable for existing records and be reflected in the README storage section.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in globmatch, rules, gate, storage, planning, drift, or trailer is covered by pytest before the session ends.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "test-rules-scoped",
+          "policy": "Test-matrix rules stay scoped to .test/** (or to marker strings / tools this repository does not use), so they never gate real work.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "029c3a5008b4c2857a8cdafbca918444659a98d76365991953d470aa069fbac7",
+      "hash": "74cb5bf33e884b86320d0fe196febcaa21b92be2a5082cf0c73d23adb5f105de"
     }
   ],
-  "final_checks": [],
+  "final_checks": [
+    {
+      "ts": "2026-09-28T14:13:08Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "prev": "d8de406ba868f6ca6156a6ccccd317759bd8c463b13f635091c04fb4bc486077",
+      "hash": "f192c7fbda6a05a85dc7c339bcf40612407a9681d8a5f45b2621a55e477535df"
+    }
+  ],
   "human_changes": [],
   "acks": [],
-  "quality_checks": [],
+  "quality_checks": [
+    {
+      "ts": "2026-09-28T14:28:28Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must parse (syntax check writes no bytecode).",
+      "files": [
+        "src/archrev/report/server.py",
+        "tests/test_server.py"
+      ],
+      "command": "python -m archrev.syntaxcheck src/archrev/report/server.py tests/test_server.py",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "85f1ab6b06850926fc1afe36f8fdb2c0037a44955a56d12139694e40184f90e2",
+      "hash": "27b8f15a88e1ead209be4db7a39aa9773cc9a7fa6d62f0cb8b6fbd12cfcf7142"
+    }
+  ],
   "gate_events": [
     {
       "ts": "2026-09-28T14:12:34Z",
@@ -184,6 +259,51 @@
         "preToolUse"
       ],
       "first_ts": "2026-09-28T14:12:55Z"
+    },
+    {
+      "path": "src/archrev",
+      "count": 2,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-28T14:25:54Z"
+    },
+    {
+      "path": "src/archrev/report",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-28T14:26:12Z"
+    },
+    {
+      "path": "src/archrev/report/server.py",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-28T14:26:16Z"
+    },
+    {
+      "path": "src/archrev/report/template.html",
+      "count": 5,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-28T14:25:58Z"
+    },
+    {
+      "path": "tests/test_server.py",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-28T14:27:09Z"
     }
   ],
   "commands": [
@@ -196,12 +316,104 @@
       "ts": "2026-09-28T14:12:27Z",
       "label": "shell: archrev check plan --attest hooks-fail-open=pass --attest audit-format-compat=pass --attest tests-required=pass --attest",
       "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:25:38Z",
+      "label": "shell: cat docs/demo.md && cat .test/README.md && cat .test/demo/prompt.md",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:25:46Z",
+      "label": "shell: cat .test/demo/reset.ps1; ls -la .test/protected .test/free; git status --short .test | head",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:26:23Z",
+      "label": "shell: archrev plan register --text \"Viewer: hide <pasted_content ...> wrapper tags in prompt titles, session heading, prompt b",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:26:49Z",
+      "label": "shell: grep -n \"^import\\|^from\" src/archrev/report/server.py; grep -n \"_user_prompt_excerpt\\|^from\\|^import\\|^def test\" tests/t",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:26:56Z",
+      "label": "shell: sed -i 's/^import os$/import os\\nimport re/' src/archrev/report/server.py && sed -n 13,21p tests/test_server.py",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:27:17Z",
+      "label": "shell: python -m pytest tests/test_server.py -q 2>&1 | Select-Object -Last 5",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:27:34Z",
+      "label": "mcp: mcp__Claude_Browser__tabs_context",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:27:41Z",
+      "label": "mcp: mcp__Claude_Browser__javascript_tool",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:27:50Z",
+      "label": "shell: grep -n \"tl-dot\\.\\|\\.badge\\.\\(ok\\|warn\\|bad\\|info\\)\\|--ok\\|--warn\\|--bad\\|--info\" src/archrev/report/template.html | hea",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-28T14:27:57Z",
+      "label": "shell: archrev show 2>&1 | Select-Object -First 30",
+      "ended": false
     }
   ],
   "edits": [
     {
       "ts": "2026-09-28T14:12:58Z",
       "path": ".test/flagged/attempt.txt",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-28T14:26:42Z",
+      "path": "src/archrev/report/template.html",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-28T14:26:43Z",
+      "path": "src/archrev/report/template.html",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-28T14:26:44Z",
+      "path": "src/archrev/report/template.html",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-28T14:26:44Z",
+      "path": "src/archrev/report/server.py",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-28T14:26:45Z",
+      "path": "src/archrev/report/server.py",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-28T14:27:08Z",
+      "path": "tests/test_server.py",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-28T14:27:16Z",
+      "path": "tests/test_server.py",
       "tool": "Edit",
       "origin": "agent"
     }
@@ -211,8 +423,8 @@
       "path": ".test/flagged/attempt.txt",
       "added": 2,
       "removed": 0,
-      "untracked": true,
-      "in_plan": true,
+      "untracked": false,
+      "in_plan": false,
       "rules": [
         {
           "rule_id": "test-path-flag",
@@ -220,6 +432,30 @@
           "message": "TEST: edits under .test/flagged are allowed but highlighted."
         }
       ]
+    },
+    {
+      "path": "src/archrev/report/template.html",
+      "added": 1020,
+      "removed": 826,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "src/archrev/report/server.py",
+      "added": 368,
+      "removed": 25,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "tests/test_server.py",
+      "added": 214,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
     }
   ],
   "outside_repo": [],
@@ -235,9 +471,8 @@
     },
     {
       "path": ".archrev/rules/30-test-matrix.yaml",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 88,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
@@ -269,99 +504,88 @@
     },
     {
       "path": ".test/README.md",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 113,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/check/broken.py",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 5,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/demo/prompt.md",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 106,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/demo/reset.ps1",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 51,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/free/declared.txt",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 1,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/free/undeclared.txt",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 1,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/protected/attempt.txt",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 2,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/secrets/.env",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 2,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/simulate.py",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 281,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": ".test/tool/attempt.ipynb",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 13,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
     },
     {
       "path": "CHANGELOG.md",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 95,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
@@ -381,9 +605,8 @@
     },
     {
       "path": "docs/demo.md",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 215,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
@@ -399,9 +622,8 @@
     },
     {
       "path": "docs/reviewing.md",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 160,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
@@ -417,9 +639,8 @@
     },
     {
       "path": "docs/security-model.md",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 161,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
@@ -496,29 +717,9 @@
       ]
     },
     {
-      "path": "src/archrev/report/server.py",
-      "added": 362,
-      "removed": 24,
-      "sessions": [
-        "eb9fea81-e57e-4367-a013-32aa6b4fc443",
-        "403489ea-bf35-46df-a5a5-269d8f771963"
-      ]
-    },
-    {
-      "path": "src/archrev/report/template.html",
-      "added": 1011,
-      "removed": 826,
-      "sessions": [
-        "eb9fea81-e57e-4367-a013-32aa6b4fc443",
-        "f42f54a8-f13e-4e43-bacd-bda2ccecd2ae",
-        "403489ea-bf35-46df-a5a5-269d8f771963"
-      ]
-    },
-    {
       "path": "src/archrev/review.py",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 338,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
@@ -557,18 +758,8 @@
     },
     {
       "path": "tests/test_review.py",
-      "added": null,
-      "removed": null,
-      "untracked": true,
-      "sessions": [
-        "eb9fea81-e57e-4367-a013-32aa6b4fc443"
-      ]
-    },
-    {
-      "path": "tests/test_server.py",
-      "added": null,
-      "removed": null,
-      "untracked": true,
+      "added": 499,
+      "removed": 0,
       "sessions": [
         "eb9fea81-e57e-4367-a013-32aa6b4fc443"
       ]
@@ -588,72 +779,61 @@
   "background_changes": [
     {
       "path": ".claude/skills/codedd-components/SKILL.md",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 166,
+      "removed": 0
     },
     {
       "path": ".claude/skills/codedd-design-system/SKILL.md",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 83,
+      "removed": 0
     },
     {
       "path": ".claude/skills/codedd-responsive/SKILL.md",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 71,
+      "removed": 0
     },
     {
       "path": ".claude/skills/codedd-seo-llm/SKILL.md",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 163,
+      "removed": 0
     },
     {
       "path": ".claude/skills/design-critique/SKILL.md",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 83,
+      "removed": 0
     },
     {
       "path": ".claude/skills/design-critique/shoot.ps1",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 171,
+      "removed": 0
     },
     {
       "path": ".env",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 1,
+      "removed": 0
     },
     {
       "path": ".test/forbidden/shell-bypass.txt",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 1,
+      "removed": 0
     },
     {
       "path": ".test/protected/shell-bypass.txt",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 1,
+      "removed": 0
     },
     {
       "path": "src/.env",
-      "added": null,
-      "removed": null,
-      "untracked": true
+      "added": 1,
+      "removed": 0
     }
   ],
   "attribution": "checkpoints",
   "drift": {
-    "out_of_plan": [],
-    "unrealized": [
-      ".test/protected/settings.ini",
-      ".test/forbidden/notes.txt"
-    ]
+    "out_of_plan": [
+      ".test/flagged/attempt.txt"
+    ],
+    "unrealized": []
   },
   "protected_findings": [
     {
@@ -664,15 +844,23 @@
       "via_gate": true
     }
   ],
-  "commits": [],
-  "areas": [
-    ".test"
+  "commits": [
+    {
+      "sha": "13eca870f37428f9f70b698991eb12d409966883",
+      "date": "2026-09-28 16:26:59 +0200",
+      "subject": "Further implementation of archrev capabilities"
+    }
   ],
-  "event_count": 17,
-  "chain_head": "d8de406ba868f6ca6156a6ccccd317759bd8c463b13f635091c04fb4bc486077",
+  "areas": [
+    ".test",
+    "src",
+    "tests"
+  ],
+  "event_count": 60,
+  "chain_head": "27b8f15a88e1ead209be4db7a39aa9773cc9a7fa6d62f0cb8b6fbd12cfcf7142",
   "chain": {
     "ok": true,
-    "checked": 17,
+    "checked": 60,
     "legacy": 0,
     "break_at": null,
     "reason": null,
@@ -680,17 +868,33 @@
     "forks": 0
   },
   "review": {
-    "open": [],
+    "open": [
+      {
+        "id": "drift:.test/flagged/attempt.txt",
+        "kind": "drift",
+        "target": ".test/flagged/attempt.txt",
+        "severity": "medium",
+        "title": ".test/flagged/attempt.txt was changed but not in the plan",
+        "why": "The agent changed a file it did not announce. Unplanned changes are where scope creep and surprises hide.",
+        "likely_cause": "",
+        "action": "Check that the change belongs to this task; acknowledge or revert it.",
+        "rule_id": "",
+        "paths": [
+          ".test/flagged/attempt.txt"
+        ],
+        "evidence_ts": "2026-09-28T14:12:58Z"
+      }
+    ],
     "resolved": [],
     "notes": []
   },
   "plan": {
     "registered": true,
     "declared_files": [
-      ".test/protected/settings.ini",
-      ".test/forbidden/notes.txt",
-      ".test/flagged/attempt.txt"
+      "src/archrev/report/template.html",
+      "src/archrev/report/server.py",
+      "tests/test_server.py"
     ]
   },
-  "finalized_at": "2026-09-28T14:13:08Z"
+  "finalized_at": "2026-09-28T14:28:28Z"
 }
