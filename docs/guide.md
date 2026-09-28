@@ -1,8 +1,10 @@
 # How ArchRev works
 
-Day-to-day commands are in the [README](../README.md). Rule examples and
-the enforcement checkpoints are in [rules.md](rules.md). This page is the
-rest: runtimes, review, attribution, rollout, storage, and limits.
+Day-to-day commands are in the [README](../README.md), rules and
+checkpoints in [rules.md](rules.md), reading a session in
+[reviewing.md](reviewing.md), and what is and is not enforced in
+[security-model.md](security-model.md). This page covers the rest:
+runtimes, attribution, rollout, storage, and limits.
 
 ## Agent runtimes
 
@@ -16,7 +18,8 @@ deny / ask / follow-up is returned.
 | Prompt | `beforeSubmitPrompt` | `UserPromptSubmit` | `UserPromptSubmit` |
 | Gate (path / tool / shell / read / MCP) | separate events | one `PreToolUse`, split by tool | one `PreToolUse` |
 | Edit capture | `afterFileEdit` | `PostToolUse` (`Edit` / `Write`) | `PostToolUse` (`apply_patch`) |
-| Command finished | `afterShellExecution`, `afterMCPExecution` | `PostToolUse` (`Bash`, `mcp__*`) | `PostToolUse` (shell tools) |
+| Shell tools | `beforeShellExecution` | `Bash`, `PowerShell` | `shell`, `exec_command` |
+| Command finished | `afterShellExecution`, `afterMCPExecution` | `PostToolUse` (`Bash`, `PowerShell`, `mcp__*`) | `PostToolUse` (shell tools) |
 | Final review nag | `stop` → `followup_message` | `Stop` → `decision: block` | `Stop` → `decision: block` |
 | Durable finalize | the same `stop` | `SessionEnd` | `SessionEnd` |
 | `block` rule | pause (`ask`) | pause (`ask`) | **deny** |
@@ -64,10 +67,20 @@ a change to the session that could have made it:
   that pre-dates the session. It is listed, and it is not raised as this
   session's gate bypass.
 
-If the after-command hooks are missing (re-run `archrev init`), a command
-window stays open until the next checkpoint. Attribution then asks for
-more review, not less. Sessions recorded before checkpoints existed keep
-since-start attribution (`"attribution": "since_start"` in the manifest).
+If the after-command hooks are missing (re-run `archrev init`; `archrev
+rules` and the viewer warn), a command window stays open until the turn
+ends. Attribution then asks for more review, not less, and names the most
+recently started command. When a later command reports finishing while an
+older one never did, the older one's end was most likely lost; changes
+attributed only to it are marked *uncertain* in the review. An end event
+pairs with the most recent start of the same command. Sessions recorded
+before checkpoints existed keep since-start attribution
+(`"attribution": "since_start"` in the manifest).
+
+A shell change to a file *after* its gated edit is also a bypass: each
+edit event records the content fingerprint the tool left, and a later
+change with different content during one of the session's commands is
+raised as "changed again by a command after its approved edit".
 
 A hand edit saved *while* one of this session's commands is running cannot
 be separated from that command's writes. It is attributed to the session;
@@ -91,27 +104,21 @@ that an exported report or a reviewed merge request already cites.
 Appends are serialized per session, including parallel tool calls, so two
 hooks cannot fork the chain by reading the same previous hash.
 
+`verify` names what it found. A **duplicate** (an event byte-identical to
+its predecessor: the runtime delivered one hook twice) changes nothing and
+passes, with a note. A **fork** (two valid events chaining to the same
+predecessor) fails: usually two hooks wrote at once when the lock was
+unavailable, but an inserted event looks the same. A **modified** break
+(content that no longer matches its hash, or a missing predecessor) means
+the log was edited after the fact.
+
 ## Reviewing
 
-**While the agent works:**
-
-```powershell
-archrev serve        # http://127.0.0.1:4177
-```
-
-The page refreshes on its own: prompt, plan, verdicts, edits with line
-counts, pauses and flags, drift ("planned 6, touched 9, 3 out-of-plan"),
-and linked commits. A file row expands to its diff. The timeline can be
-filtered and searched. Stopping the server does not affect capture.
-
-**A shareable file:**
-
-```powershell
-archrev export <session>    # one HTML file, diffs embedded (size-capped)
-```
-
-Every session directory also contains `report.md`, regenerated at
-finalize, readable in any git UI.
+`archrev serve` (live), `archrev show` / `report.md` (text), and
+`archrev export` (one HTML file with diffs) all lead with the same review.
+How to read a session: [reviewing.md](reviewing.md). The viewer is
+view-only apart from acknowledgments and unsealing; stopping it never
+affects capture.
 
 ## Team rollout
 
@@ -232,6 +239,19 @@ adds `background_changes`, an `attribution` mode (`checkpoints` or
 `since_start`), and a `during` list on unexplained changes and protected
 findings.
 
+Other additive fields and events (older records without them stay valid):
+
+| Where | Field / event | Meaning |
+| --- | --- | --- |
+| `edit` | `fingerprint` | Content fingerprint the tool left; detects a later shell change. |
+| `gate_resolved` | `ref`, `kind`, `target`, `outcome: approved` | A paused (`ask`) action then ran. `ref` is the gate event's hash. |
+| `ack` | `actor` (`human` / `agent`), `actor_basis`, `via` (`cli` / `viewer`) | Who acknowledged, and why ArchRev thinks so. Missing `actor` counts as `human`. |
+| `plan_check.prompt_rules[]` | `verdict: n/a`, `scope: out of scope` | Policy not applicable; `applies_to` auto-n/a. |
+| manifest | `review` (`open` / `resolved` / `notes`) | The review as of that finalize. |
+| manifest | `commands[]` (`ts`, `label`, `ended`) | Commands run, and whether each reported finishing. |
+| manifest | `gate_events[].outcome` | `refused` / `approved` / `declined` / `waiting` / `flagged` / `unknown`. |
+| manifest | `chain` (`duplicates`, `forks`, `reason`) | Hash-chain verification detail. |
+
 Runtime files that are not part of the record — `hook-errors.log`,
 `fingerprint-cache.json`, and `locks/` — are gitignored by `archrev init`.
 
@@ -258,9 +278,13 @@ Runtime files that are not part of the record — `hook-errors.log`,
   where it was written.
 - If hooks are disabled or the CLI is not on `PATH`, capture stops. That
   is fail-open. `archrev sessions` shows the gap.
-- A `read` rule sees `Read` and `Grep` when they name a path. It does not
-  see a workspace-wide search or a shell command that prints a file.
-  Shell rules cover the command text if you write them.
+- `read` rules cover file tools that name a path and shell commands that
+  read a file visibly (reader programs, inline code). A directory-wide
+  search, a path built at runtime, or a program that opens files itself
+  is out of reach. Full list: [security-model.md](security-model.md#known-gaps).
+- An agent runtime's own permission check runs after ArchRev's pre-tool
+  hook, so a command it stops still shows as *started, no completion
+  recorded*.
 
 ## Roadmap
 

@@ -161,13 +161,123 @@ def _classify_unedited(
         if mine:
             if entry.get("untracked"):
                 entry["added"], entry["removed"] = _count_lines(root, path), 0
-            entry["during"] = sorted({w.label for w in mine})
+            # The most recently started open command is the likeliest author;
+            # listing every open command (a whole turn, when a runtime sends
+            # no after-hooks) buries the answer.
+            entry["during"] = sorted({w.latest or w.label for w in mine})
+            entry["changed_at"] = max((w.end or "" for w in mine), default="") or None
+            if all(w.uncertain for w in mine):
+                entry["uncertain"] = True
             own.append(entry)
         elif owners:
             owned_elsewhere.append({**entry, "sessions": list(owners)})
         elif not is_runtime_noise(path):
             background.append(entry)
     return own, owned_elsewhere, background
+
+
+#: Event types after which a still-unresolved pause counts as declined:
+#: the user moved on (new prompt) or the turn / session ended.
+_TURN_MOVED_ON = ("prompt", "session_stop")
+
+
+def _gate_outcomes(events: list[dict]) -> list[dict]:
+    """Gate events, each copied with an ``outcome`` a reviewer can read.
+
+    - ``refused``  — deny: the action never ran.
+    - ``flagged``  — allowed and highlighted.
+    - ``approved`` — paused, then it ran: a ``gate_resolved`` event, or
+      (for pauses recorded before approvals were tracked) an edit of the
+      same file later in the same turn, which only happens if it ran.
+    - ``declined`` — paused, and the turn moved on without it running.
+    - ``waiting``  — paused, no answer yet.
+    - ``unknown``  — a paused command or tool call from before approvals
+      were tracked: nothing in the record says whether it ran.
+    """
+    resolved = {e.get("ref") for e in events if e.get("type") == "gate_resolved"}
+    first_tracked = next(
+        (i for i, e in enumerate(events) if e.get("type") == "gate_resolved"), None
+    )
+    out: list[dict] = []
+    for index, event in enumerate(events):
+        if event.get("type") != "gate":
+            continue
+        permission = event.get("permission")
+        if permission == "deny":
+            outcome = "refused"
+        elif permission != "ask":
+            outcome = "flagged"
+        elif event.get("hash") in resolved:
+            outcome = "approved"
+        else:
+            later = events[index + 1 :]
+            turn_end = next(
+                (
+                    j
+                    for j, e in enumerate(later)
+                    if e.get("type") in _TURN_MOVED_ON
+                    or (e.get("type") == "worktree" and e.get("phase") == "turn_end")
+                ),
+                None,
+            )
+            this_turn = later if turn_end is None else later[:turn_end]
+            paths = {str(p).lower() for p in event.get("paths") or []}
+            if paths and any(
+                e.get("type") == "edit" and str(e.get("path", "")).lower() in paths
+                for e in this_turn
+            ):
+                outcome = "approved"
+            elif event.get("kind") != "edit" and (
+                first_tracked is None or first_tracked > index
+            ):
+                outcome = "unknown"
+            elif turn_end is not None:
+                outcome = "declined"
+            else:
+                outcome = "waiting"
+        out.append({**event, "outcome": outcome})
+    return out
+
+
+def _shell_after_gate(events: list[dict], scope: Replay) -> dict[str, list]:
+    """Touched files a command changed again after their last tool edit.
+
+    The edit event records the content the tool left. A later change,
+    observed while one of this session's commands ran and with different
+    content, bypassed the gate even though the file shows a gated edit.
+    Maps lowercased path -> windows of those changes. Edits recorded
+    before fingerprints existed are skipped.
+    """
+    # path -> [(log index, fingerprint)] of its tool edits, in log order.
+    edits: dict[str, list[tuple[int, str | None]]] = {}
+    for index, event in enumerate(events):
+        if event.get("type") == "edit" and isinstance(event.get("path"), str):
+            edits.setdefault(event["path"].lower(), []).append(
+                (index, event.get("fingerprint"))
+            )
+    changes = {p.lower(): c for p, c in scope.changes.items()}
+    found: dict[str, list] = {}
+    for path, path_edits in edits.items():
+        if not any(fp for _, fp in path_edits):
+            continue  # recorded before edit fingerprints existed
+        tool_contents = {fp for _, fp in path_edits if fp}
+        for index, _ts, content, window in changes.get(path, []):
+            # A checkpoint that saw content some tool edit produced is the
+            # tool's own write (possibly observed out of order); only other
+            # content, written while one of this session's commands ran, is
+            # a command changing a gated file. Every change is judged on its
+            # own, so a later tool edit cannot hide an earlier shell change.
+            if window is None or content in tool_contents:
+                continue
+            # The nearest earlier edit left no fingerprint (recorded before
+            # fingerprints existed): its content is unknown, so a change
+            # observed after it cannot be told apart from it. Skip rather
+            # than accuse (found by dogfooding: approved edits were raised).
+            prior = [fp for i, fp in path_edits if i < index]
+            if prior and not prior[-1]:
+                continue
+            found.setdefault(path, []).append(window)
+    return found
 
 
 def compute_view(
@@ -212,7 +322,7 @@ def compute_view(
     declared = plan_revisions[-1]["declared_files"] if plan_revisions else []
 
     checks = [e for e in events if e.get("type") == "plan_check"]
-    gate_events = [e for e in events if e.get("type") == "gate"]
+    gate_events = _gate_outcomes(events)
     edits = [
         {
             "ts": e.get("ts"),
@@ -223,6 +333,26 @@ def compute_view(
         for e in events
         if e.get("type") == "edit"
     ]
+    # Commands the agent ran (shell / MCP), from the working-tree checkpoints
+    # that bracket them: the trace must show what ran, not only what a rule
+    # stopped. Labels carry command text only under prompt_capture: full.
+    # ``ended`` is False when no matching exec_end followed: the command may
+    # still run, may have been stopped before it ran (a runtime's own
+    # permission check runs after ArchRev's hook), or its end was not wired.
+    commands: list[dict] = []
+    open_commands: dict[str, list[dict]] = {}
+    for e in events:
+        if e.get("type") != "worktree":
+            continue
+        label = e.get("label") or "command"
+        if e.get("phase") == "exec_start":
+            entry = {"ts": e.get("ts"), "label": label, "ended": False}
+            commands.append(entry)
+            open_commands.setdefault(label, []).append(entry)
+        elif e.get("phase") == "exec_end" and open_commands.get(label):
+            # An end belongs to the most recent start with the same label;
+            # older identical starts whose end was lost must stay open.
+            open_commands[label].pop()["ended"] = True
     final_checks = [e for e in events if e.get("type") == "final_check"]
     human_changes = [e for e in events if e.get("type") == "human_changes"]
     # Acknowledgments: audited resolutions of final-review findings
@@ -305,17 +435,32 @@ def compute_view(
         # The diff-level backstop covers this session's tracked edits and
         # its unexplained changes, never other sessions' or background work.
         during = {c["path"].lower(): c.get("during") for c in other_changes}
+        uncertain = {c["path"].lower(): bool(c.get("uncertain")) for c in other_changes}
+        changed_at = {c["path"].lower(): c.get("changed_at") for c in other_changes}
+        after_gate = _shell_after_gate(events, scope) if scope.enabled else {}
         scanned = {p.lower(): p for p in [*touched, *(c["path"] for c in other_changes)]}
         for hit in rule_hits_for_paths(ruleset, [scanned[p] for p in sorted(scanned)]):
+            key = hit.path.lower()
             finding = {
                 "path": hit.path,
                 "rule_id": hit.rule_id,
                 "action": hit.action,
                 "message": hit.message,
-                "via_gate": hit.path.lower() in touched_set,
+                "via_gate": key in touched_set and key not in after_gate,
             }
-            if not finding["via_gate"] and during.get(hit.path.lower()):
-                finding["during"] = during[hit.path.lower()]
+            if key in after_gate:
+                windows = after_gate[key]
+                finding["after_gate"] = True
+                finding["during"] = sorted({w.latest or w.label for w in windows})
+                finding["changed_at"] = max((w.end or "" for w in windows), default="") or None
+                if all(w.uncertain for w in windows):
+                    finding["uncertain"] = True
+            elif not finding["via_gate"]:
+                finding["changed_at"] = changed_at.get(key)
+                if during.get(key):
+                    finding["during"] = during[key]
+                if uncertain.get(key):
+                    finding["uncertain"] = True
             protected_findings.append(finding)
 
     commits = git.commits_with_session(session.id) if git.is_repo() else []
@@ -347,6 +492,7 @@ def compute_view(
         "quality_checks": quality_checks,
         "gate_events": gate_events,
         "reads": reads,
+        "commands": commands,
         "edits": edits,
         "files": files,
         "outside_repo": outside_repo,
@@ -365,6 +511,11 @@ def compute_view(
         # Tamper evidence: hash-chain verification over the event log.
         "chain": session.verify_chain(),
     }
+    # What needs the reviewer, why, and how to resolve it (one definition
+    # for the agent follow-up, the viewer, and report.md).
+    from archrev.review import review_items
+
+    view["review"] = review_items(view)
 
     if finalize:
         # The manifest omits the full plan text (plan.md sits next to it)

@@ -27,8 +27,8 @@ recorded. When the stop must not depend on editor settings, use `deny`.
 
 These rules gate the agent's *attempts* and record every attempt. They are
 not a sandbox: an allowed shell can still open the network, and a search
-with no path argument can still see a file a `read` rule would have
-denied. Name the file (`Read`, `Grep` with a path) and the rule fires.
+over a directory can still see a file a `read` rule would have denied.
+What is and is not covered: [security-model.md](security-model.md).
 
 ## Path rules
 
@@ -97,8 +97,28 @@ that pauses edits to them.
 with the hook that reported it (`via`). A read of a known file with no
 event means the runtime never called ArchRev. Exempt paths are not denied.
 
-`shell` patterns are case-insensitive regexes over the command text.
-`mcp` and `tool` patterns match the tool identifier.
+`read` rules also apply to shell commands (Bash and PowerShell tools):
+
+- reader programs' file arguments: `cat .env`, `head < .env`,
+  `grep KEY config/.env.local`, `sha256sum .env`, `cp .env /tmp`,
+  `Get-Content .env`, `Get-FileHash .env`;
+- quoted paths in interpreter inline code: `python -c "open('.env')"`,
+  `node -e`, `pwsh -Command`, and nested `bash -c 'cat .env'`;
+- quoted paths anywhere in a PowerShell-tool command
+  (`[IO.File]::ReadAllText('.env')`).
+
+Commands that only *mention* a path (`ls`, `git add`, a commit message)
+are not reads. Trade-off: a quoted secret path in inline code counts as a
+read even in `print('.env')`. Out of reach: paths built at runtime
+(`'.e'+'nv'`, `cat $(echo .e)nv`), programs that open files themselves
+(`python app.py`), and `Grep` pointed at a directory that contains a
+secret. ArchRev never records command output. This is policy, not a
+sandbox.
+
+`shell` patterns are case-insensitive regexes over the command text, so a
+determined agent can evade them (`archrev-""deny`). Treat shell rules as a
+clear statement of intent plus an audit trail. `mcp` and `tool` patterns
+match the tool identifier.
 
 ## Check rules
 
@@ -135,9 +155,13 @@ Three honesty tiers show up in the review: **verified** (check rules),
 ```
 
 The agent runs `archrev rules`, judges each policy, and records
-`archrev check plan --attest api-rate-limit=pass`. Verdicts are
-attestations. A missing or failed attestation is visible in the timeline
-and, in strict mode, keeps the edit gate closed.
+`archrev check plan --attest api-rate-limit=pass`. Verdicts are `pass`,
+`fail`, or `n/a` (the policy does not apply to this plan; it counts as
+satisfied and stays visible). A prompt rule with `applies_to` is `n/a`
+automatically when the plan declares no file in its scope. Verdicts are
+attestations. A missing or failed attestation is visible in the review and,
+in strict mode, keeps the edit gate closed. A check without a registered
+plan never passes.
 
 ## Checkpoints
 
@@ -154,7 +178,8 @@ prompt ──> plan ──> check ──> edits ──> stop ──> commit
    of replacing it.
 2. **Plan check** (`archrev check plan`). Declared files are matched
    against path rules (a preview of the gate) and every prompt rule needs
-   a pass/fail attestation. The check exits non-zero when it does not pass.
+   a pass/fail/n/a attestation. The check exits non-zero when it does not
+   pass, including when no plan is registered.
 3. **Live gates.** Edits, reads, shell commands, and MCP/tool calls are
    matched before they run. In strict mode the first edit is denied until
    a *passing* plan check exists. Strict mode does not apply to shell
@@ -165,18 +190,31 @@ prompt ──> plan ──> check ──> edits ──> stop ──> commit
    and a protected-path scan of the diff. The scan is session-scoped; see
    [Parallel sessions](guide.md#parallel-sessions). Material findings
    (gate bypasses, a failed plan check, out-of-plan drift, failed `block`
-   checks) are sent back to the agent once. `final_check: false` turns
-   that notification off. Resolve a legitimate finding with an audited
-   acknowledgment:
+   checks) are sent back to the agent once, with the instruction to report
+   them to you rather than acknowledge them. `final_check: false` turns
+   that notification off. The same findings, with why each matters and
+   what to do, lead `archrev show`, `report.md`, and the viewer's review
+   box. Resolve a legitimate finding with an audited acknowledgment, from
+   your own terminal or the viewer's **Acknowledge** button:
 
    ```powershell
    archrev ack .cursor/hooks.json --note "hooks rewired by archrev init, user-approved"
    archrev ack plan-check --note "policy waived for this hotfix"
+   archrev ack check-python-syntax --note "generated file, excluded upstream"
    ```
 
-   The finding stops being re-raised. The ack stays in the hash chain.
-   An agent can run `ack` itself; the timeline shows that it did. The
+   The finding stops being re-raised. The ack stays in the hash chain with
+   its `actor`. **Acknowledging is the reviewer's decision.** An ack made
+   while one of the agent's commands runs is recorded as `actor: agent`
+   and clears only plan drift; gate bypasses, failed checks, a failed plan
+   check, and a broken chain still need you. The shipped
+   `archrev-no-agent-ack` shell rule refuses `archrev ack` from the agent
+   outright; the attribution is the backstop when that regex is evaded.
+   Acks recorded before attribution existed count as the reviewer's. The
    protected-path result in the manifest is unchanged.
+
+   A paused action that then ran is recorded as approved (`gate_resolved`),
+   so the review can tell "you approved" from "did not run".
 5. **Commit linking.** The git hook matches staged files to recent
    sessions and appends `ArchRev-Session:` trailers, including commits
    made hours later.

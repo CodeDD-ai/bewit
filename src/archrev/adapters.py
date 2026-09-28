@@ -62,7 +62,13 @@ NATIVE_EVENTS = {
 
 _EVENT_MAP = {**CURSOR_EVENTS, **NATIVE_EVENTS}
 
-_SHELL_TOOL_RE = re.compile(r"^(bash|shell|exec_command)$", re.IGNORECASE)
+# PowerShell/pwsh: Claude Code on Windows ships a PowerShell tool next to
+# Bash. Missing it let every command there bypass shell rules, read rules,
+# and command attribution (found in a live read test).
+_SHELL_TOOL_RE = re.compile(
+    r"^(bash|shell|exec_command|powershell|pwsh)$", re.IGNORECASE
+)
+_POWERSHELL_TOOL_RE = re.compile(r"^(powershell|pwsh)$", re.IGNORECASE)
 # Grep returns file contents, so a secret-read deny must cover it. A grep
 # with no path still searches the workspace; that is the documented
 # "not a sandbox" limit, not something a path rule can see.
@@ -122,6 +128,10 @@ def tool_name_of(payload: dict) -> str:
 
 def is_shell_tool(name: str) -> bool:
     return bool(_SHELL_TOOL_RE.match(name.strip()))
+
+
+def is_powershell_tool(name: str) -> bool:
+    return bool(_POWERSHELL_TOOL_RE.match(name.strip()))
 
 
 def is_read_tool(name: str) -> bool:
@@ -256,9 +266,20 @@ def render_response(
         return result if result else {}
 
     perm = str(result.get("permission") or "allow")
-    reason = str(
-        result.get("user_message") or result.get("agent_message") or ""
-    )
+    # Claude/Codex show a deny reason to the agent and an ask reason to the
+    # user, so each gets the message written for its reader. The rule lines
+    # (which rule, which path) live in the user message; a deny keeps them
+    # after the agent guidance so the agent knows exactly what was refused.
+    if perm == "deny":
+        reason = "\n".join(
+            str(part)
+            for part in (result.get("agent_message"), result.get("user_message"))
+            if part
+        )
+    else:
+        reason = str(
+            result.get("user_message") or result.get("agent_message") or ""
+        )
     if perm == "ask" and not runtime_supports_ask(runtime):
         perm = "deny"
         reason = (

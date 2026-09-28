@@ -28,6 +28,7 @@ from archrev.adapters import (
     detect_runtime,
     fail_open_response,
     is_mcp_tool,
+    is_powershell_tool,
     is_read_tool,
     is_shell_tool,
     map_event,
@@ -61,6 +62,9 @@ from archrev.worktree import (
 
 #: Characters of a shell command kept as a checkpoint label.
 _COMMAND_LABEL_CHARS = 120
+
+#: A command that acknowledges findings (CLI or the viewer's endpoint).
+_ACK_COMMAND_RE = re.compile(r"archrev(\.exe)?[\"']?\s+ack\b|/api/ack\b", re.IGNORECASE)
 
 #: Tool names whose calls modify files and are therefore subject to path
 #: (edit) rules in the preToolUse gate.
@@ -314,15 +318,104 @@ def handle_edit(root: Path, config: Config, payload: dict) -> dict:
     tool = str(payload.get("tool_name") or payload.get("tool") or "")
     origin = "tab" if "tab" in (event_name + tool).lower() else "agent"
     count = len(edits) if isinstance(edits, list) else None
+    recorded: list[str] = []
     for raw_path in paths:
-        session.append_event(
-            "edit",
-            path=relativize(raw_path, root),
-            tool=tool,
-            origin=origin,
-            edit_count=count,
-        )
+        rel = relativize(raw_path, root)
+        data: dict = {"path": rel, "tool": tool, "origin": origin, "edit_count": count}
+        # The content this tool call left behind. A later change to the file
+        # during one of the session's commands, with different content, is a
+        # shell change after the gated edit (see drift.compute_view).
+        fingerprint = _edit_fingerprint(root, rel)
+        if fingerprint:
+            data["fingerprint"] = fingerprint
+        session.append_event("edit", **data)
+        recorded.append(rel)
+    _resolve_asks(root, session, ("edit",), recorded, by="paths")
+    if tool:
+        _resolve_asks(root, session, ("tool",), [tool])
     return {}
+
+
+def _edit_fingerprint(root: Path, rel: str) -> str | None:
+    from archrev.drift import _is_outside_repo
+    from archrev.worktree import DELETED, fingerprint_file
+
+    if not rel or _is_outside_repo(rel):
+        return None
+    try:
+        value = fingerprint_file(root, rel)
+    except OSError:
+        return None
+    return value if value and value != DELETED else None
+
+
+#: Events scanned backwards for an unresolved pause (bounded hook latency).
+_ASK_LOOKBACK = 400
+
+
+def _resolve_asks(
+    root: Path,
+    session: Session,
+    kinds: tuple[str, ...],
+    keys: list[str],
+    by: str = "target",
+) -> None:
+    """Record that a paused action ran, i.e. the user approved it.
+
+    A runtime sends the after-hook of a tool call only when the call
+    executed. After an ``ask`` that means the user said yes; a declined
+    call never produces one. ``by`` selects what identifies the paused
+    action: its ``paths`` (edits; the target there is only the tool name)
+    or its ``target`` (the command, MCP identifier, or tool name). Never
+    raises: approval tracking only adds evidence and must not disturb
+    capture.
+    """
+    try:
+        wanted = {k.lower() for k in keys if k}
+        if not wanted:
+            return
+        events = session.events()[-_ASK_LOOKBACK:]
+        resolved = {e.get("ref") for e in events if e.get("type") == "gate_resolved"}
+        for event in reversed(events):
+            # A pause from an earlier turn that never ran was declined; a
+            # later run of the same thing (rule changed, monitor mode) must
+            # not turn it into "approved".
+            if event.get("type") in ("prompt", "session_stop") or (
+                event.get("type") == "worktree" and event.get("phase") == "turn_end"
+            ):
+                return
+            if (
+                event.get("type") != "gate"
+                or event.get("permission") != "ask"
+                or event.get("kind") not in kinds
+                or event.get("hash") in resolved
+            ):
+                continue
+            if by == "paths":
+                targets = {str(p).lower() for p in event.get("paths") or []}
+            else:
+                targets = {str(event.get("target") or "").lower()}
+            if wanted & targets:
+                session.append_event(
+                    "gate_resolved",
+                    ref=event.get("hash"),
+                    kind=event.get("kind"),
+                    target=event.get("target"),
+                    outcome="approved",
+                )
+                return
+    except Exception as exc:  # noqa: BLE001 — evidence only, never disruptive
+        _log_hook_error(root, "resolve_asks", exc)
+
+
+def _effective_permission(decision: GateDecision, payload: dict | None) -> str:
+    """What the runtime will actually do: Codex turns ``ask`` into ``deny``."""
+    if decision.permission == "ask" and payload is not None:
+        from archrev.adapters import runtime_supports_ask
+
+        if not runtime_supports_ask(detect_runtime(payload)):
+            return "deny"
+    return decision.permission
 
 
 def _record_gate(
@@ -331,15 +424,24 @@ def _record_gate(
     kind: str,
     target: str,
     paths: list[str] | None = None,
+    payload: dict | None = None,
 ) -> None:
-    """Persist a gate decision when it stopped, asked, or flagged something."""
+    """Persist a gate decision when it stopped, asked, or flagged something.
+
+    The *effective* permission is recorded: Codex cannot ask, so a
+    ``block`` rule is enforced there as ``deny`` and must read "refused"
+    in the review, not "waiting for you".
+    """
     if decision.permission == "allow" and not decision.hits:
         return
+    permission = _effective_permission(decision, payload)
+    extra = {"requested": "ask"} if permission != decision.permission else {}
     session.append_event(
         "gate",
         kind=kind,
         target=target,
-        permission=decision.permission,
+        permission=permission,
+        **extra,
         paths=paths or [],
         hits=[
             {"rule_id": h.rule_id, "action": h.action, "path": h.path}
@@ -358,7 +460,7 @@ def handle_gate(root: Path, config: Config, payload: dict) -> dict:
     if tool_name:
         decision = evaluate_tool(config, ruleset, "tool", tool_name)
         if decision.permission != "allow" or decision.hits:
-            _record_gate(session, decision, "tool", tool_name)
+            _record_gate(session, decision, "tool", tool_name, payload=payload)
             if decision.permission != "allow":
                 return decision.to_hook_output()
 
@@ -388,6 +490,7 @@ def handle_gate(root: Path, config: Config, payload: dict) -> dict:
         "edit",
         tool_name,
         paths=[relativize(p, root) for p in paths],
+        payload=payload,
     )
     return decision.to_hook_output()
 
@@ -401,9 +504,10 @@ def handle_shell(root: Path, config: Config, payload: dict) -> dict:
             "payload_debug", hook="shell", payload=_trim_payload(payload)
         )
         return {"permission": "allow"}
-    decision = evaluate_shell(config, load_rules(root), command)
-    _record_gate(session, decision, "shell", command.strip()[:200])
-    if decision.permission != "deny":
+    dialect = "powershell" if is_powershell_tool(tool_name_of(payload)) else "posix"
+    decision = evaluate_shell(config, load_rules(root), command, root, dialect=dialect)
+    _record_gate(session, decision, "shell", command.strip()[:200], payload=payload)
+    if _effective_permission(decision, payload) != "deny":
         _checkpoint(root, session, PHASE_EXEC_START, _exec_label(config, payload))
     return decision.to_hook_output()
 
@@ -441,7 +545,9 @@ def _exec_label(config: Config, payload: dict) -> str | None:
     command = _shell_command(payload)
     if command:
         if config.prompt_capture != "full":
-            return "shell"
+            # No command text, but a non-secret marker for acknowledgments,
+            # so an agent acking another session is still attributable.
+            return "shell [archrev ack]" if _ACK_COMMAND_RE.search(command) else "shell"
         return f"shell: {' '.join(command.split())[:_COMMAND_LABEL_CHARS]}"
     identifier = _mcp_identifier(payload)
     return f"mcp: {identifier}" if identifier else None
@@ -479,7 +585,7 @@ def handle_read(
         tool=tool_name_of(payload),
         rules=[h.rule_id for h in decision.hits],
     )
-    _record_gate(session, decision, "read", target)
+    _record_gate(session, decision, "read", target, payload=payload)
     return decision.to_hook_output()
 
 
@@ -493,8 +599,8 @@ def handle_mcp(root: Path, config: Config, payload: dict) -> dict:
         )
         return {"permission": "allow"}
     decision = evaluate_tool(config, load_rules(root), "mcp", identifier)
-    _record_gate(session, decision, "mcp", identifier)
-    if decision.permission != "deny":
+    _record_gate(session, decision, "mcp", identifier, payload=payload)
+    if _effective_permission(decision, payload) != "deny":
         _checkpoint(root, session, PHASE_EXEC_START, f"mcp: {identifier}")
     return decision.to_hook_output()
 
@@ -504,64 +610,24 @@ def handle_exec_end(root: Path, config: Config, payload: dict) -> dict:
     close this session's command window (see :mod:`archrev.worktree`)."""
     session = _ensure_session(root, payload, "exec_end")
     _checkpoint(root, session, PHASE_EXEC_END, _exec_label(config, payload))
+    command = _shell_command(payload)
+    if command:
+        _resolve_asks(root, session, ("shell",), [command.strip()[:200]])
+    else:
+        _resolve_asks(root, session, ("mcp", "tool"), [_mcp_identifier(payload)])
     return {}
 
 
 def _final_findings(view: dict) -> list[str]:
     """Material findings worth confronting the agent with at session end.
 
-    Targets acknowledged via ``archrev ack`` are skipped: acknowledgment is
-    the review's prescribed resolution for legitimate findings, and the ack
-    itself is an audited, hash-chained event — resolved, not erased.
+    Defined once in :mod:`archrev.review` so the follow-up, the viewer, and
+    the report count the same things. Acknowledged items are skipped; an
+    agent's own acknowledgment clears only plan drift.
     """
-    acked = {
-        str(a.get("target", "")).lower()
-        for a in view.get("acks", [])
-        if a.get("target")
-    }
-    findings: list[str] = []
-    bypassed = [
-        f
-        for f in view.get("protected_findings", [])
-        if not f.get("via_gate") and f["path"].lower() not in acked
-    ]
-    if bypassed:
-        listed = ", ".join(
-            f["path"] + (f" (during {'; '.join(f['during'])})" if f.get("during") else "")
-            for f in bypassed[:5]
-        )
-        findings.append(
-            f"{len(bypassed)} protected path(s) changed OUTSIDE the edit "
-            f"gate (shell/manual): {listed}"
-        )
-    checks = view.get("checks", [])
-    if checks and not checks[-1].get("ok") and "plan-check" not in acked:
-        findings.append(
-            "the latest plan check did NOT pass (failed or unattested "
-            "prompt rules)"
-        )
-    out_of_plan = [
-        p
-        for p in view.get("drift", {}).get("out_of_plan", [])
-        if p.lower() not in acked
-    ]
-    if view.get("plan", {}).get("registered") and out_of_plan:
-        listed = ", ".join(out_of_plan[:5])
-        findings.append(
-            f"{len(out_of_plan)} file(s) touched but not declared in the "
-            f"plan: {listed}"
-        )
-    # Quality gates: the latest result per rule counts; block failures are
-    # findings (flag failures are recorded and highlighted, not raised).
-    latest: dict[str, dict] = {}
-    for q in view.get("quality_checks", []):
-        latest[str(q.get("rule_id"))] = q
-    for rule_id, q in latest.items():
-        if q.get("ok") is False and q.get("action") == "block" and rule_id.lower() not in acked:
-            findings.append(
-                f"quality check '{rule_id}' FAILED: {q.get('message') or 'see recorded output'}"
-            )
-    return findings
+    from archrev.review import final_findings
+
+    return final_findings(view)
 
 
 def handle_finalize(
@@ -666,10 +732,12 @@ def handle_finalize(
             "followup_message": (
                 "ArchRev final review found issues in this session:\n- "
                 + "\n- ".join(findings)
-                + "\nReview them with the user: confirm legitimate ones with "
-                "`archrev ack <path|plan-check> --note \"<reason>\"` (audited, "
-                "stops re-raising); revert unintended ones. See `archrev "
-                "show` for the full record."
+                + "\nReport these to the user and let them decide. Revert "
+                "changes that were not intended. Do not run `archrev ack` "
+                "yourself: acknowledging is the reviewer's decision (from their "
+                "own terminal or the viewer), and an agent's acknowledgment does "
+                "not clear gate bypasses or failed checks. See `archrev show` "
+                "for the full record."
             )
         }
     return {}

@@ -53,7 +53,9 @@ def test_events_are_hash_chained(tmp_path: Path):
     assert events[1]["prev"] == events[0]["hash"]
     assert events[2]["prev"] == events[1]["hash"]
     result = session.verify_chain()
-    assert result == {"ok": True, "checked": 3, "legacy": 0, "break_at": None}
+    assert result["ok"] is True
+    assert (result["checked"], result["legacy"], result["break_at"]) == (3, 0, None)
+    assert (result["duplicates"], result["forks"], result["reason"]) == (0, 0, None)
 
 
 def test_verify_detects_tampering(tmp_path: Path):

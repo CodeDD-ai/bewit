@@ -64,10 +64,13 @@ def extract_declared_files(text: str, root: Path) -> list[str]:
 
     Heuristic by design: precision is preferred over recall, since false
     positives would produce noisy "unrealized plan" drift. A candidate is
-    kept when it exists in the repository, or contains a path separator
-    plus a file extension (a strong signal it is a concrete file path).
+    kept when it exists in the repository, contains a path separator plus
+    a file extension (a strong signal it is a concrete file path), or is a
+    backticked name with an extension: a plan that writes `CHANGELOG.md`
+    names a new top-level file on purpose (found while dogfooding: such
+    files were dropped and later reported as unplanned).
     """
-    candidates: list[str] = []
+    candidates: list[tuple[str, bool]] = []
     for regex in (
         _BACKTICK_RE,
         _MDLINK_RE,
@@ -75,16 +78,18 @@ def extract_declared_files(text: str, root: Path) -> list[str]:
         _BARE_PATH_RE,
         _BARE_NAME_RE,
     ):
-        candidates.extend(regex.findall(text))
+        explicit = regex is _BACKTICK_RE
+        candidates.extend((raw, explicit) for raw in regex.findall(text))
 
     seen: dict[str, None] = {}
-    for raw in candidates:
+    for raw, explicit in candidates:
         token = _clean_candidate(raw)
         if not token:
             continue
         exists = (root / token).exists()
-        looks_like_file = "/" in token and re.search(r"\.\w{1,10}$", token)
-        if exists or looks_like_file:
+        has_extension = re.search(r"\.\w{1,10}$", token) is not None
+        looks_like_file = "/" in token and has_extension
+        if exists or looks_like_file or (explicit and has_extension):
             seen.setdefault(token, None)
     return list(seen)
 
@@ -134,6 +139,12 @@ def register_plan(
     return declared
 
 
+#: Attestation verdicts. ``n/a`` states that a policy does not apply to
+#: this plan; it counts as satisfied but stays visible in the review.
+VERDICTS = ("pass", "fail", "n/a")
+_SATISFIED = ("pass", "n/a")
+
+
 def check_plan(
     config: Config,
     ruleset: RuleSet,
@@ -148,12 +159,18 @@ def check_plan(
     - ``path_findings``: declared files that match path rules — a preview
       of what the edit gate will block or flag during implementation.
     - ``prompt_rules``: one entry per enabled prompt rule with the agent's
-      attestation (``pass``/``fail``) or ``unattested``.
-    - ``ok``: True only when every prompt rule is attested ``pass``.
+      attestation (``pass`` / ``fail`` / ``n/a``) or ``unattested``. A rule
+      whose ``applies_to`` scope contains none of the declared files is
+      ``n/a`` automatically (``scope: "out of scope"``), unless attested.
+    - ``ok``: True only when a plan is registered and every prompt rule is
+      ``pass`` or ``n/a``. Without a plan there is no intent to check, so a
+      check can never pass (and never unlock strict mode) before one.
     """
     declared: list[str] = []
+    plan_registered = False
     for event in reversed(session.events()):
         if event.get("type") == "plan_registered":
+            plan_registered = True
             raw = event.get("declared_files")
             declared = [p for p in raw if isinstance(p, str)] if isinstance(raw, list) else []
             break
@@ -170,15 +187,24 @@ def check_plan(
 
     prompt_results = []
     for rule in ruleset.prompt_rules:
-        verdict = attestations.get(rule.id, "unattested")
-        prompt_results.append(
-            {"rule_id": rule.id, "policy": rule.policy, "verdict": verdict}
-        )
+        entry = {"rule_id": rule.id, "policy": rule.policy}
+        if rule.id in attestations:
+            entry["verdict"] = attestations[rule.id]
+        elif (
+            rule.applies_to
+            and declared  # a plan naming no files cannot show it is out of scope
+            and not any(rule.scope_matches(p) for p in declared)
+        ):
+            entry["verdict"] = "n/a"
+            entry["scope"] = "out of scope"
+        else:
+            entry["verdict"] = "unattested"
+        prompt_results.append(entry)
     unknown_ids = sorted(set(attestations) - {r.id for r in ruleset.prompt_rules})
 
-    ok = all(r["verdict"] == "pass" for r in prompt_results)
+    ok = plan_registered and all(r["verdict"] in _SATISFIED for r in prompt_results)
     report = {
-        "plan_registered": session.plan_text() is not None,
+        "plan_registered": plan_registered,
         "declared_files": declared,
         "path_findings": path_findings,
         "prompt_rules": prompt_results,

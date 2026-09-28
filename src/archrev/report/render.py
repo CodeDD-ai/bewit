@@ -44,6 +44,26 @@ def _drift_line(view: dict) -> str:
     )
 
 
+def _review(view: dict) -> dict:
+    review = view.get("review")
+    if review is None:
+        from archrev.review import review_items
+
+        review = review_items(view)
+    return review
+
+
+def _ack_by(ack: dict | None) -> str:
+    if not ack:
+        return ""
+    actor = ack.get("actor")
+    if actor == "agent":
+        return "the agent (clears plan drift only)"
+    if actor == "unknown":
+        return "an unverified actor (clears plan drift only)"
+    return "the reviewer"
+
+
 def render_text(view: dict) -> str:
     """Plain-text report for the terminal (``archrev show``)."""
     lines: list[str] = []
@@ -55,6 +75,22 @@ def render_text(view: dict) -> str:
         add(f"Runtime   {view['runtime']}")
     if view.get("areas"):
         add(f"Areas     {', '.join(view['areas'])}")
+    add("")
+
+    review = _review(view)
+    open_items = review.get("open", [])
+    if open_items:
+        add(f"NEEDS YOUR REVIEW ({len(open_items)})")
+        for item in open_items:
+            add(f"  ! {item['title']}")
+            add(f"      why:  {item['why']}")
+            if item.get("likely_cause"):
+                add(f"      from: {item['likely_cause']}")
+            add(f"      do:   {item['action']}")
+    else:
+        add("Review    nothing needs your review")
+    for item in review.get("resolved", []):
+        add(f"  resolved: {item['title']} (acknowledged by {_ack_by(item.get('ack'))})")
     add("")
 
     prompts = view.get("prompts", [])
@@ -146,7 +182,9 @@ def render_text(view: dict) -> str:
     if final_checks:
         last = final_checks[-1]
         issues = last.get("findings", [])
-        add(f"Final review  {'CLEAN' if not issues else f'{len(issues)} finding(s)'}")
+        add(f"Last end-of-turn review [{last.get('ts')}]  "
+            f"{'clean' if not issues else f'{len(issues)} finding(s)'}"
+            " (the review at the top is current)")
         for issue in issues:
             add(f"  - {issue}")
 
@@ -166,7 +204,8 @@ def render_text(view: dict) -> str:
     if acks:
         add(f"Acknowledged findings ({len(acks)})")
         for a in acks:
-            add(f"  [{a.get('ts')}] {a.get('target')}: {a.get('note', '')}")
+            add(f"  [{a.get('ts')}] {a.get('target')}: {a.get('note', '')}"
+                f"  (by {_ack_by(a)})")
 
     human = view.get("human_changes", [])
     if human:
@@ -200,6 +239,22 @@ def render_markdown(view: dict) -> str:
         add(f"- **Runtime:** {view['runtime']}")
     add(f"- **Areas:** {', '.join(view.get('areas', [])) or '-'}")
     add(f"- **Drift:** {_drift_line(view)}")
+    add("")
+
+    review = _review(view)
+    open_items = review.get("open", [])
+    add(f"## Needs your review ({len(open_items)})" if open_items else "## Review")
+    add("")
+    if not open_items:
+        add("Nothing needs your review: no gate bypasses, failed checks, or unplanned changes left open.")
+    for item in open_items:
+        add(f"- **{item['title']}**  ")
+        add(f"  *Why it matters:* {item['why']}  ")
+        if item.get("likely_cause"):
+            add(f"  *Likely cause:* `{item['likely_cause'].replace('`', chr(39))}`  ")
+        add(f"  *What to do:* {item['action']}")
+    for item in review.get("resolved", []):
+        add(f"- ~~{item['title']}~~ — acknowledged by {_ack_by(item.get('ack'))}")
     add("")
 
     add("## Prompts")
@@ -306,7 +361,10 @@ def render_markdown(view: dict) -> str:
     if final_checks:
         last = final_checks[-1]
         issues = last.get("findings", [])
-        add("## Final review")
+        add(f"## Last end-of-turn review ({final_checks[-1].get('ts')})")
+        add("")
+        add("*What the agent was told at its last turn end; the review at the top is current.*")
+        add("")
         if issues:
             for issue in issues:
                 add(f"- {issue}")
@@ -333,7 +391,8 @@ def render_markdown(view: dict) -> str:
     if acks:
         add("## Acknowledged findings")
         for a in acks:
-            add(f"- {a.get('ts')}: `{a.get('target')}` — {a.get('note', '')}")
+            add(f"- {a.get('ts')}: `{a.get('target')}` — {a.get('note', '')} "
+                f"*(by {_ack_by(a)})*")
         add("")
 
     human = view.get("human_changes", [])

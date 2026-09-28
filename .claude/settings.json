@@ -28,7 +28,7 @@
             "command": "archrev hook"
           }
         ],
-        "matcher": "Edit|Write|NotebookEdit|apply_patch"
+        "matcher": "Edit|Write|NotebookEdit|apply_patch|Bash|PowerShell|pwsh|shell|exec_command|mcp__.*"
       }
     ],
     "Stop": [

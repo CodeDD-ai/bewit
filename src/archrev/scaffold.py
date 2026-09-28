@@ -122,6 +122,13 @@ _STARTER_RULES = """\
   message: "Agents may not read secrets or environment files."
   enabled: false
 
+- id: example-protect-secret-files
+  kind: path
+  match: ["dev-secrets/**", ".env", ".env.*"]
+  action: block
+  message: "Writing secrets or environment files requires explicit approval."
+  enabled: false
+
 - id: example-no-push
   kind: shell
   match_command: ['\\bgit\\s+push\\b']
@@ -237,6 +244,18 @@ _SELF_PROTECTION_RULES = """\
   message: >-
     ArchRev governance file - changing capture or enforcement configuration
     requires explicit user approval.
+
+# Acknowledging a finding is the reviewer's decision. An acknowledgment made
+# while an agent command runs is recorded as agent-made and does not clear
+# bypasses or failed checks; this rule stops the attempt up front.
+- id: archrev-no-agent-ack
+  kind: shell
+  match_command: ['\\barchrev(\\.exe)?\\s+ack\\b', '/api/ack\\b']
+  action: deny
+  message: >-
+    Only the reviewer acknowledges ArchRev findings. Report the findings to
+    the user; they acknowledge legitimate ones from their own terminal or the
+    viewer.
 """
 
 _GIT_HOOK = """\
@@ -265,7 +284,7 @@ _NATIVE_HOOK_SPECS: tuple[tuple[str, str | None, dict], ...] = (
     ("PreToolUse", None, {}),
     (
         "PostToolUse",
-        "Edit|Write|NotebookEdit|apply_patch|Bash|shell|exec_command|mcp__.*",
+        "Edit|Write|NotebookEdit|apply_patch|Bash|PowerShell|pwsh|shell|exec_command|mcp__.*",
         {},
     ),
     ("Stop", None, {}),
@@ -534,6 +553,49 @@ def _merge_native_hooks(
         result.created.append(str(path))
     else:
         result.skipped.append(str(path))
+
+
+def wiring_problems(root: Path) -> list[str]:
+    """Differences between the installed Claude/Codex wiring and this version.
+
+    Wiring is written once by ``archrev init``; upgrading ArchRev does not
+    touch it. Stale wiring degrades silently (an outdated PostToolUse
+    matcher leaves every shell command window open until the turn ends,
+    blurring attribution), so ``archrev rules`` and the viewer report it.
+    Read-only; never raises.
+    """
+    problems: list[str] = []
+    for rel in (".claude/settings.json", ".codex/hooks.json"):
+        path = root / rel
+        if not path.is_file():
+            continue
+        try:
+            hooks = json.loads(path.read_text(encoding="utf-8")).get("hooks") or {}
+        except (OSError, json.JSONDecodeError, AttributeError):
+            problems.append(f"{rel}: not valid JSON")
+            continue
+        if not isinstance(hooks, dict):
+            problems.append(f"{rel}: 'hooks' is not an object")
+            continue
+        for event, matcher, _extras in _NATIVE_HOOK_SPECS:
+            entries = hooks.get(event)
+            groups = [
+                g for g in (entries if isinstance(entries, list) else [])
+                if isinstance(g, dict)
+                and isinstance(g.get("hooks"), list)
+                and any(
+                    isinstance(h, dict) and _OURS_RE.search(str(h.get("command", "")))
+                    for h in g["hooks"]
+                )
+            ]
+            if not groups:
+                problems.append(f"{rel}: no ArchRev hook for {event}")
+            elif matcher and groups[0].get("matcher") != matcher:
+                problems.append(
+                    f"{rel}: {event} matcher is outdated "
+                    f"('{groups[0].get('matcher')}', expected '{matcher}')"
+                )
+    return problems
 
 
 def _ensure_agents_md(root: Path, result: InitResult) -> None:

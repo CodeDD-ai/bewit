@@ -8,6 +8,12 @@
   action: deny
   message: "Agents may not read secrets, keys, or environment files."
 
+- id: protect-secret-files
+  kind: path
+  match: ["dev-secrets/**", ".env", ".env.*", "**/*.pem", "**/*.key"]
+  action: block
+  message: "Writing secrets, keys, or environment files requires explicit approval."
+
 - id: push-needs-approval
   kind: shell
   match_command: ["\\bgit\\s+push\\b"]

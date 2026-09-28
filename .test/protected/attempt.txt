@@ -1,0 +1,2 @@
+T02: this write should pause for user approval (test-path-block).
+T13b: appended via shell after an approved gate edit

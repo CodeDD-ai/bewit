@@ -171,6 +171,13 @@ def _fingerprint(
     return value
 
 
+def fingerprint_file(root: Path, rel: str) -> str | None:
+    """Content fingerprint of one repo file, comparable with checkpoints."""
+    if not rel or is_runtime_noise(rel):
+        return None
+    return _fingerprint(root / rel)
+
+
 def snapshot(root: Path, carried: Iterable[str] = ()) -> dict[str, str] | None:
     """Fingerprints of every dirty path plus every ``carried`` path.
 
@@ -195,11 +202,23 @@ def snapshot(root: Path, carried: Iterable[str] = ()) -> dict[str, str] | None:
 
 @dataclass(frozen=True)
 class Window:
-    """One interval during which this session's command(s) were running."""
+    """One interval during which this session's command(s) were running.
+
+    ``label`` names every command open in the interval; ``latest`` is the
+    most recently started one, the likeliest author of a change. Runtimes
+    without after-hooks leave commands open until the turn ends, so
+    ``label`` can list the whole turn while ``latest`` stays specific.
+    """
 
     label: str
     start: str | None
     end: str | None
+    latest: str = ""
+    #: Every open command here is one whose end was never recorded although
+    #: a later-started command's end was: its after-hook was most likely
+    #: lost (e.g. wiring from before PostToolUse covered shells), so the
+    #: change may not be this session's at all.
+    uncertain: bool = False
 
     def contains(self, ts: str) -> bool:
         # Event timestamps are second-resolution ISO-8601 UTC strings, so
@@ -221,6 +240,17 @@ class Replay:
     windows: dict[str, list[Window]] = field(default_factory=dict)
     #: paths whose content changed while no command of this session ran
     background: set[str] = field(default_factory=set)
+    #: path -> every observed content change: (log index, ts, fingerprint,
+    #: window or None). The index orders changes against other events
+    #: exactly; timestamps only have one-second resolution.
+    changes: dict[str, list[tuple[int, str | None, str, Window | None]]] = field(
+        default_factory=dict
+    )
+    #: Parallel to ``open_labels``: True for an open command whose end was
+    #: likely lost (a later-started command already ended). Per instance,
+    #: not per label, so identical labels (every command is just ``shell``
+    #: without full capture) do not taint later commands.
+    open_suspect: list[bool] = field(default_factory=list)
 
     @property
     def enabled(self) -> bool:
@@ -233,23 +263,38 @@ class Replay:
     def delta(self, current: dict[str, str]) -> dict[str, str]:
         return {p: fp for p, fp in current.items() if self.state.get(p) != fp}
 
-    def apply(self, changed: dict, ts: str | None, *, baseline: bool = False) -> None:
+    def apply(
+        self,
+        changed: dict,
+        ts: str | None,
+        *,
+        baseline: bool = False,
+        index: int = 1 << 62,
+    ) -> None:
         for path, fingerprint in changed.items():
             if not isinstance(path, str) or not isinstance(fingerprint, str):
                 continue
+            window: Window | None = None
             if self.open_labels and not baseline:
-                self.windows.setdefault(path, []).append(
-                    Window("; ".join(self.open_labels), self.last_ts, ts)
+                window = Window(
+                    "; ".join(self.open_labels),
+                    self.last_ts,
+                    ts,
+                    latest=self.open_labels[-1],
+                    uncertain=all(self.open_suspect),
                 )
+                self.windows.setdefault(path, []).append(window)
             else:
                 self.background.add(path)
+            if not baseline:
+                self.changes.setdefault(path, []).append((index, ts, fingerprint, window))
             self.state[path] = fingerprint
 
 
 def replay(events: Iterable[dict]) -> Replay:
     """Fold a session's ``worktree`` events in log order."""
     result = Replay()
-    for event in events:
+    for index, event in enumerate(events):
         if event.get("type") != EVENT_TYPE:
             continue
         changed = event.get("changed")
@@ -258,21 +303,33 @@ def replay(events: Iterable[dict]) -> Replay:
             changed if isinstance(changed, dict) else {},
             ts,
             baseline=not result.enabled,
+            index=index,
         )
         phase = event.get("phase")
         if phase == PHASE_EXEC_START:
             result.open_labels.append(str(event.get("label") or "command"))
+            result.open_suspect.append(False)
         elif phase == PHASE_EXEC_END:
             # Parallel commands may finish in any order. Close the command
             # this end names when known; otherwise the oldest. The count of
             # open commands is what decides attribution either way.
             label = event.get("label")
             if label in result.open_labels:
-                result.open_labels.remove(label)
+                # The most recent identical command is the one ending; an
+                # older identical one whose end was lost stays open.
+                pos = len(result.open_labels) - 1 - result.open_labels[::-1].index(label)
+                # Commands started before this one and still open: their
+                # after-hooks were most likely lost (or they run long).
+                for earlier in range(pos):
+                    result.open_suspect[earlier] = True
+                result.open_labels.pop(pos)
+                result.open_suspect.pop(pos)
             elif result.open_labels:
                 result.open_labels.pop(0)
+                result.open_suspect.pop(0)
         else:
             result.open_labels.clear()
+            result.open_suspect.clear()
         result.last_ts = ts
         result.checkpoints += 1
     return result

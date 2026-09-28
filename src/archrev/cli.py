@@ -210,9 +210,10 @@ def _parse_attestations(pairs: tuple[str, ...]) -> dict[str, str]:
     attests: dict[str, str] = {}
     for pair in pairs:
         rule_id, sep, verdict = pair.partition("=")
-        if not sep or verdict not in ("pass", "fail"):
+        verdict = {"na": "n/a"}.get(verdict.strip().lower(), verdict.strip().lower())
+        if not sep or verdict not in ("pass", "fail", "n/a"):
             raise click.ClickException(
-                f"Invalid attestation '{pair}' (expected <rule-id>=pass|fail)."
+                f"Invalid attestation '{pair}' (expected <rule-id>=pass|fail|n/a)."
             )
         attests[rule_id.strip()] = verdict
     return attests
@@ -223,7 +224,8 @@ def _parse_attestations(pairs: tuple[str, ...]) -> dict[str, str]:
     "--attest",
     "attest_pairs",
     multiple=True,
-    help="Prompt-rule verdict as <rule-id>=pass|fail (repeatable).",
+    help="Prompt-rule verdict as <rule-id>=pass|fail|n/a (repeatable). "
+    "n/a states the policy does not apply to this plan.",
 )
 @click.option("--note", default=None, help="Free-text note stored with the check.")
 @click.option("--session", "session_ref", default="latest", show_default=True)
@@ -258,8 +260,9 @@ def check_plan_cmd(
                 fg=color,
             )
     for pr in report["prompt_rules"]:
-        color = {"pass": "green", "fail": "red"}.get(pr["verdict"], "yellow")
-        click.secho(f"  attest {pr['verdict']:>10}  {pr['rule_id']}", fg=color)
+        color = {"pass": "green", "fail": "red", "n/a": "cyan"}.get(pr["verdict"], "yellow")
+        scope = f"  ({pr['scope']})" if pr.get("scope") else ""
+        click.secho(f"  attest {pr['verdict']:>10}  {pr['rule_id']}{scope}", fg=color)
         click.echo(f"    policy: {pr['policy']}")
     for unknown in report["unknown_attestations"]:
         click.secho(f"  unknown rule id in --attest: {unknown}", fg="yellow")
@@ -268,7 +271,8 @@ def check_plan_cmd(
         click.secho("Plan check OK - recorded.", fg="green")
     else:
         click.secho(
-            "Plan check NOT OK (failed or unattested prompt rules) - recorded. "
+            "Plan check NOT OK (no plan registered, or failed or unattested "
+            "prompt rules) - recorded. "
             "Resolve with the user before implementing.",
             fg="red",
         )
@@ -393,6 +397,13 @@ def _print_rules() -> None:
         click.secho(f"\nProblems ({len(ruleset.errors)}):", fg="yellow")
         for error in ruleset.errors:
             click.secho(f"  {error}", fg="yellow")
+    from archrev.scaffold import wiring_problems
+
+    stale = wiring_problems(root)
+    if stale:
+        click.secho("\nHook wiring is out of date (run `archrev init` to upgrade):", fg="yellow")
+        for problem in stale:
+            click.secho(f"  {problem}", fg="yellow")
 
 
 def explain_path(root: Path, relpath: str, kind: str) -> str:
@@ -708,15 +719,34 @@ def ack(target: str, note: str, session_ref: str) -> None:
     """Acknowledge a final-review finding as legitimate.
 
     TARGET is the path the finding names (for gate bypasses and
-    out-of-plan drift) or the literal ``plan-check`` (for a failed check).
-    The acknowledgment is an audited, hash-chained event: the finding stops
-    being re-raised at session end, but who acknowledged what, when, and
-    why stays in the permanent record.
+    out-of-plan drift), a quality-check rule id, or the literal
+    ``plan-check`` (for a failed check). The acknowledgment is an audited,
+    hash-chained event: the finding stops being re-raised at session end,
+    but who acknowledged what, when, and why stays in the permanent record.
+
+    Acknowledging is the reviewer's decision. When an agent command is
+    running, the ack is recorded as agent-made and clears only plan drift.
     """
+    from archrev.review import detect_ack_actor
+
     root = _require_root()
     session = _resolve_session(root, session_ref)
     normalized = target.replace("\\", "/")
-    session.append_event("ack", target=normalized, note=note)
+    actor, basis = detect_ack_actor(root, session)
+    session.append_event(
+        "ack", target=normalized, note=note, actor=actor, actor_basis=basis, via="cli"
+    )
+    if actor in ("agent", "unknown"):
+        label = "an AGENT" if actor == "agent" else "an UNVERIFIED"
+        click.secho(
+            f"Recorded as {label} acknowledgment of '{normalized}' ({basis}).",
+            fg="yellow",
+        )
+        click.echo(
+            "It clears plan drift only; bypasses and failed checks still need "
+            "the reviewer."
+        )
+        return
     click.secho(
         f"Acknowledged '{normalized}' for session {session.id}.", fg="green"
     )
@@ -758,16 +788,28 @@ def verify(session_ref: str | None, verify_all: bool) -> None:
             continue
         result = session.verify_chain()
         if result["ok"]:
-            note = f" ({result['legacy']} legacy pre-chain event(s))" if result["legacy"] else ""
+            notes = []
+            if result["legacy"]:
+                notes.append(f"{result['legacy']} legacy pre-chain event(s)")
+            if result.get("duplicates"):
+                notes.append(
+                    f"{result['duplicates']} duplicate hook delivery(ies), content unchanged"
+                )
+            note = f" ({'; '.join(notes)})" if notes else ""
             click.secho(
                 f"  ok      {session.id}: {result['checked']} event(s) verified{note}",
                 fg="green",
             )
         else:
             broken += 1
+            why = (
+                "two events chain to the same predecessor - usually concurrent "
+                "hook writes, but an inserted event looks the same"
+                if result.get("reason") == "fork"
+                else "an event was modified or removed after it was written"
+            )
             click.secho(
-                f"  BROKEN  {session.id}: chain breaks at event #{result['break_at']} "
-                "- the log was modified after the fact",
+                f"  BROKEN  {session.id}: chain breaks at event #{result['break_at']} - {why}",
                 fg="red",
             )
     if broken:
@@ -776,34 +818,94 @@ def verify(session_ref: str | None, verify_all: bool) -> None:
 
 @main.command()
 @click.option("--host", default="127.0.0.1", show_default=True)
-@click.option("--port", default=4177, show_default=True)
-def serve(host: str, port: int) -> None:
-    """Serve the live session timeline (view-only; capture is independent)."""
-    from archrev.report.server import serve as run_server
+@click.option(
+    "--port",
+    default=4177,
+    show_default=True,
+    help="Preferred port. If another project's viewer holds it, the next "
+    "free port is used; a viewer for this project is reused.",
+)
+@click.option(
+    "--all",
+    "hub_dirs",
+    multiple=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Serve every ArchRev repository in DIR (the directory itself or its "
+    "immediate children) with a project switcher. Repeatable.",
+)
+@click.option(
+    "--open/--no-open",
+    "open_browser",
+    default=True,
+    show_default=True,
+    help="Open the viewer in the default browser.",
+)
+def serve(host: str, port: int, hub_dirs: tuple[Path, ...], open_browser: bool) -> None:
+    """Serve the live session timeline (view-only; capture is independent).
 
-    root = _require_root()
-    click.echo(f"ArchRev viewer: http://{host}:{port}/  (root: {root})")
-    click.echo("Press Ctrl+C to stop. Capture continues either way.")
+    Without --all, the viewer shows only the project of the current
+    directory. Capture never depends on the viewer.
+    """
+    from archrev.report.server import bind_viewer, run_server
+
+    hub = bool(hub_dirs)
+    if hub:
+        from archrev.metrics import discover_repos
+
+        roots = discover_repos(list(hub_dirs))
+        if not roots:
+            raise click.ClickException(
+                "No ArchRev repositories found (looked for .archrev in the "
+                "given directories and their immediate children)."
+            )
+    else:
+        roots = [_require_root()]
+
     try:
-        run_server(root, host, port)
+        binding = bind_viewer(roots, host, port, hub=hub)
+    except OSError as exc:
+        raise click.ClickException(f"Cannot start the viewer: {exc}") from exc
+
+    url = f"http://{'127.0.0.1' if host == '0.0.0.0' else host}:{binding.port}/"
+    what = (
+        f"{len(roots)} projects: " + ", ".join(r.name for r in roots)
+        if hub
+        else f"{roots[0].name}  ({roots[0]})"
+    )
+    if binding.displaced_by is not None:
+        holder = (
+            "the viewer for " + ", ".join(Path(p).name for p in binding.displaced_by)
+            if binding.displaced_by
+            else "another program"
+        )
+        click.secho(
+            f"Port {port} is used by {holder}; this viewer uses {binding.port}.",
+            fg="yellow",
+        )
+    if binding.reused:
+        click.echo(f"A viewer for {what} is already running at {url}")
+        if open_browser:
+            _open_browser(url)
+        return
+
+    click.echo(f"ArchRev viewer for {what}")
+    click.echo(f"  {url}")
+    click.echo("Press Ctrl+C to stop. Capture continues either way.")
+    if open_browser:
+        _open_browser(url)
+    try:
+        run_server(binding.server)
     except KeyboardInterrupt:
         click.echo("\nStopped.")
-    except OSError as exc:
-        if _port_in_use(exc):
-            raise click.ClickException(
-                f"Port {port} is already in use. A viewer is probably already "
-                f"running at http://{host}:{port}/ — open that, or rerun with "
-                "--port."
-            ) from exc
-        raise
 
 
-def _port_in_use(exc: OSError) -> bool:
-    import errno
+def _open_browser(url: str) -> None:
+    import webbrowser
 
-    if getattr(exc, "winerror", None) == 10048:
-        return True
-    return exc.errno in (errno.EADDRINUSE, 10048)
+    try:
+        webbrowser.open(url)
+    except Exception:  # noqa: BLE001 — a missing browser must not stop the viewer
+        pass
 
 
 @main.command()

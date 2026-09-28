@@ -286,30 +286,55 @@ class Session:
     def verify_chain(self) -> dict:
         """Validate the event hash chain.
 
-        Returns ``{"ok": bool, "checked": int, "legacy": int, "break_at": int | None}``.
-        Events written before hashing existed count as ``legacy`` and reset
-        the chain start; they are reported, not failed.
+        Returns ``{"ok", "checked", "legacy", "break_at", "reason",
+        "duplicates", "forks"}``. Events written before hashing existed
+        count as ``legacy`` and reset the chain start; they are reported,
+        not failed.
+
+        Breaks carry a ``reason``:
+
+        - ``modified``: an event's hash does not match its content, or its
+          ``prev`` names no earlier event (edited or deleted history).
+        - ``fork``: a valid event whose ``prev`` names an *earlier* event, so
+          two events chain to one predecessor. Usually two concurrent
+          appends; an inserted event looks the same, so it still fails.
+
+        ``duplicates`` (an event byte-identical to its predecessor: one
+        hook delivered twice) alter nothing and do not break the chain.
         """
-        checked = legacy = 0
+        checked = legacy = duplicates = forks = 0
         break_at: int | None = None
+        reason: str | None = None
         prev: str | None = None
+        seen: set[str] = set()
         for index, event in enumerate(self.events(), start=1):
             if "hash" not in event:
                 legacy += 1
                 prev = None  # chain restarts after legacy prefix
                 continue
-            expected = event_hash(event)
-            prev_ok = prev is None or event.get("prev") == prev
-            if event.get("hash") != expected or not prev_ok:
-                break_at = index
+            own = str(event.get("hash"))
+            if own != event_hash(event):
+                break_at, reason = index, "modified"
                 break
-            prev = str(event["hash"])
+            if prev is not None and event.get("prev") != prev:
+                if own == prev:
+                    duplicates += 1
+                    continue
+                forks += 1 if event.get("prev") in seen else 0
+                break_at = index
+                reason = "fork" if event.get("prev") in seen else "modified"
+                break
+            prev = own
+            seen.add(own)
             checked += 1
         return {
             "ok": break_at is None,
             "checked": checked,
             "legacy": legacy,
             "break_at": break_at,
+            "reason": reason,
+            "duplicates": duplicates,
+            "forks": forks,
         }
 
     def events(self) -> list[dict]:

@@ -19,3 +19,17 @@
   message: >-
     ArchRev governance file - changing capture or enforcement configuration
     requires explicit user approval.
+
+# Acknowledging a finding is the reviewer's decision. Agents report findings
+# to the user instead of acknowledging them; an acknowledgment made while an
+# agent command runs is recorded as agent-made and does not clear bypasses,
+# failed checks, or a failed plan check (regex rules can be evaded, so that
+# attribution is the backstop).
+- id: archrev-no-agent-ack
+  kind: shell
+  match_command: ['\barchrev(\.exe)?\s+ack\b', '/api/ack\b']
+  action: deny
+  message: >-
+    Only the reviewer acknowledges ArchRev findings. Report the findings to
+    the user; they acknowledge legitimate ones from their own terminal or the
+    viewer.
