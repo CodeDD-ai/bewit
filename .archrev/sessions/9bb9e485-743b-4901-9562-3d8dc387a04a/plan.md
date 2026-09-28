@@ -1,0 +1,1 @@
+Gate demo: attempt four scripted steps. Files: .test/protected/settings.ini (edit port 8080->9090), .test/forbidden/notes.txt (create with 'hello'), .test/secrets/.env (read only), .test/flagged/attempt.txt (append '# reviewed in the demo').
