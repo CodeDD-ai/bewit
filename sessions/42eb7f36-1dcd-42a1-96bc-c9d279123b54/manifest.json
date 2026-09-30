@@ -1,0 +1,186 @@
+{
+  "id": "42eb7f36-1dcd-42a1-96bc-c9d279123b54",
+  "started_at": "2026-09-30T13:59:23Z",
+  "head_sha": "6bba504a9d3823e869b66e67104be4068c186ef0",
+  "finalized": true,
+  "generated_at": "2026-09-30T14:00:17Z",
+  "prompts": [
+    {
+      "ts": "2026-09-30T13:59:23Z",
+      "text": "I did this: \n\n<pasted_content id=\"470f\">\nE:\\ArchRev>bewit init\nBewit in E:\\ArchRev\n  written  .bewit/config.yaml\n  written  .gitignore\n  written  .gitattributes\n  written  .bewit/rules/00-starter-rules.yaml\n  written  .bewit/rules/90-bewit-self-protection.yaml\n  written  .bewit/sessions\n  written  .cursor/hooks.json\n  written  .cursor/rules/bewit.mdc\n  written  .claude/settings.json\n  written  .claude/rules/bewit.md\n  written  .codex/hooks.json\n  written  AGENTS.md\n  warning  E:\\ArchRev\\.git\\hooks\\prepare-commit-msg already exists and is not Bewit's. Append this line manually to keep commit linking:\n  bewit git-trailer \"$1\" 2>/dev/null || true\n  warning  E:\\ArchRev\\.git\\hooks\\pre-push already exists and is not Bewit's. Session records are not pushed automatically; run `bewit sync` after pushing, or add `bewit sync --remote \"$1\" --quiet || true` to that hook.\n\nWired: cursor, claude, codex.\nRecords: published to refs/bewit/records, never in code commits. `git push` shares them (pre-push hook); `bewit sync` fetches colleagues'.\n  Codex runs project hooks only after you trust them: run /hooks in Codex.\n\nNext:\n  1. Review .bewit/rules/ (00-starter-rules.yaml has disabled examples).\n  2. Commit .bewit/ and the hook wiring: they are the policy and the record.\n  3. Run `bewit serve`, then start an agent session in this folder.\n\nE:\\ArchRev>bewit git-trailer \"$1\" 2>/dev/null || true\nThe system cannot find the path specified.\n'true' is not recognized as an internal or external command,\noperable program or batch file.\n</pasted_content id=\"470f\">\n",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    }
+  ],
+  "branch": "release_v1",
+  "runtime": "claude",
+  "checks": [],
+  "final_checks": [],
+  "human_changes": [],
+  "acks": [],
+  "quality_checks": [],
+  "gate_events": [],
+  "reads": [
+    {
+      "path": "src",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:00:00Z"
+    }
+  ],
+  "commands": [
+    {
+      "ts": "2026-09-30T13:59:30Z",
+      "label": "shell: cd /e/ArchRev/.git/hooks && for f in prepare-commit-msg pre-push; do echo \"=== $f\"; cat \"$f\"; done",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:00:08Z",
+      "label": "shell: cp prepare-commit-msg prepare-commit-msg.archrev.bak && cp pre-push pre-push.archrev.bak && cat > prepare-commit-msg <<'",
+      "ended": true
+    }
+  ],
+  "edits": [],
+  "files": [],
+  "outside_repo": [],
+  "other_sessions": [],
+  "other_changes": [],
+  "background_changes": [
+    {
+      "path": ".archrev/config.yaml",
+      "added": 0,
+      "removed": 23
+    },
+    {
+      "path": ".archrev/rules/00-starter-rules.yaml",
+      "added": 0,
+      "removed": 38
+    },
+    {
+      "path": ".archrev/rules/10-archrev-repo.yaml",
+      "added": 0,
+      "removed": 99
+    },
+    {
+      "path": ".archrev/rules/20-agent-boundaries.yaml",
+      "added": 0,
+      "removed": 43
+    },
+    {
+      "path": ".archrev/rules/90-archrev-self-protection.yaml",
+      "added": 0,
+      "removed": 50
+    },
+    {
+      "path": ".bewit/config.yaml",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".bewit/rules/00-starter-rules.yaml",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".bewit/rules/90-bewit-self-protection.yaml",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".claude/rules/bewit.md",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".claude/settings.json",
+      "added": 42,
+      "removed": 0
+    },
+    {
+      "path": ".codex/hooks.json",
+      "added": 42,
+      "removed": 0
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "added": 31,
+      "removed": 0
+    },
+    {
+      "path": ".cursor/rules/bewit.mdc",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".gitattributes",
+      "added": 3,
+      "removed": 0
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "added": 15,
+      "removed": 1
+    },
+    {
+      "path": ".gitignore",
+      "added": 11,
+      "removed": 0
+    },
+    {
+      "path": "AGENTS.md",
+      "added": 28,
+      "removed": 0
+    },
+    {
+      "path": "src/bewit/gate.py",
+      "added": 27,
+      "removed": 5
+    },
+    {
+      "path": "tests/test_gate.py",
+      "added": 39,
+      "removed": 0
+    }
+  ],
+  "attribution": "checkpoints",
+  "drift": {
+    "out_of_plan": [],
+    "no_net_change": [],
+    "unrealized": []
+  },
+  "protected_findings": [],
+  "commits": [],
+  "areas": [],
+  "event_count": 8,
+  "chain_head": "60c5840b88335b14721e8b789abb817541ca84b0efb5dc5a87117b2f56ff72a6",
+  "chain": {
+    "ok": true,
+    "checked": 8,
+    "legacy": 0,
+    "break_at": null,
+    "reason": null,
+    "duplicates": 0,
+    "forks": 0
+  },
+  "review": {
+    "open": [],
+    "resolved": [],
+    "notes": []
+  },
+  "plan": {
+    "registered": false,
+    "declared_files": [],
+    "progress": [],
+    "text": null
+  },
+  "finalized_at": "2026-09-30T14:00:17Z"
+}
