@@ -3,53 +3,53 @@
   "hooks": {
     "beforeSubmitPrompt": [
       {
-        "command": "archrev hook prompt"
+        "command": "bewit hook prompt"
       }
     ],
     "afterFileEdit": [
       {
-        "command": "archrev hook edit"
+        "command": "bewit hook edit"
       }
     ],
     "preToolUse": [
       {
-        "command": "archrev hook gate"
+        "command": "bewit hook gate"
       }
     ],
     "stop": [
       {
-        "command": "archrev hook finalize",
+        "command": "bewit hook finalize",
         "loop_limit": 2
       }
     ],
     "beforeShellExecution": [
       {
-        "command": "archrev hook shell"
+        "command": "bewit hook shell"
       }
     ],
     "beforeReadFile": [
       {
-        "command": "archrev hook read"
+        "command": "bewit hook read"
       }
     ],
     "beforeMCPExecution": [
       {
-        "command": "archrev hook mcp"
+        "command": "bewit hook mcp"
       }
     ],
     "afterShellExecution": [
       {
-        "command": "archrev hook exec_end"
+        "command": "bewit hook exec_end"
       }
     ],
     "afterMCPExecution": [
       {
-        "command": "archrev hook exec_end"
+        "command": "bewit hook exec_end"
       }
     ],
     "afterTabFileEdit": [
       {
-        "command": "archrev hook edit"
+        "command": "bewit hook edit"
       }
     ]
   }

@@ -1,0 +1,55 @@
+# Bewit configuration. Safe to edit; invalid values fall back to defaults.
+
+# Edit-gate behavior:
+#   on      - enforce rules as written (block rules pause for user approval)
+#   monitor - record everything, downgrade blocks to flags (never stops)
+#   off     - disable the gate entirely (session capture still runs)
+enforcement: on
+
+# When true, the first gated edit of a session is denied until the agent has
+# registered a plan and run `bewit check plan` ("no validated plan, no code").
+strict_plan_check: false
+
+# When true, session finalization scans the full git diff against path rules,
+# catching protected files changed outside the edit gate (e.g. via shell).
+protected_scan: true
+
+# When true, the end-of-session review sends the agent a follow-up message
+# when material findings exist (gate bypasses, failed checks, out-of-plan
+# drift), so sessions never end silently with open rule violations.
+final_check: true
+
+# Prompt privacy - how much of the user's prompt text enters the record:
+#   full    - the whole prompt (default; best provenance)
+#   excerpt - first 200 characters plus total length
+#   none    - no text; only length and a content hash
+#   sealed  - ciphertext for the public keys in .bewit/recipients.yaml
+#             (bewit seal keygen). Falls back to `none` if sealing
+#             cannot run — never stores plaintext by accident.
+# Prompts are the most sensitive artifact Bewit stores. Decide this
+# consciously before a team rollout.
+prompt_capture: full
+
+# What of the session record is committed with the repository
+# (re-run `bewit init` after changing it; it rewrites .gitignore):
+#   audit - one file per session: manifest.json (summary, plan, review,
+#           and the event-log chain head). The event log stays on the
+#           machine that wrote it.
+#   full  - events.jsonl + meta.json + manifest.json: the full evidence,
+#           including every prompt your capture mode kept.
+# plan.md and report.md are never committed; `bewit show` renders them.
+record_scope: audit
+
+# Where those committed files live:
+#   ref  - on git ref refs/bewit/records, never in a code commit or a
+#          merge-request diff. Shared by `bewit sync` (the pre-push hook
+#          runs it); CI and hubs fetch that one ref.
+#   tree - in .bewit/sessions/, committed with the code.
+record_store: ref
+
+# Additional glob patterns the gate never blocks (extends built-in exemptions
+# for .bewit/sessions/** and *.plan.md). Note: Bewit governance files
+# (.bewit/config.yaml, rules, .cursor/hooks.json) are intentionally NOT
+# exempt - see rules/90-bewit-self-protection.yaml.
+# exempt:
+#   - docs/**

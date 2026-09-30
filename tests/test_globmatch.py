@@ -1,4 +1,4 @@
-from archrev.globmatch import matches, matches_any, normalize
+from bewit.globmatch import matches, matches_any, normalize
 
 
 def test_globstar_spans_directories():

@@ -1,0 +1,109 @@
+# Rules for the Bewit repository itself (dogfooding).
+
+# --- Path rules -----------------------------------------------------------
+
+- id: flag-audit-format
+  kind: path
+  match:
+    - "src/bewit/storage.py"    # event log, chain, meta
+    - "src/bewit/drift.py"      # manifest (the committed record)
+    - "src/bewit/worktree.py"   # checkpoint events
+    - "src/bewit/gitutil.py"    # git linkage, Bewit-Session commit trailers
+    - "src/bewit/trailer.py"
+    - "src/bewit/refstore.py"   # refs/bewit/records (the shared record)
+  action: flag
+  message: >-
+    This file defines the on-disk record or its git linkage. Changes must
+    stay readable for existing session records (additive fields only).
+
+- id: flag-enforcement-core
+  kind: path
+  match:
+    - "src/bewit/gate.py"
+    - "src/bewit/hooks.py"
+    - "src/bewit/adapters.py"
+    - "src/bewit/config.py"
+    - "src/bewit/rules.py"      # rule parsing: a bug here disables rules
+    - "src/bewit/planning.py"
+    - "src/bewit/review.py"
+    - "src/bewit/quality.py"    # runs check-rule commands with file names
+    - "src/bewit/scaffold.py"   # hook wiring and the shipped self-protection rules
+  action: flag
+  message: >-
+    Enforcement-core change (rule parsing, gate decisions, hook fail-open
+    behavior, check commands, plan checks, what counts as a finding,
+    shipped rules). Needs regression tests and a run of tests/rule_matrix.py.
+
+- id: flag-viewer-security
+  kind: path
+  match:
+    - "src/bewit/report/server.py"
+    - "src/bewit/report/template.html"
+  action: flag
+  message: >-
+    Viewer: Host-header check, X-Bewit header on writes, the read-rule
+    filter on diffs (server), and HTML escaping of every recorded value
+    (page). Keep them intact.
+
+- id: block-packaging
+  kind: path
+  match: ["pyproject.toml"]
+  action: block
+  message: "Packaging/dependency changes require explicit approval."
+
+- id: block-license
+  kind: path
+  match: ["LICENSE", "NOTICE"]
+  action: block
+  message: "License changes require explicit approval."
+
+# release.yml publishes to PyPI under this project's name: a quiet change to
+# a workflow could ship a different package or leak the publishing identity.
+- id: block-ci-and-release
+  kind: path
+  match: [".github/workflows/**"]
+  action: block
+  message: >-
+    GitHub Actions workflow (CI and the PyPI release). Changes require
+    explicit approval.
+
+# --- Check rules (quality gates over changed files) -------------------------
+
+- id: check-python-syntax
+  kind: check
+  match: ["src/**/*.py", "tests/**/*.py"]
+  command: python -m bewit.syntaxcheck {files}
+  action: block
+  message: "Changed Python files must parse (syntax check writes no bytecode)."
+
+# --- Prompt rules (attested via `bewit check plan`) -------------------------
+# applies_to makes a policy n/a automatically when the plan declares no file
+# in its scope, so the agent only attests what is relevant.
+
+- id: hooks-fail-open
+  kind: prompt
+  applies_to: ["src/bewit/hooks.py", "src/bewit/adapters.py", "src/bewit/cli.py"]
+  policy: >-
+    Changes to hook handling must preserve fail-open behavior: hooks may
+    never raise, block the editor on internal errors, or break git commits.
+
+- id: audit-format-compat
+  kind: prompt
+  applies_to:
+    - "src/bewit/storage.py"
+    - "src/bewit/drift.py"
+    - "src/bewit/worktree.py"
+    - "src/bewit/gitutil.py"
+    - "src/bewit/trailer.py"
+    - "src/bewit/refstore.py"
+  policy: >-
+    Changes to session record formats (events.jsonl, meta.json,
+    manifest.json, refs/bewit/records) must remain readable for existing
+    records and be reflected in the README storage section and docs/guide.md.
+
+- id: tests-required
+  kind: prompt
+  applies_to: ["src/bewit/**"]
+  policy: >-
+    New or changed behavior in src/bewit is covered by pytest before the
+    session ends.

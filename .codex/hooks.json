@@ -1,12 +1,12 @@
 {
-  "description": "ArchRev lifecycle hooks (trust with /hooks).",
+  "description": "Bewit lifecycle hooks (trust with /hooks).",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ]
       }
@@ -26,10 +26,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ],
-        "matcher": "Edit|Write|NotebookEdit|apply_patch"
+        "matcher": "Edit|Write|NotebookEdit|apply_patch|Bash|PowerShell|pwsh|shell|exec_command|mcp__.*"
       }
     ],
     "Stop": [
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ]
       }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook",
+            "command": "bewit hook",
             "timeout": 60
           }
         ]

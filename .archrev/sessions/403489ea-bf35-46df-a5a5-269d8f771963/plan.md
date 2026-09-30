@@ -1,1 +1,0 @@
-Viewer: section menu and chronological record in src/archrev/report/template.html. Sidebar excerpt uses the latest user prompt in src/archrev/report/server.py. Test the summary in tests/test_report.py.

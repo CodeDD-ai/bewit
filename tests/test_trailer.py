@@ -2,9 +2,9 @@ import os
 import time
 from pathlib import Path
 
-from archrev.gitutil import Git
-from archrev.storage import SessionStore
-from archrev.trailer import add_trailers, attribute_staged, sessions_for_staged
+from bewit.gitutil import Git
+from bewit.storage import SessionStore
+from bewit.trailer import add_trailers, attribute_staged, sessions_for_staged
 from conftest import git  # pytest puts the tests dir on sys.path (no __init__.py)
 
 
@@ -45,10 +45,10 @@ def test_add_trailers_appends_once(repo: Path):
 
     assert add_trailers(msg, repo) is True
     content = msg.read_text(encoding="utf-8")
-    assert "ArchRev-Session: sess-one" in content
+    assert "Bewit-Session: sess-one" in content
     # Idempotent: second run adds nothing.
     assert add_trailers(msg, repo) is False
-    assert content.count("ArchRev-Session") == 1
+    assert content.count("Bewit-Session") == 1
 
 
 def test_trailer_lookup_via_git_log(repo: Path):
@@ -57,7 +57,7 @@ def test_trailer_lookup_via_git_log(repo: Path):
     git(repo, "add", "app/main.py")
     git(
         repo, "commit", "--quiet",
-        "-m", "feat: change main\n\nArchRev-Session: sess-one",
+        "-m", "feat: change main\n\nBewit-Session: sess-one",
     )
     commits = Git(repo).commits_with_session("sess-one")
     assert len(commits) == 1
@@ -94,7 +94,7 @@ def test_unattributed_staged_files_recorded_as_human(repo: Path):
     assert "human" not in sessions_for_staged(repo)
 
 
-def test_archrev_bookkeeping_never_counts_as_human(repo: Path):
+def test_bewit_bookkeeping_never_counts_as_human(repo: Path):
     """Session files are written by hooks; the human ledger must skip them."""
     session = _session_with_edit(repo, "sess-one", "app/main.py")
     git(repo, "add", str(session.dir.relative_to(repo)).replace("\\", "/"))

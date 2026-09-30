@@ -8,14 +8,21 @@ dist/
 .pytest_cache/
 .ruff_cache/
 
-# ArchRev runtime noise (session records themselves ARE committed)
-.archrev/hook-errors.log
-.archrev/fingerprint-cache.json
-.archrev/locks/
-
 # Editors / OS
 .idea/
 *.swp
 Thumbs.db
-archrev-session-*.html
-.archrev-smoke.html
+
+# Exported session reports (bewit export)
+bewit-session-*.html
+
+# Bewit runtime files (not part of the session record).
+.bewit/hook-errors.log
+.bewit/fingerprint-cache.json
+.bewit/locks/
+
+# >>> bewit session records (managed by `bewit init`; change record_scope, not this block) >>>
+# record_store: ref. Session records (manifest.json per session) are
+# published to refs/bewit/records, never committed with code: bewit sync.
+.bewit/sessions/
+# <<< bewit session records <<<

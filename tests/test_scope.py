@@ -4,14 +4,14 @@ import os
 import time
 from pathlib import Path
 
-from archrev.cli import explain_path
-from archrev.config import load_config
-from archrev.drift import compute_view
-from archrev.gitutil import Git
-from archrev.quality import run_check
-from archrev.rules import Rule, load_rules
-from archrev.scaffold import init_repo
-from archrev.storage import SessionStore
+from bewit.cli import explain_path
+from bewit.config import load_config
+from bewit.drift import compute_view
+from bewit.gitutil import Git
+from bewit.quality import run_check
+from bewit.rules import Rule, load_rules
+from bewit.scaffold import init_repo
+from bewit.storage import SessionStore
 from conftest import git
 
 
@@ -20,16 +20,16 @@ def test_init_audit_scope_gitignores_event_logs(tmp_path: Path):
     git(tmp_path, "config", "user.email", "t@t")
     git(tmp_path, "config", "user.name", "t")
     git(tmp_path, "config", "commit.gpgsign", "false")
-    init_repo(tmp_path)
+    init_repo(tmp_path, record_store="tree")
     assert load_config(tmp_path).record_scope == "audit"
     gitignore = (tmp_path / ".gitignore").read_text(encoding="utf-8")
-    assert ".archrev/sessions/*/events.jsonl" in gitignore
-    assert ".archrev/fingerprint-cache.json" in gitignore
-    assert ".archrev/locks/" in gitignore
+    assert ".bewit/sessions/*/events.jsonl" in gitignore
+    assert ".bewit/fingerprint-cache.json" in gitignore
+    assert ".bewit/locks/" in gitignore
 
 
 def test_invalid_record_scope_falls_back_to_full(repo: Path):
-    (repo / ".archrev" / "config.yaml").write_text(
+    (repo / ".bewit" / "config.yaml").write_text(
         "record_scope: everywhere\n", encoding="utf-8"
     )
     assert load_config(repo).record_scope == "full"
@@ -115,7 +115,7 @@ def test_syntaxcheck_does_not_need_pycache(repo: Path):
         kind="check",
         action="block",
         message="parse",
-        command="python -m archrev.syntaxcheck {files}",
+        command="python -m bewit.syntaxcheck {files}",
         match=("**/*.py",),
     )
     ok = run_check(repo, rule, ["app/main.py"])

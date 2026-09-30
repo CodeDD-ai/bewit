@@ -3,17 +3,17 @@
 import json
 from pathlib import Path
 
-from archrev.hooks import run_hook
-from archrev.quality import run_checks
-from archrev.rules import load_rules
-from archrev.storage import SessionStore
+from bewit.hooks import run_hook
+from bewit.quality import run_checks
+from bewit.rules import load_rules
+from bewit.storage import SessionStore
 
 _PASS = 'python -c "import sys; sys.exit(0)"'
 _FAIL = 'python -c "import sys; print(\'violation found\'); sys.exit(1)"'
 
 
 def _write_rule(repo: Path, name: str, body: str) -> None:
-    (repo / ".archrev" / "rules" / name).write_text(body, encoding="utf-8")
+    (repo / ".bewit" / "rules" / name).write_text(body, encoding="utf-8")
 
 
 def test_check_rule_parses_and_lists(repo: Path):

@@ -1,18 +1,18 @@
 from pathlib import Path
 
-from archrev.config import Config
-from archrev.drift import compute_view
-from archrev.gitutil import Git
-from archrev.planning import register_plan
-from archrev.rules import load_rules
-from archrev.storage import SessionStore
+from bewit.config import Config
+from bewit.drift import compute_view
+from bewit.gitutil import Git
+from bewit.planning import register_plan
+from bewit.rules import load_rules
+from bewit.storage import SessionStore
 
 
 def test_outside_repo_paths_excluded_from_drift(repo: Path):
     """Regression: Cursor saving chat-attachment images (absolute paths
     under C:/Users/.../.cursor/...) fired edit hooks and produced false
     out-of-plan drift. Outside-root paths are recorded but segregated."""
-    from archrev.config import Config
+    from bewit.config import Config
 
     session = SessionStore(repo).session("s-outside")
     session.ensure_meta(Git(repo).head_sha())
@@ -35,7 +35,7 @@ def test_outside_repo_paths_excluded_from_drift(repo: Path):
 def test_view_carries_branch_and_plan_progress(repo: Path):
     """The review header needs the working branch; the plan section needs
     per-file progress (touched vs pending)."""
-    from archrev.config import Config
+    from bewit.config import Config
 
     session = SessionStore(repo).session("s-branch")
     git = Git(repo)

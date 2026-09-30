@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from archrev.rules import load_rules
+from bewit.rules import load_rules
 
 
 def _write_rules(root: Path, name: str, content: str) -> None:
-    rules_dir = root / ".archrev" / "rules"
+    rules_dir = root / ".bewit" / "rules"
     rules_dir.mkdir(parents=True, exist_ok=True)
     (rules_dir / name).write_text(content, encoding="utf-8")
 

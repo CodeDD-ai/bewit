@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from archrev.config import load_config
-from archrev.drift import compute_view
-from archrev.gitutil import Git
-from archrev.hooks import run_hook
-from archrev.rules import load_rules
-from archrev.storage import SessionStore
-from archrev.worktree import (
+from bewit.config import load_config
+from bewit.drift import compute_view
+from bewit.gitutil import Git
+from bewit.hooks import run_hook
+from bewit.rules import load_rules
+from bewit.storage import SessionStore
+from bewit.worktree import (
     DELETED,
     EVENT_TYPE,
     PHASE_EXEC_END,
@@ -171,7 +171,7 @@ def test_new_and_deleted_files_inside_a_window_are_attributed(in_repo: Path):
 
 
 def test_denied_command_opens_no_window(in_repo: Path):
-    (in_repo / ".archrev" / "rules" / "shell.yaml").write_text(
+    (in_repo / ".bewit" / "rules" / "shell.yaml").write_text(
         '- id: no-rm\n  kind: shell\n  match_command: ["\\\\brm\\\\b"]\n'
         "  action: deny\n",
         encoding="utf-8",
@@ -198,11 +198,11 @@ def test_checkpoints_store_deltas_and_skip_bookkeeping(in_repo: Path):
     # even though the session's own event log changed in between.
     assert events[1]["changed"] == {} and events[2]["changed"] == {}
     for event in events:
-        assert not any(p.startswith(".archrev/sessions/") for p in event["changed"])
+        assert not any(p.startswith(".bewit/sessions/") for p in event["changed"])
 
 
 def test_command_text_is_kept_only_with_full_capture(in_repo: Path):
-    (in_repo / ".archrev" / "config.yaml").write_text(
+    (in_repo / ".bewit" / "config.yaml").write_text(
         "prompt_capture: none\n", encoding="utf-8"
     )
     _hook("prompt", "s", prompt="go")
@@ -267,10 +267,10 @@ def test_legacy_session_never_starts_checkpointing(in_repo: Path):
 
 
 def test_shell_hook_makes_its_session_the_cli_default(in_repo: Path):
-    """`archrev plan register` / `ack` bind to the latest session. The shell
+    """`bewit plan register` / `ack` bind to the latest session. The shell
     hook right before the command now records a checkpoint, so the agent's
     own session wins even if another window was active a moment earlier."""
     _hook("prompt", "win-a", prompt="a")
     _hook("prompt", "win-b", prompt="b")
-    _hook("shell", "win-a", command="archrev plan register --text x")
+    _hook("shell", "win-a", command="bewit plan register --text x")
     assert SessionStore(in_repo).current_session().id == "win-a"

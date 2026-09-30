@@ -3,13 +3,13 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "archrev"
+name = "bewit"
 version = "0.5.0"
-description = "Session provenance and architecture-rule enforcement for AI coding agents."
+description = "Session provenance and rule enforcement for AI coding agents."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
-authors = [{ name = "ArchRev contributors" }]
+license = { text = "Apache-2.0" }
+authors = [{ name = "Bewit contributors" }]
 keywords = [
     "cursor",
     "claude",
@@ -24,7 +24,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -42,13 +42,13 @@ dev = ["pytest>=8.0", "cryptography>=42"]
 seal = ["cryptography>=42"]
 
 [project.scripts]
-archrev = "archrev.cli:main"
+bewit = "bewit.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-archrev = ["report/template.html"]
+bewit = ["report/template.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

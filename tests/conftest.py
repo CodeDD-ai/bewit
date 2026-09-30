@@ -1,4 +1,4 @@
-"""Shared fixtures: a real temporary git repository with ArchRev installed."""
+"""Shared fixtures: a real temporary git repository with Bewit installed."""
 
 from __future__ import annotations
 
@@ -22,10 +22,10 @@ def git(repo: Path, *args: str) -> str:
 
 @pytest.fixture()
 def repo(tmp_path: Path) -> Path:
-    """A git repository with one initial commit and .archrev scaffolding."""
+    """A git repository with one initial commit and .bewit scaffolding."""
     git(tmp_path, "init", "--quiet")
-    git(tmp_path, "config", "user.email", "test@archrev.local")
-    git(tmp_path, "config", "user.name", "ArchRev Tests")
+    git(tmp_path, "config", "user.email", "test@bewit.local")
+    git(tmp_path, "config", "user.name", "Bewit Tests")
     git(tmp_path, "config", "commit.gpgsign", "false")
 
     (tmp_path / "app").mkdir()
@@ -37,7 +37,7 @@ def repo(tmp_path: Path) -> Path:
     git(tmp_path, "add", "-A")
     git(tmp_path, "commit", "--quiet", "-m", "chore: initial commit")
 
-    rules_dir = tmp_path / ".archrev" / "rules"
+    rules_dir = tmp_path / ".bewit" / "rules"
     rules_dir.mkdir(parents=True)
     rules_dir.joinpath("rules.yaml").write_text(
         """

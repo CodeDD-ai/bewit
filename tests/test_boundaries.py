@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from archrev.config import Config
-from archrev.gate import evaluate_read, evaluate_shell, evaluate_tool
-from archrev.hooks import run_hook
-from archrev.rules import load_rules
-from archrev.storage import SessionStore
+from bewit.config import Config
+from bewit.gate import evaluate_read, evaluate_shell, evaluate_tool
+from bewit.hooks import run_hook
+from bewit.rules import load_rules
+from bewit.storage import SessionStore
 
 BOUNDARY_RULES = """
 - id: no-secret-reads
@@ -42,7 +42,7 @@ BOUNDARY_RULES = """
 
 @pytest.fixture()
 def bounded_repo(repo: Path) -> Path:
-    (repo / ".archrev" / "rules" / "20-boundaries.yaml").write_text(
+    (repo / ".bewit" / "rules" / "20-boundaries.yaml").write_text(
         BOUNDARY_RULES, encoding="utf-8"
     )
     return repo
@@ -58,7 +58,7 @@ def test_boundary_rules_load_cleanly(bounded_repo: Path):
 
 
 def test_invalid_regex_is_a_load_error(repo: Path):
-    (repo / ".archrev" / "rules" / "bad.yaml").write_text(
+    (repo / ".bewit" / "rules" / "bad.yaml").write_text(
         "{id: bad-re, kind: shell, match_command: ['[unclosed'], action: deny}",
         encoding="utf-8",
     )

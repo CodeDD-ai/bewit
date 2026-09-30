@@ -1,0 +1,49 @@
+# Agent boundaries for the Bewit repository: what agents may read,
+# which shell commands need approval, and what gets recorded.
+# Policy + audit at the tool layer - not a sandbox (see docs/security-model.md).
+
+# --- Secrets -------------------------------------------------------------------
+
+- id: no-secret-reads
+  kind: read
+  match: ["dev-secrets/**", ".env", ".env.*", "**/*.pem", "**/*.key"]
+  action: deny
+  message: "Agents may not read secrets, keys, or environment files."
+
+- id: protect-secret-files
+  kind: path
+  match: ["dev-secrets/**", ".env", ".env.*", "**/*.pem", "**/*.key"]
+  action: block
+  message: "Writing secrets, keys, or environment files requires explicit approval."
+
+# --- Shell -----------------------------------------------------------------------
+
+- id: push-needs-approval
+  kind: shell
+  match_command: ['\bgit\s+push\b']
+  action: block
+  message: "Pushing to a remote requires explicit approval."
+
+- id: release-tag-needs-approval
+  kind: shell
+  match_command: ['\bgit\s+tag\s+(?!-l\b|--list\b)\S']
+  action: block
+  message: "A v* tag publishes to PyPI (release.yml) - explicit approval only."
+
+- id: destructive-git-needs-approval
+  kind: shell
+  match_command:
+    - '\bgit\s+reset\s+--hard\b'
+    - '\bgit\s+clean\s+-[a-z]*f'
+    - '\bgit\s+push\s+.*(--force|\s-f\b)'
+    - '\bgit\s+(checkout|restore)\s+(--\s+)?\.(\s|$)'
+    - '\bgit\s+branch\s+-D\b'
+    - '\bgit\s+stash\s+(drop|clear)\b'
+  action: block
+  message: "Destructive git operation (discards work or history) requires explicit approval."
+
+- id: flag-dependency-installs
+  kind: shell
+  match_command: ['\b(pip|pip3|uv\s+pip|uv\s+tool|uv|npm|pnpm|yarn)\s+(install|add)\b']
+  action: flag
+  message: "Dependency installation - recorded for review."
