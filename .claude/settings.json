@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ]
       }
@@ -25,7 +25,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ],
         "matcher": "Edit|Write|NotebookEdit|apply_patch|Bash|PowerShell|pwsh|shell|exec_command|mcp__.*"
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook"
+            "command": "bewit hook"
           }
         ]
       }
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "archrev hook",
+            "command": "bewit hook",
             "timeout": 60
           }
         ]

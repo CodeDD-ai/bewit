@@ -1,4 +1,9 @@
-# Bewit
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/CodeDD-ai/bewit/master/docs/images/bewit-wordmark-reversed.svg">
+    <img src="https://raw.githubusercontent.com/CodeDD-ai/bewit/master/docs/images/bewit-wordmark.svg" alt="Bewit" width="300">
+  </picture>
+</h1>
 
 **See what your AI coding agent did, why, and whether it kept to your rules.**
 
@@ -27,6 +32,8 @@ repository.
 - **Stays out of the way.** No daemon, no database, no server. Hooks
   append a line and exit. If Bewit breaks, it fails open and records
   that it did.
+
+![The bewit serve viewer: one session with its review box, rule outcomes, changed files, and a tamper-evident record](https://raw.githubusercontent.com/CodeDD-ai/bewit/master/docs/images/bewit-serve.png)
 
 The parts and the trust model on one page: [docs/how-it-works.md](docs/how-it-works.md).
 

@@ -184,6 +184,56 @@ def test_relativize_decodes_file_uris(repo: Path):
     assert relativize("FILE://" + str(repo / "app" / "main.py"), repo) == "app/main.py"
 
 
+def test_relativize_keeps_posix_paths_outside_the_repo_absolute(repo: Path):
+    """normalize() strips the leading "/"; an outside path must not become
+    repo-relative (Linux/macOS: ~/.claude/plans counted as a repo file)."""
+    from bewit.gate import is_outside_repo
+
+    outside = relativize("/home/u/.claude/plans/p.md", repo)
+    assert outside == "/home/u/.claude/plans/p.md" and is_outside_repo(outside)
+    # A file URI's drive form stays a Windows path, not a POSIX one.
+    assert relativize("file:///C:/elsewhere/x.py", repo) == "C:/elsewhere/x.py"
+
+
+def test_relativize_through_a_symlinked_directory(tmp_path: Path):
+    """macOS: /var/folders/... is a symlink to /private/var/folders/..."""
+    import os
+
+    import pytest
+
+    real = tmp_path / "real-repo"
+    (real / "app").mkdir(parents=True)
+    link = tmp_path / "link-repo"
+    try:
+        os.symlink(real, link, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not available here")
+    root = real.resolve()  # find_root resolves the root
+    assert relativize(str(link / "app" / "main.py"), root) == "app/main.py"
+    assert relativize(str(link / ".bewit" / "rules" / "x.yaml"), root) == ".bewit/rules/x.yaml"
+
+
+def test_relativize_with_a_windows_short_name(tmp_path: Path):
+    """Windows CI: TEMP is C:/Users/RUNNER~1/..., the resolved root is long."""
+    import ctypes
+    import sys
+
+    import pytest
+
+    if sys.platform != "win32":
+        pytest.skip("8.3 short names are a Windows feature")
+    long_dir = tmp_path / "a-long-directory-name"
+    (long_dir / "app").mkdir(parents=True)
+    buf = ctypes.create_unicode_buffer(1024)
+    if not ctypes.windll.kernel32.GetShortPathNameW(str(long_dir), buf, 1024):
+        pytest.skip("GetShortPathNameW failed")
+    short = buf.value
+    if short.lower() == str(long_dir).lower():
+        pytest.skip("8.3 short names are disabled on this volume")
+    root = long_dir.resolve()
+    assert relativize(short + "\\app\\main.py", root) == "app/main.py"
+
+
 def test_config_exempt_extends_defaults(repo: Path):
     (repo / ".bewit" / "config.yaml").write_text(
         "exempt:\n  - docs/**\n", encoding="utf-8"

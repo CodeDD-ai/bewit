@@ -20,6 +20,7 @@ activity is always visible in the timeline even when nothing was stopped.
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -100,12 +101,45 @@ def relativize(path: str, root: Path) -> str:
     if path[:7].lower() == "file://":
         path = unquote(path[7:])
     norm = globmatch.normalize(path)
-    root_norm = globmatch.normalize(str(root))
-    if root_norm and norm.lower().startswith(root_norm.lower() + "/"):
-        return norm[len(root_norm) + 1 :]
-    if norm.lower() == root_norm.lower():
-        return ""
+    for candidate, root_norm in _spellings(path, norm, root):
+        if root_norm and candidate.lower().startswith(root_norm.lower() + "/"):
+            return candidate[len(root_norm) + 1 :]
+        if root_norm and candidate.lower() == root_norm.lower():
+            return ""
+    # Outside the repository. normalize() strips the leading "/", which
+    # would make a POSIX absolute path (/home/u/.claude/plans/p.md) look
+    # repo-relative; keep it absolute so is_outside_repo() sees it.
+    if _is_posix_absolute(path):
+        return "/" + norm
     return norm
+
+
+def _is_posix_absolute(path: str) -> bool:
+    """``/home/x`` or ``//server/share``, but not ``/C:/x`` (a file URI's drive)."""
+    p = path.replace("\\", "/").lstrip()
+    return p.startswith("/") and not re.match(r"^/+[A-Za-z]:(/|$)", p)
+
+
+def _spellings(path: str, norm: str, root: Path):
+    """``(path, root)`` pairs to compare: as given, then both fully resolved.
+
+    One directory can have several spellings: a Windows 8.3 short name
+    (``C:/Users/RUNNER~1``) and its long name, or a symlink and its target
+    (macOS ``/var`` -> ``/private/var``). ``find_root`` resolves the root,
+    while agents send paths as they see them; without the resolved
+    comparison such a path looks outside the repository and no path rule
+    matches it.
+    """
+    yield norm, globmatch.normalize(str(root))
+    # normalize() strips the leading "/", so decide on the original path.
+    if not (os.path.isabs(path) or re.match(r"^[A-Za-z]:[/\\]", path.strip())):
+        return
+    try:
+        real_path = globmatch.normalize(os.path.realpath(path.strip()))
+        real_root = globmatch.normalize(os.path.realpath(root))
+    except (OSError, ValueError):
+        return
+    yield real_path, real_root
 
 
 def _apply_mode(action: str, config: Config) -> str:

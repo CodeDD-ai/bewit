@@ -1,0 +1,49 @@
+# Bewit self-protection (enabled by default - think twice before removing).
+#
+# The edit gate exempts only .bewit/sessions/** and plan files. These
+# governance files stay gated so an agent cannot silently disable capture
+# or enforcement by editing them; changes pause for your explicit approval.
+
+- id: bewit-self-protection
+  kind: path
+  match:
+    - ".bewit/config.yaml"
+    - ".bewit/rules/**"
+    - ".cursor/hooks.json"
+    - ".cursor/rules/bewit.mdc"
+    - ".claude/settings.json"
+    - ".claude/settings.local.json"   # can set disableAllHooks
+    - ".claude/rules/bewit.md"
+    - ".codex/hooks.json"
+    - "AGENTS.md"
+  action: block
+  message: >-
+    Bewit governance file - changing capture or enforcement configuration
+    requires explicit user approval.
+
+# Deleting or moving the record itself is a shell act, which path rules do
+# not see (they gate edits). This pauses it for approval instead.
+- id: bewit-no-record-deletion
+  kind: shell
+  match_command:
+    - '(\brm\b|\brmdir\b|\bdel\b|\berase\b|\brd\b|remove-item|\bri\b|\bgit\s+rm\b|\bmv\b|\bmove\b|move-item|\bunlink\b|shutil\.rmtree)[^|;&\n]*\.bewit'
+  action: block
+  message: >-
+    Deleting or moving .bewit/ (or anything in it) removes Bewit's
+    configuration, rules, or audit record and requires explicit approval.
+
+# Acknowledging a finding is the reviewer's decision. An acknowledgment made
+# while an agent command runs is recorded as agent-made and does not clear
+# bypasses or failed checks; this rule stops the attempt up front. The second
+# pattern matches an HTTP client calling the viewer's ack endpoint, not a
+# plan or commit message that merely mentions it.
+- id: bewit-no-agent-ack
+  kind: shell
+  match_command:
+    - '\bbewit(\.exe)?\s+ack\b'
+    - '(\bcurl\b|\bwget\b|invoke-webrequest|invoke-restmethod|\biwr\b|\birm\b|requests\.|urllib|httpx\.|aiohttp|\bfetch\s*\()[^|;&\n]*/api/ack\b'
+  action: deny
+  message: >-
+    Only the reviewer acknowledges Bewit findings. Report the findings to
+    the user; they acknowledge legitimate ones from their own terminal or the
+    viewer.

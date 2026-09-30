@@ -47,7 +47,21 @@ jobs:
           git config --global init.defaultBranch main
       - run: pip install -e ".[dev]"
       # With bewit on PATH, the real `git push` pre-push test runs too.
-      - run: python -m pytest -q
+      - run: python -m pytest -q --junitxml=junit.xml
+      # One annotation per failing test, shown on the run's summary page.
+      - name: Annotate failing tests
+        if: failure()
+        shell: python
+        run: |
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          if Path("junit.xml").exists():
+              for case in ET.parse("junit.xml").iter("testcase"):
+                  for bad in list(case.iter("failure")) + list(case.iter("error")):
+                      text = (bad.get("message") or bad.text or "").strip().replace("\r", "")
+                      text = text[:900].replace("%", "%25").replace("\n", "%0A")
+                      name = f"{case.get('classname')}::{case.get('name')}"
+                      print(f"::error title={name}::{text}")
 
   rule-matrix:
     # Every rule kind replayed through the real hooks in a fresh `bewit init`.

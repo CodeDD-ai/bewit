@@ -1,0 +1,115 @@
+# Bewit rules. Each YAML file in this directory may hold one rule or a list.
+#
+# Path rules (machine-enforced at edit time):
+#   id:         unique identifier
+#   kind:       path
+#   match:      list of globs; `**` spans directories, patterns without `/`
+#               match at any depth (like .gitignore). Case-insensitive.
+#   action:     block - pause the edit for explicit user approval
+#               flag  - allow, but record and highlight in the review
+#   message:    shown to the user and the agent when the rule fires
+#   applies_to: optional globs restricting the rule to a monorepo subtree
+#   enabled:    default true
+#
+# Prompt rules (policies the agent must attest during `bewit check plan`):
+#   id:      unique identifier
+#   kind:    prompt
+#   policy:  the policy text the agent attests with --attest <id>=pass|fail
+#
+# Further machine-enforced kinds (all support deny | block | flag):
+#   kind: read   - globs over files the agent READS (e.g. secrets)
+#   kind: shell  - `match_command` regexes over shell commands
+#   kind: mcp    - `match_tool` regexes over MCP tool identifiers
+#   kind: tool   - `match_tool` regexes over agent tool names
+#   Write regexes in 'single quotes': YAML keeps backslashes literal there,
+#   while "double quotes" treat \s, \d, ... as (invalid) escape sequences.
+#
+# Honesty note: these gate the agent's *attempts* at the tool layer and
+# record everything - policy plus audit, not a sandbox. Use containers /
+# network isolation underneath when hard containment is required.
+#
+# The starter rules below are DISABLED examples. Copy, adapt, enable.
+
+- id: example-protect-migrations
+  kind: path
+  match: ["**/migrations/**"]
+  action: block
+  message: "Database migrations require explicit approval."
+  enabled: false
+
+- id: example-flag-infrastructure
+  kind: path
+  match: ["Dockerfile*", "docker-compose*.yml", ".gitlab-ci*.yml", "k8s/**"]
+  action: flag
+  message: "Infrastructure change - will be highlighted for review."
+  enabled: false
+
+- id: example-no-secret-reads
+  kind: read
+  match: ["dev-secrets/**", ".env", ".env.*"]
+  action: deny
+  message: "Agents may not read secrets or environment files."
+  enabled: false
+
+- id: example-protect-secret-files
+  kind: path
+  match: ["dev-secrets/**", ".env", ".env.*"]
+  action: block
+  message: "Writing secrets or environment files requires explicit approval."
+  enabled: false
+
+- id: example-no-push
+  kind: shell
+  match_command: ['\bgit\s+push\b']
+  action: block
+  message: "Pushing requires explicit approval."
+  enabled: false
+
+- id: example-flag-installs
+  kind: shell
+  match_command: ['\b(pip|pip3|uv pip|npm|pnpm|yarn)\s+(install|add)\b']
+  action: flag
+  message: "Dependency installation - recorded for review."
+  enabled: false
+
+- id: example-no-subagents
+  kind: tool
+  match_tool: ["^Task$"]
+  action: deny
+  message: "Subagents are not permitted in this repository."
+  enabled: false
+
+- id: example-api-rate-limit
+  kind: prompt
+  policy: "Every new API endpoint must specify rate limiting and authorization."
+  enabled: false
+
+# Check rules: quality gates run against the session's changed files at
+# session end and by `bewit check diff` (CI). The command's exit code is
+# the verdict; {files} is replaced with the matched changed files.
+# action: block - failures become final-review findings and fail CI
+#         flag  - failures are recorded and highlighted only
+
+- id: example-endpoint-validation
+  kind: check
+  match: ["api/**/*.py"]
+  command: "semgrep scan --config .bewit/checks/endpoints.yaml --error --quiet {files}"
+  action: block
+  message: "New/changed endpoints must validate input (semgrep)."
+  enabled: false
+
+- id: example-python-syntax
+  kind: check
+  match: ["**/*.py"]
+  command: python -m bewit.syntaxcheck {files}
+  action: flag
+  message: "Changed Python files must parse (no bytecode written)."
+  enabled: false
+
+- id: example-eslint
+  kind: check
+  match: ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"]  # no {a,b} braces
+  command: "npx eslint --max-warnings 0 {files}"
+  action: flag
+  message: "Lint findings in changed frontend files."
+  enabled: false

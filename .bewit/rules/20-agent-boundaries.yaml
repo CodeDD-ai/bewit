@@ -1,4 +1,4 @@
-# Agent boundaries for the ArchRev repository: what agents may read,
+# Agent boundaries for the Bewit repository: what agents may read,
 # which shell commands need approval, and what gets recorded.
 # Policy + audit at the tool layer - not a sandbox (see docs/security-model.md).
 
@@ -23,6 +23,12 @@
   match_command: ['\bgit\s+push\b']
   action: block
   message: "Pushing to a remote requires explicit approval."
+
+- id: release-tag-needs-approval
+  kind: shell
+  match_command: ['\bgit\s+tag\s+(?!-l\b|--list\b)\S']
+  action: block
+  message: "A v* tag publishes to PyPI (release.yml) - explicit approval only."
 
 - id: destructive-git-needs-approval
   kind: shell
