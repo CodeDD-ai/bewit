@@ -3,7 +3,7 @@
   "started_at": "2026-09-30T13:59:58Z",
   "head_sha": "6bba504a9d3823e869b66e67104be4068c186ef0",
   "finalized": true,
-  "generated_at": "2026-09-30T14:50:04Z",
+  "generated_at": "2026-09-30T14:52:13Z",
   "prompts": [
     {
       "ts": "2026-09-30T14:00:40Z",
@@ -43,6 +43,13 @@
     {
       "ts": "2026-09-30T14:49:48Z",
       "text": "I skipped perviously one of the tasks, I reruning pipeline for release and merge. Should merge now complete, will this automatically push to pypi? I have setup all the above with environments and pypi parts...",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    },
+    {
+      "ts": "2026-09-30T14:51:51Z",
+      "text": "<!-- attach: Terminal | tab:0 -->\n> PS E:\\ArchRev> git tag v0.5.0\n> fatal: tag 'v0.5.0' already exists\n> PS E:\\ArchRev> git checkout master\n> Already on 'master'\n> Your branch is up to date with 'origin/master'.\n> PS E:\\ArchRev> git pull\n> Already up to date.\n> PS E:\\ArchRev> git tag v0.5.0\n> fatal: tag 'v0.5.0' already exists\n> PS E:\\ArchRev> git push origin v0.5.0\n> Everything up-to-date\n\nI cant see anything... the ci #5 was all on green.",
       "capture": "full",
       "chars": null,
       "sealed": false
@@ -264,6 +271,16 @@
       "raised_keys": [],
       "prev": "03370085e0a2eff40453049b70497a1390406f7b75768662655d181a3f430d98",
       "hash": "7cc7ff57c116a8962c9b0eb50e3ef64c75a2e8af924fcf26465f292cb5914332"
+    },
+    {
+      "ts": "2026-09-30T14:50:05Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "raised_keys": [],
+      "prev": "e2d33cf8d93f7d28ccf8c360884091381bd91a9fd168b2c9b169989095d29394",
+      "hash": "35f736244d046ddb41dfafadb625a431520c8812997e2de065a22b3bcc53ecac"
     }
   ],
   "human_changes": [],
@@ -578,6 +595,11 @@
       "ts": "2026-09-30T14:32:20Z",
       "label": "shell: $h = @{ \"User-Agent\" = \"bewit-check\" }; $runs = Invoke-RestMethod \"https://api.github.com/repos/CodeDD-ai/bewit/actions/",
       "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:52:00Z",
+      "label": "shell: \"--- local tag\"; git rev-list -n1 v0.5.0; git log --oneline -1 v0.5.0; \"--- remote tag\"; git ls-remote --tags origin; \"-",
+      "ended": false
     }
   ],
   "edits": [
@@ -950,11 +972,11 @@
     "src",
     "tests"
   ],
-  "event_count": 86,
-  "chain_head": "e2d33cf8d93f7d28ccf8c360884091381bd91a9fd168b2c9b169989095d29394",
+  "event_count": 91,
+  "chain_head": "e4aa750a5e5b084d0d7f58e158871d80f6cbcc795dc93d2c5c12cd5b95f18ded",
   "chain": {
     "ok": true,
-    "checked": 86,
+    "checked": 91,
     "legacy": 0,
     "break_at": null,
     "reason": null,
@@ -1044,5 +1066,5 @@
     ],
     "text": "Also `.gitattributes`, `.gitignore`, `src/bewit/gate.py`, `tests/test_gate.py`, `.github/workflows/ci.yml`."
   },
-  "finalized_at": "2026-09-30T14:50:04Z"
+  "finalized_at": "2026-09-30T14:52:13Z"
 }
