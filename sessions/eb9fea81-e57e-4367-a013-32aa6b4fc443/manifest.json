@@ -3,7 +3,7 @@
   "started_at": "2026-09-30T13:59:58Z",
   "head_sha": "6bba504a9d3823e869b66e67104be4068c186ef0",
   "finalized": true,
-  "generated_at": "2026-09-30T14:36:36Z",
+  "generated_at": "2026-09-30T14:42:15Z",
   "prompts": [
     {
       "ts": "2026-09-30T14:00:40Z",
@@ -29,6 +29,13 @@
     {
       "ts": "2026-09-30T14:36:19Z",
       "text": "I dont see where and how this works.",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    },
+    {
+      "ts": "2026-09-30T14:42:09Z",
+      "text": "give me a 3 max 4 word sentance what bewit is.",
       "capture": "full",
       "chars": null,
       "sealed": false
@@ -230,6 +237,16 @@
       "raised_keys": [],
       "prev": "ee5cedf875a5cbbddc86e3f018fe006b1a8ce66a22caa592e188f404ba667058",
       "hash": "5e40e4098d8460f1666739e2102c7ddd259ed5b08eb3695b5a6f30077551cf74"
+    },
+    {
+      "ts": "2026-09-30T14:36:36Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "raised_keys": [],
+      "prev": "ec4c08fe6b69145f16364ec39e168d3aaae7233e4dbebdf6f0059e4e7e0ca1fe",
+      "hash": "3ea2f58d4c38c99703ad72f5c945a88a2e2b561cbe686b065dc9e95b681acc1a"
     }
   ],
   "human_changes": [],
@@ -916,11 +933,11 @@
     "src",
     "tests"
   ],
-  "event_count": 80,
-  "chain_head": "ec4c08fe6b69145f16364ec39e168d3aaae7233e4dbebdf6f0059e4e7e0ca1fe",
+  "event_count": 83,
+  "chain_head": "03370085e0a2eff40453049b70497a1390406f7b75768662655d181a3f430d98",
   "chain": {
     "ok": true,
-    "checked": 80,
+    "checked": 83,
     "legacy": 0,
     "break_at": null,
     "reason": null,
@@ -1010,5 +1027,5 @@
     ],
     "text": "Also `.gitattributes`, `.gitignore`, `src/bewit/gate.py`, `tests/test_gate.py`, `.github/workflows/ci.yml`."
   },
-  "finalized_at": "2026-09-30T14:36:36Z"
+  "finalized_at": "2026-09-30T14:42:15Z"
 }
