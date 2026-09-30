@@ -3,23 +3,757 @@
   "started_at": "2026-09-30T13:59:58Z",
   "head_sha": "6bba504a9d3823e869b66e67104be4068c186ef0",
   "finalized": true,
-  "generated_at": "2026-09-30T14:00:11Z",
-  "prompts": [],
+  "generated_at": "2026-09-30T14:25:35Z",
+  "prompts": [
+    {
+      "ts": "2026-09-30T14:00:40Z",
+      "text": "yes, run options 2\n\nwe also need to fix all the naming - not sure about the Readme.md file -> the current mast still has Archrev. Maybe we need to finalize this PR?",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    }
+  ],
   "branch": "release_v1",
   "runtime": "claude",
-  "checks": [],
-  "final_checks": [],
+  "checks": [
+    {
+      "ts": "2026-09-30T14:09:21Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "plan_revision": 1,
+      "declared_files": [
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        ".cursor/hooks.json",
+        ".claude/rules/archrev.md",
+        ".cursor/rules/archrev.mdc",
+        "AGENTS.md",
+        ".gitignore",
+        ".gitattributes",
+        ".bewit/rules/10-bewit-repo.yaml",
+        ".bewit/rules/20-agent-boundaries.yaml",
+        "src/bewit/gate.py",
+        "tests/test_gate.py",
+        ".github/workflows/ci.yml",
+        "README.md"
+      ],
+      "path_findings": [
+        {
+          "path": ".claude/settings.json",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".codex/hooks.json",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".cursor/hooks.json",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "AGENTS.md",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".bewit/rules/10-bewit-repo.yaml",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".bewit/rules/20-agent-boundaries.yaml",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prompt_rules": [],
+      "unknown_attestations": [],
+      "note": "",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "1023ce04f24fc27b5b4e332fde0e7cd7c6a3dacc1f3246115810042d58c1e490",
+      "hash": "8b34792903d8f97b6be2e75da034ce134a7d12ab2ab94001b99f072a4fd71673"
+    },
+    {
+      "ts": "2026-09-30T14:22:09Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "plan_revision": 2,
+      "declared_files": [
+        ".claude/settings.json",
+        ".codex/hooks.json",
+        ".cursor/hooks.json",
+        ".claude/rules/archrev.md",
+        ".cursor/rules/archrev.mdc",
+        "AGENTS.md",
+        ".gitignore",
+        ".gitattributes",
+        ".bewit/rules/10-bewit-repo.yaml",
+        ".bewit/rules/20-agent-boundaries.yaml",
+        "src/bewit/gate.py",
+        "tests/test_gate.py",
+        ".github/workflows/ci.yml",
+        "README.md"
+      ],
+      "path_findings": [
+        {
+          "path": ".claude/settings.json",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".codex/hooks.json",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".cursor/hooks.json",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "AGENTS.md",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".bewit/rules/10-bewit-repo.yaml",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": ".bewit/rules/20-agent-boundaries.yaml",
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        },
+        {
+          "path": "src/bewit/gate.py",
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (rule parsing, gate decisions, hook fail-open behavior, check commands, plan checks, what counts as a finding, shipped rules). Needs regression tests and a run of tests/rule_matrix.py."
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "rule_id": "block-ci-and-release",
+          "action": "block",
+          "message": "GitHub Actions workflow (CI and the PyPI release). Changes require explicit approval."
+        }
+      ],
+      "prompt_rules": [
+        {
+          "rule_id": "hooks-fail-open",
+          "policy": "Changes to hook handling must preserve fail-open behavior: hooks may never raise, block the editor on internal errors, or break git commits.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "audit-format-compat",
+          "policy": "Changes to session record formats (events.jsonl, meta.json, manifest.json, refs/bewit/records) must remain readable for existing records and be reflected in the README storage section and docs/guide.md.",
+          "verdict": "pass"
+        },
+        {
+          "rule_id": "tests-required",
+          "policy": "New or changed behavior in src/bewit is covered by pytest before the session ends.",
+          "verdict": "pass"
+        }
+      ],
+      "unknown_attestations": [],
+      "note": "",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "0b5e915e3fe4dd70822ef7136042e6d986c3932812101fd5bb270ab604d846ff",
+      "hash": "9da739d76df83eb2059ca0f34b44cd72b6540716f9d715e097ca4a5afecb25b3"
+    }
+  ],
+  "final_checks": [
+    {
+      "ts": "2026-09-30T14:00:11Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "raised_keys": [],
+      "prev": "403d3dd4a895538db75d1457195c9c9fc445591a1c5c7a334adfd7df2a94fc23",
+      "hash": "6e641b4b6620311989e9d954923866b47903ca6e4ea51be71ef8d9398de8c72e"
+    }
+  ],
   "human_changes": [],
   "acks": [],
-  "quality_checks": [],
-  "gate_events": [],
-  "reads": [],
-  "commands": [],
-  "edits": [],
-  "files": [],
-  "outside_repo": [],
-  "other_sessions": [],
-  "other_changes": [],
+  "quality_checks": [
+    {
+      "ts": "2026-09-30T14:25:35Z",
+      "type": "quality_check",
+      "rule_id": "check-python-syntax",
+      "action": "block",
+      "message": "Changed Python files must parse (syntax check writes no bytecode).",
+      "files": [
+        "src/bewit/gate.py",
+        "tests/test_gate.py"
+      ],
+      "command": "python -m bewit.syntaxcheck \"src/bewit/gate.py\" \"tests/test_gate.py\"",
+      "ok": true,
+      "exit_code": 0,
+      "output": "",
+      "error": null,
+      "prev": "835a31fd05307db15b8043298555720b2584513d0b7178b227c6ed18350bb1aa",
+      "hash": "c132d13b4bf5965f3e3e4c1c07ad17fe461517d9d2996a962ac31ee9d66e36cb"
+    }
+  ],
+  "gate_events": [
+    {
+      "ts": "2026-09-30T14:09:31Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        ".claude/settings.json"
+      ],
+      "hits": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "path": ".claude/settings.json",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prev": "2e74c49473ed1e2f6295409692c7c83f8502f146434ece8166d22dddf9a955ad",
+      "hash": "b135188cd2d22fe501db3a4e596f3bdcee5002127e7c722d56671e1daf56d958",
+      "outcome": "approved"
+    },
+    {
+      "ts": "2026-09-30T14:12:03Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        ".codex/hooks.json"
+      ],
+      "hits": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "path": ".codex/hooks.json",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prev": "d47b4bcb8fa462d248f9cc9464275fd67cbe4cff67c9bca7d47ae07917e1c5e7",
+      "hash": "6ea4f8b3aef6ca57f558eea901b48fb68f9c68bb07e23b38fce37113e759483d",
+      "outcome": "approved"
+    },
+    {
+      "ts": "2026-09-30T14:14:00Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        ".cursor/hooks.json"
+      ],
+      "hits": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "path": ".cursor/hooks.json",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prev": "e53f46b4aa1f961bc1468606cd6d67267028b8a39d5f8489e0324a490a5315d1",
+      "hash": "f98bc367c6ccdd184434c81b19f2f65923ca5c56311a0eb0dd603fbe33af9ff4",
+      "outcome": "approved"
+    },
+    {
+      "ts": "2026-09-30T14:14:18Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        "AGENTS.md"
+      ],
+      "hits": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "path": "AGENTS.md",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prev": "bcadda2937025e1a74a324e3221b79be111b5a147ecd64f2925b59f297239c68",
+      "hash": "2f1f3ef63196159fc4418a3537473ef56f30eeb873e85fcd2b97a9b344d5ce4c",
+      "outcome": "approved"
+    },
+    {
+      "ts": "2026-09-30T14:17:08Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        ".bewit/rules/10-bewit-repo.yaml"
+      ],
+      "hits": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "path": ".bewit/rules/10-bewit-repo.yaml",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prev": "39acb5003152879a1293a1a8f3788325a58df9b4b868fcb5fe606aa3dbabcd34",
+      "hash": "c846f12b692efa766935fdd5a389b1b786af9e07e5be78d1aafae6b99a72a013",
+      "outcome": "approved"
+    },
+    {
+      "ts": "2026-09-30T14:22:05Z",
+      "type": "gate",
+      "kind": "edit",
+      "target": "Write",
+      "permission": "ask",
+      "paths": [
+        ".bewit/rules/20-agent-boundaries.yaml"
+      ],
+      "hits": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "path": ".bewit/rules/20-agent-boundaries.yaml",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ],
+      "prev": "7d6b96e3bfef29e67f3edca040256f17b78c6b60a7612e04c91c34f28ab3bba5",
+      "hash": "3348189901cea3b5d0005fb304b731ee5e9766d96ee5a1af47c37ebfd7cbcdd4",
+      "outcome": "approved"
+    }
+  ],
+  "reads": [
+    {
+      "path": ".claude/settings.json",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:09:26Z"
+    },
+    {
+      "path": ".codex/hooks.json",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:11:52Z"
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:11:52Z"
+    },
+    {
+      "path": ".gitignore",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:16:31Z"
+    },
+    {
+      "path": "AGENTS.md",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:14:10Z"
+    },
+    {
+      "path": "src/bewit",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:01:39Z"
+    },
+    {
+      "path": "src/bewit/cli.py",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:16:43Z"
+    },
+    {
+      "path": "src/bewit/gate.py",
+      "count": 2,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:01:42Z"
+    },
+    {
+      "path": "src/bewit/globmatch.py",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:01:48Z"
+    },
+    {
+      "path": "tests/test_gate.py",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:01:35Z"
+    }
+  ],
+  "commands": [
+    {
+      "ts": "2026-09-30T14:00:47Z",
+      "label": "shell: docker pull python:3.13-slim 2>&1 | Select-Object -Last 2",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:01:02Z",
+      "label": "shell: $sp = \"C:\\Users\\CP\\AppData\\Local\\Temp\\claude\\E--ArchRev\\eb9fea81-e57e-4367-a013-32aa6b4fc443\\scratchpad\"; docker run --r",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:02:19Z",
+      "label": "shell: $sp = \"C:\\Users\\CP\\AppData\\Local\\Temp\\claude\\E--ArchRev\\eb9fea81-e57e-4367-a013-32aa6b4fc443\\scratchpad\"; (Get-Content \"",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:03:14Z",
+      "label": "shell: $sp = \"C:\\Users\\CP\\AppData\\Local\\Temp\\claude\\E--ArchRev\\eb9fea81-e57e-4367-a013-32aa6b4fc443\\scratchpad\"; \"--- linux rul",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:08:20Z",
+      "label": "shell: .venv\\Scripts\\python -m pytest -q tests/test_gate.py 2>&1 | Select-Object -Last 1; \"--- tracked files still naming archr",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:08:46Z",
+      "label": "shell: foreach ($f in \".claude/settings.json\", \".codex/hooks.json\", \".cursor/hooks.json\") { \"=== $f\"; $j = Get-Content $f -Raw ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:08:54Z",
+      "label": "shell: git status --short | Select-Object -First 30; \"--- .bewit\"; Get-ChildItem .bewit -Recurse -Force -Name -ErrorAction Sile",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:09:13Z",
+      "label": "shell: (Get-Command bewit -ErrorAction SilentlyContinue).Source; bewit plan register --text \"Finish the Bewit rename for the PR",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:09:19Z",
+      "label": "shell: bewit check plan 2>&1 | Select-Object -Last 3",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:16:51Z",
+      "label": "shell: git rm -q -- .claude/rules/archrev.md .cursor/rules/archrev.mdc; git status --short -- .claude .cursor; \"===== 10\"; git ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:22:07Z",
+      "label": "shell: bewit rules 2>&1 | Select-String \"^\\S.*\\(\\d+\\)\\s*$|(?i)problem|invalid\" | ForEach-Object { $_.Line.Trim() }; bewit plan ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:22:21Z",
+      "label": "shell: \"--- files still containing 'archrev' (excluding .git, .venv)\"; Get-ChildItem -Recurse -File -Force | Where-Object { $_.",
+      "ended": true
+    }
+  ],
+  "edits": [
+    {
+      "ts": "2026-09-30T14:01:01Z",
+      "path": "C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/eb9fea81-e57e-4367-a013-32aa6b4fc443/scratchpad/linux-test.sh",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:02:11Z",
+      "path": "src/bewit/gate.py",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:02:12Z",
+      "path": "src/bewit/gate.py",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:08:19Z",
+      "path": "tests/test_gate.py",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:11:49Z",
+      "path": ".claude/settings.json",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:14:00Z",
+      "path": ".codex/hooks.json",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:14:02Z",
+      "path": ".cursor/hooks.json",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:16:30Z",
+      "path": "AGENTS.md",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:16:39Z",
+      "path": ".gitignore",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:16:39Z",
+      "path": ".gitattributes",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:21:55Z",
+      "path": ".bewit/rules/10-bewit-repo.yaml",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:22:07Z",
+      "path": ".bewit/rules/20-agent-boundaries.yaml",
+      "tool": "Write",
+      "origin": "agent"
+    }
+  ],
+  "files": [
+    {
+      "path": "src/bewit/gate.py",
+      "added": 39,
+      "removed": 5,
+      "untracked": false,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "flag-enforcement-core",
+          "action": "flag",
+          "message": "Enforcement-core change (rule parsing, gate decisions, hook fail-open behavior, check commands, plan checks, what counts as a finding, shipped rules). Needs regression tests and a run of tests/rule_matrix.py."
+        }
+      ]
+    },
+    {
+      "path": "tests/test_gate.py",
+      "added": 50,
+      "removed": 0,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": ".claude/settings.json",
+      "added": 5,
+      "removed": 5,
+      "untracked": false,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ]
+    },
+    {
+      "path": ".codex/hooks.json",
+      "added": 6,
+      "removed": 6,
+      "untracked": false,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ]
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "added": 10,
+      "removed": 10,
+      "untracked": false,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ]
+    },
+    {
+      "path": "AGENTS.md",
+      "added": 8,
+      "removed": 8,
+      "untracked": false,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ]
+    },
+    {
+      "path": ".gitignore",
+      "added": 13,
+      "removed": 14,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": ".gitattributes",
+      "added": 2,
+      "removed": 2,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": ".bewit/rules/10-bewit-repo.yaml",
+      "added": 109,
+      "removed": 0,
+      "untracked": true,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ]
+    },
+    {
+      "path": ".bewit/rules/20-agent-boundaries.yaml",
+      "added": 49,
+      "removed": 0,
+      "untracked": true,
+      "in_plan": true,
+      "rules": [
+        {
+          "rule_id": "bewit-self-protection",
+          "action": "block",
+          "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval."
+        }
+      ]
+    }
+  ],
+  "outside_repo": [
+    "C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/eb9fea81-e57e-4367-a013-32aa6b4fc443/scratchpad/linux-test.sh"
+  ],
+  "other_sessions": [
+    {
+      "path": "README.md",
+      "added": 8,
+      "removed": 1,
+      "sessions": [
+        "e69bb069-cd07-4cac-bfe9-c010f039500b"
+      ]
+    },
+    {
+      "path": "docs/images/bewit-wordmark-reversed.svg",
+      "added": null,
+      "removed": null,
+      "untracked": true,
+      "sessions": [
+        "e69bb069-cd07-4cac-bfe9-c010f039500b"
+      ]
+    },
+    {
+      "path": "docs/images/bewit-wordmark.svg",
+      "added": null,
+      "removed": null,
+      "untracked": true,
+      "sessions": [
+        "e69bb069-cd07-4cac-bfe9-c010f039500b"
+      ]
+    }
+  ],
+  "other_changes": [
+    {
+      "path": ".claude/rules/archrev.md",
+      "added": 0,
+      "removed": 27,
+      "during": [
+        "shell: git rm -q -- .claude/rules/archrev.md .cursor/rules/archrev.mdc; git status --short -- .claude .cursor; \"===== 10\"; git "
+      ],
+      "changed_at": "2026-09-30T14:16:53Z"
+    },
+    {
+      "path": ".cursor/rules/archrev.mdc",
+      "added": 0,
+      "removed": 32,
+      "during": [
+        "shell: git rm -q -- .claude/rules/archrev.md .cursor/rules/archrev.mdc; git status --short -- .claude .cursor; \"===== 10\"; git "
+      ],
+      "changed_at": "2026-09-30T14:16:53Z"
+    },
+    {
+      "path": "docs/images/bewit-serve.png",
+      "added": 8415,
+      "removed": 0,
+      "untracked": true,
+      "during": [
+        "shell: .venv\\Scripts\\python -m pytest -q tests/test_gate.py 2>&1 | Select-Object -Last 1; \"--- tracked files still naming archr"
+      ],
+      "changed_at": "2026-09-30T14:08:31Z"
+    }
+  ],
   "background_changes": [
     {
       "path": ".archrev/config.yaml",
@@ -71,71 +805,96 @@
       "untracked": true
     },
     {
-      "path": ".claude/settings.json",
-      "added": 42,
-      "removed": 0
-    },
-    {
-      "path": ".codex/hooks.json",
-      "added": 42,
-      "removed": 0
-    },
-    {
-      "path": ".cursor/hooks.json",
-      "added": 31,
-      "removed": 0
-    },
-    {
       "path": ".cursor/rules/bewit.mdc",
       "added": null,
       "removed": null,
       "untracked": true
     },
     {
-      "path": ".gitattributes",
-      "added": 3,
-      "removed": 0
-    },
-    {
       "path": ".github/workflows/ci.yml",
       "added": 15,
       "removed": 1
-    },
-    {
-      "path": ".gitignore",
-      "added": 11,
-      "removed": 0
-    },
-    {
-      "path": "AGENTS.md",
-      "added": 28,
-      "removed": 0
-    },
-    {
-      "path": "src/bewit/gate.py",
-      "added": 27,
-      "removed": 5
-    },
-    {
-      "path": "tests/test_gate.py",
-      "added": 39,
-      "removed": 0
     }
   ],
   "attribution": "checkpoints",
   "drift": {
     "out_of_plan": [],
     "no_net_change": [],
-    "unrealized": []
+    "unrealized": [
+      ".claude/rules/archrev.md",
+      ".cursor/rules/archrev.mdc",
+      ".github/workflows/ci.yml",
+      "README.md"
+    ]
   },
-  "protected_findings": [],
+  "protected_findings": [
+    {
+      "path": ".bewit/rules/10-bewit-repo.yaml",
+      "rule_id": "bewit-self-protection",
+      "action": "block",
+      "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": ".bewit/rules/20-agent-boundaries.yaml",
+      "rule_id": "bewit-self-protection",
+      "action": "block",
+      "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": ".claude/settings.json",
+      "rule_id": "bewit-self-protection",
+      "action": "block",
+      "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": ".codex/hooks.json",
+      "rule_id": "bewit-self-protection",
+      "action": "block",
+      "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "rule_id": "bewit-self-protection",
+      "action": "block",
+      "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": "AGENTS.md",
+      "rule_id": "bewit-self-protection",
+      "action": "block",
+      "message": "Bewit governance file - changing capture or enforcement configuration requires explicit user approval.",
+      "via_gate": true
+    },
+    {
+      "path": "src/bewit/gate.py",
+      "rule_id": "flag-enforcement-core",
+      "action": "flag",
+      "message": "Enforcement-core change (rule parsing, gate decisions, hook fail-open behavior, check commands, plan checks, what counts as a finding, shipped rules). Needs regression tests and a run of tests/rule_matrix.py.",
+      "via_gate": true
+    }
+  ],
   "commits": [],
-  "areas": [],
-  "event_count": 2,
-  "chain_head": "403d3dd4a895538db75d1457195c9c9fc445591a1c5c7a334adfd7df2a94fc23",
+  "areas": [
+    ".bewit",
+    ".claude",
+    ".codex",
+    ".cursor",
+    ".gitattributes",
+    ".gitignore",
+    "AGENTS.md",
+    "src",
+    "tests"
+  ],
+  "event_count": 69,
+  "chain_head": "c132d13b4bf5965f3e3e4c1c07ad17fe461517d9d2996a962ac31ee9d66e36cb",
   "chain": {
     "ok": true,
-    "checked": 2,
+    "checked": 69,
     "legacy": 0,
     "break_at": null,
     "reason": null,
@@ -148,10 +907,82 @@
     "notes": []
   },
   "plan": {
-    "registered": false,
-    "declared_files": [],
-    "progress": [],
-    "text": null
+    "registered": true,
+    "declared_files": [
+      ".claude/settings.json",
+      ".codex/hooks.json",
+      ".cursor/hooks.json",
+      ".claude/rules/archrev.md",
+      ".cursor/rules/archrev.mdc",
+      "AGENTS.md",
+      ".gitignore",
+      ".gitattributes",
+      ".bewit/rules/10-bewit-repo.yaml",
+      ".bewit/rules/20-agent-boundaries.yaml",
+      "src/bewit/gate.py",
+      "tests/test_gate.py",
+      ".github/workflows/ci.yml",
+      "README.md"
+    ],
+    "progress": [
+      {
+        "path": ".claude/settings.json",
+        "touched": true
+      },
+      {
+        "path": ".codex/hooks.json",
+        "touched": true
+      },
+      {
+        "path": ".cursor/hooks.json",
+        "touched": true
+      },
+      {
+        "path": ".claude/rules/archrev.md",
+        "touched": false
+      },
+      {
+        "path": ".cursor/rules/archrev.mdc",
+        "touched": false
+      },
+      {
+        "path": "AGENTS.md",
+        "touched": true
+      },
+      {
+        "path": ".gitignore",
+        "touched": true
+      },
+      {
+        "path": ".gitattributes",
+        "touched": true
+      },
+      {
+        "path": ".bewit/rules/10-bewit-repo.yaml",
+        "touched": true
+      },
+      {
+        "path": ".bewit/rules/20-agent-boundaries.yaml",
+        "touched": true
+      },
+      {
+        "path": "src/bewit/gate.py",
+        "touched": true
+      },
+      {
+        "path": "tests/test_gate.py",
+        "touched": true
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "touched": false
+      },
+      {
+        "path": "README.md",
+        "touched": false
+      }
+    ],
+    "text": "Also `.gitattributes`, `.gitignore`, `src/bewit/gate.py`, `tests/test_gate.py`, `.github/workflows/ci.yml`."
   },
-  "finalized_at": "2026-09-30T14:00:11Z"
+  "finalized_at": "2026-09-30T14:25:35Z"
 }
