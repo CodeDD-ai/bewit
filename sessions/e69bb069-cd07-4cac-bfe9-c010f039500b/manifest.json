@@ -3,17 +3,85 @@
   "started_at": "2026-09-30T13:59:26Z",
   "head_sha": "6bba504a9d3823e869b66e67104be4068c186ef0",
   "finalized": true,
-  "generated_at": "2026-09-30T14:00:21Z",
-  "prompts": [],
+  "generated_at": "2026-09-30T14:09:00Z",
+  "prompts": [
+    {
+      "ts": "2026-09-30T14:02:25Z",
+      "text": "I like this the most: 6-wordmark.svg\nCan you add this into the Readme? \nAlso, I want to add a screenshot of the ui from bewit serve. Can you recreate one and add is as .png as well to the readme?",
+      "capture": "full",
+      "chars": null,
+      "sealed": false
+    }
+  ],
   "branch": "release_v1",
   "runtime": "claude",
-  "checks": [],
-  "final_checks": [],
+  "checks": [
+    {
+      "ts": "2026-09-30T14:02:49Z",
+      "type": "plan_check",
+      "plan_registered": true,
+      "plan_revision": 1,
+      "declared_files": [
+        "docs/images/bewit-wordmark.svg",
+        "docs/images/bewit-wordmark-reversed.svg",
+        "docs/images/bewit-serve.png",
+        "README.md"
+      ],
+      "path_findings": [],
+      "prompt_rules": [],
+      "unknown_attestations": [],
+      "note": "",
+      "ok": true,
+      "strict_mode": false,
+      "prev": "0bcfa655e73408995ee1ead1a8af223ef09666a55d3711e420d7ba4c7d935964",
+      "hash": "b1b20071f8176609354913ee2b50445f980f17dced5c8b57b1a098f21a1350d6"
+    }
+  ],
+  "final_checks": [
+    {
+      "ts": "2026-09-30T14:00:22Z",
+      "type": "final_check",
+      "findings": [],
+      "fingerprint": "4f53cda18c2baa0c",
+      "notified": false,
+      "raised_keys": [],
+      "prev": "98edf60b4e16248a22f30af6c17a4a78f0ccf8da030fa2265e3f2c9bd95f32c4",
+      "hash": "7df1866d5f8bda755f05c01415b48f56867d091e14cc635620903484ebb12bb9"
+    }
+  ],
   "human_changes": [],
   "acks": [],
   "quality_checks": [],
   "gate_events": [],
-  "reads": [],
+  "reads": [
+    {
+      "path": "C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/bewit-serve.png",
+      "count": 2,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:05:53Z"
+    },
+    {
+      "path": "C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/make_demo.py",
+      "count": 2,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:07:01Z"
+    },
+    {
+      "path": "README.md",
+      "count": 1,
+      "permission": "allow",
+      "via": [
+        "preToolUse"
+      ],
+      "first_ts": "2026-09-30T14:08:36Z"
+    }
+  ],
   "commands": [
     {
       "ts": "2026-09-30T13:59:26Z",
@@ -44,13 +112,254 @@
       "ts": "2026-09-30T14:00:03Z",
       "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/logos\" python - <<'",
       "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:02:30Z",
+      "label": "shell: head -40 README.md; echo ----; grep -n \"serve\" -r src/bewit --include=*.py | head -30; echo ----; which bewit archrev; l",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:02:35Z",
+      "label": "shell: ls -a; ls .bewit .archrev 2>/dev/null | head; ls .bewit/sessions 2>/dev/null | wc -l; head -60 docs/demo.md; bewit serve",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:02:44Z",
+      "label": "shell: bewit plan register --text \"Add the Bewit falcon wordmark and a screenshot of the bewit serve viewer to the README. New ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:02:48Z",
+      "label": "shell: bewit check plan; ls .bewit/sessions; for d in .bewit/sessions/*; do ls $d | head -5; done",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:02:53Z",
+      "label": "shell: bewit serve --no-open --port 4177",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:02:55Z",
+      "label": "mcp: mcp__Claude_Browser__browser_batch",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:03:03Z",
+      "label": "shell: cat .claude/settings.json | head -60; grep -n \"def hook\\|@cli.command\\|@main.command\\|@click.command\\|def [a-z_]*(\" src/",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:03:09Z",
+      "label": "shell: sed -n 160,195p src/bewit/cli.py; grep -ln \"hook_event_name\" tests/*.py | head; grep -n \"def _run_hook\\|def run_hook\\|de",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:03:12Z",
+      "label": "shell: grep -n \"PreToolUse\\|UserPromptSubmit\\|\\\"Stop\\\"\\|PostToolUse\" tests/test_final_review.py | head -20; sed -n 1,80p tests/",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:03:21Z",
+      "label": "shell: bewit init --help | sed -n 1,30p; bewit plan register --help | sed -n 1,30p; grep -n \"id:\" src/bewit/scaffold.py | head ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:03:25Z",
+      "label": "shell: sed -n 105,200p src/bewit/scaffold.py",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:04:00Z",
+      "label": "shell: mkdir -p \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && cat ",
+      "ended": false
+    },
+    {
+      "ts": "2026-09-30T14:04:16Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && sed -i 's/",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:04:45Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && sed -i 's/",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:05:13Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/acme-billing\" ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:05:15Z",
+      "label": "mcp: mcp__Claude_Browser__browser_batch",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:05:19Z",
+      "label": "mcp: mcp__Claude_Browser__browser_batch",
+      "ended": false
+    },
+    {
+      "ts": "2026-09-30T14:05:22Z",
+      "label": "mcp: mcp__Claude_Browser__computer",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:05:31Z",
+      "label": "shell: /e/ArchRev/.venv/Scripts/python.exe -c \"import playwright; print('pw ok')\" 2>&1 | tail -1; python -c \"import playwright;",
+      "ended": false
+    },
+    {
+      "ts": "2026-09-30T14:05:36Z",
+      "label": "mcp: mcp__Claude_Browser__javascript_tool",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:05:42Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && cat > shot",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:06:02Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && sed -i 's#",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:06:35Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && python - <",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:07:10Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && /e/ArchRev",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:07:36Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/acme-billing\" ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:07:40Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo\" && python -c ",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:07:54Z",
+      "label": "shell: cd \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad\" && ls -la demo/bew",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:08:05Z",
+      "label": "shell: S=\"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad\"; cat \"$S/logos/6-wo",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:08:22Z",
+      "label": "shell: cp \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/bewit-serve.pn",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:08:30Z",
+      "label": "shell: grep -n -i \"readme\\|url\\|homepage\\|repository\" pyproject.toml; git remote -v",
+      "ended": true
+    },
+    {
+      "ts": "2026-09-30T14:08:47Z",
+      "label": "shell: bewit show e69bb069 2>&1 | head -40; git status --short",
+      "ended": true
     }
   ],
-  "edits": [],
-  "files": [],
-  "outside_repo": [],
-  "other_sessions": [],
-  "other_changes": [],
+  "edits": [
+    {
+      "ts": "2026-09-30T14:07:09Z",
+      "path": "C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/make_demo.py",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:08:20Z",
+      "path": "docs/images/bewit-wordmark.svg",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:08:21Z",
+      "path": "docs/images/bewit-wordmark-reversed.svg",
+      "tool": "Write",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:08:40Z",
+      "path": "README.md",
+      "tool": "Edit",
+      "origin": "agent"
+    },
+    {
+      "ts": "2026-09-30T14:08:41Z",
+      "path": "README.md",
+      "tool": "Edit",
+      "origin": "agent"
+    }
+  ],
+  "files": [
+    {
+      "path": "docs/images/bewit-wordmark.svg",
+      "added": 11,
+      "removed": 0,
+      "untracked": true,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "docs/images/bewit-wordmark-reversed.svg",
+      "added": 11,
+      "removed": 0,
+      "untracked": true,
+      "in_plan": true,
+      "rules": []
+    },
+    {
+      "path": "README.md",
+      "added": 8,
+      "removed": 1,
+      "untracked": false,
+      "in_plan": true,
+      "rules": []
+    }
+  ],
+  "outside_repo": [
+    "C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/make_demo.py"
+  ],
+  "other_sessions": [
+    {
+      "path": "src/bewit/gate.py",
+      "added": 39,
+      "removed": 5,
+      "sessions": [
+        "eb9fea81-e57e-4367-a013-32aa6b4fc443"
+      ]
+    },
+    {
+      "path": "tests/test_gate.py",
+      "added": 50,
+      "removed": 0,
+      "sessions": [
+        "eb9fea81-e57e-4367-a013-32aa6b4fc443"
+      ]
+    }
+  ],
+  "other_changes": [
+    {
+      "path": "docs/images/bewit-serve.png",
+      "added": 8415,
+      "removed": 0,
+      "untracked": true,
+      "during": [
+        "shell: cp \"C:/Users/CP/AppData/Local/Temp/claude/E--ArchRev/e69bb069-cd07-4cac-bfe9-c010f039500b/scratchpad/demo/bewit-serve.pn"
+      ],
+      "changed_at": "2026-09-30T14:08:23Z"
+    }
+  ],
   "background_changes": [
     {
       "path": ".archrev/config.yaml",
@@ -141,32 +450,27 @@
       "path": "AGENTS.md",
       "added": 28,
       "removed": 0
-    },
-    {
-      "path": "src/bewit/gate.py",
-      "added": 27,
-      "removed": 5
-    },
-    {
-      "path": "tests/test_gate.py",
-      "added": 39,
-      "removed": 0
     }
   ],
   "attribution": "checkpoints",
   "drift": {
     "out_of_plan": [],
     "no_net_change": [],
-    "unrealized": []
+    "unrealized": [
+      "docs/images/bewit-serve.png"
+    ]
   },
   "protected_findings": [],
   "commits": [],
-  "areas": [],
-  "event_count": 15,
-  "chain_head": "98edf60b4e16248a22f30af6c17a4a78f0ccf8da030fa2265e3f2c9bd95f32c4",
+  "areas": [
+    "README.md",
+    "docs"
+  ],
+  "event_count": 93,
+  "chain_head": "60fa7d947abd4f1d25dcd74daa8fd837423d9e178047fe15b3078e602a8a7f11",
   "chain": {
     "ok": true,
-    "checked": 15,
+    "checked": 93,
     "legacy": 0,
     "break_at": null,
     "reason": null,
@@ -179,10 +483,32 @@
     "notes": []
   },
   "plan": {
-    "registered": false,
-    "declared_files": [],
-    "progress": [],
-    "text": null
+    "registered": true,
+    "declared_files": [
+      "docs/images/bewit-wordmark.svg",
+      "docs/images/bewit-wordmark-reversed.svg",
+      "docs/images/bewit-serve.png",
+      "README.md"
+    ],
+    "progress": [
+      {
+        "path": "docs/images/bewit-wordmark.svg",
+        "touched": true
+      },
+      {
+        "path": "docs/images/bewit-wordmark-reversed.svg",
+        "touched": true
+      },
+      {
+        "path": "docs/images/bewit-serve.png",
+        "touched": false
+      },
+      {
+        "path": "README.md",
+        "touched": true
+      }
+    ],
+    "text": "Add the Bewit falcon wordmark and a screenshot of the bewit serve viewer to the README. New files: docs/images/bewit-wordmark.svg, docs/images/bewit-wordmark-reversed.svg (dark-mode variant), docs/images/bewit-serve.png. Edit README.md to show the wordmark at the top (picture element with light/dark sources) and the screenshot in the intro."
   },
-  "finalized_at": "2026-09-30T14:00:21Z"
+  "finalized_at": "2026-09-30T14:09:00Z"
 }
