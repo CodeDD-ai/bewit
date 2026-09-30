@@ -1,1 +1,0 @@
-T05: no rule covers this path, but the plan does NOT declare it: expect out-of-plan drift in the final review.

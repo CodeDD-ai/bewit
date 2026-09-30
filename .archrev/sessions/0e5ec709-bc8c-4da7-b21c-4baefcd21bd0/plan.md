@@ -1,1 +1,0 @@
-Keep runtime noise out of the review in src/archrev/drift.py and tests/test_adapters.py.

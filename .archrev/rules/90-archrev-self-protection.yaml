@@ -12,6 +12,7 @@
     - ".cursor/hooks.json"
     - ".cursor/rules/archrev.mdc"
     - ".claude/settings.json"
+    - ".claude/settings.local.json"   # can set disableAllHooks
     - ".claude/rules/archrev.md"
     - ".codex/hooks.json"
     - "AGENTS.md"
@@ -20,14 +21,28 @@
     ArchRev governance file - changing capture or enforcement configuration
     requires explicit user approval.
 
+# Deleting or moving the record itself is a shell act, which path rules do
+# not see (they gate edits). This pauses it for approval instead.
+- id: archrev-no-record-deletion
+  kind: shell
+  match_command:
+    - '(\brm\b|\brmdir\b|\bdel\b|\berase\b|\brd\b|remove-item|\bri\b|\bgit\s+rm\b|\bmv\b|\bmove\b|move-item|\bunlink\b|shutil\.rmtree)[^|;&\n]*\.archrev'
+  action: block
+  message: >-
+    Deleting or moving .archrev/ (or anything in it) removes ArchRev's
+    configuration, rules, or audit record and requires explicit approval.
+
 # Acknowledging a finding is the reviewer's decision. Agents report findings
 # to the user instead of acknowledging them; an acknowledgment made while an
 # agent command runs is recorded as agent-made and does not clear bypasses,
 # failed checks, or a failed plan check (regex rules can be evaded, so that
-# attribution is the backstop).
+# attribution is the backstop). The second pattern matches an HTTP client
+# calling the viewer's ack endpoint, not text that merely mentions it.
 - id: archrev-no-agent-ack
   kind: shell
-  match_command: ['\barchrev(\.exe)?\s+ack\b', '/api/ack\b']
+  match_command:
+    - '\barchrev(\.exe)?\s+ack\b'
+    - '(\bcurl\b|\bwget\b|invoke-webrequest|invoke-restmethod|\biwr\b|\birm\b|requests\.|urllib|httpx\.|aiohttp|\bfetch\s*\()[^|;&\n]*/api/ack\b'
   action: deny
   message: >-
     Only the reviewer acknowledges ArchRev findings. Report the findings to

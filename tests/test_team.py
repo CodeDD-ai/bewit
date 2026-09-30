@@ -5,14 +5,14 @@ from pathlib import Path
 
 import yaml
 
-from archrev import __version__
-from archrev.ci import write_gitlab_template
-from archrev.config import load_config
-from archrev.hooks import run_hook
-from archrev.metrics import collect, discover_repos
-from archrev.rules import load_rules
-from archrev.scaffold import init_repo
-from archrev.storage import SessionStore
+from bewit import __version__
+from bewit.ci import write_gitlab_template
+from bewit.config import load_config
+from bewit.hooks import run_hook
+from bewit.metrics import collect, discover_repos
+from bewit.rules import load_rules
+from bewit.scaffold import init_repo
+from bewit.storage import SessionStore
 
 
 # -- uvx shim ---------------------------------------------------------------
@@ -24,11 +24,11 @@ def test_init_uvx_shim_writes_shimmed_commands(repo: Path):
     commands = [
         e["command"] for entries in hooks["hooks"].values() for e in entries
     ]
-    assert commands and all(c.startswith("uvx archrev ") for c in commands)
+    assert commands and all(c.startswith("uvx bewit ") for c in commands)
     git_hook = (repo / ".git" / "hooks" / "prepare-commit-msg").read_text(
         encoding="utf-8"
     )
-    assert 'uvx archrev git-trailer "$1"' in git_hook
+    assert 'uvx bewit git-trailer "$1"' in git_hook
 
 
 def test_reinit_upgrades_between_shim_modes(repo: Path):
@@ -37,9 +37,9 @@ def test_reinit_upgrades_between_shim_modes(repo: Path):
     init_repo(repo, shim="uvx")
     hooks = json.loads((repo / ".cursor" / "hooks.json").read_text(encoding="utf-8"))
     for event, entries in hooks["hooks"].items():
-        ours = [e for e in entries if "archrev" in e.get("command", "")]
+        ours = [e for e in entries if "bewit" in e.get("command", "")]
         assert len(ours) == 1, f"duplicated entry for {event}"
-        assert ours[0]["command"].startswith("uvx archrev ")
+        assert ours[0]["command"].startswith("uvx bewit ")
 
 
 def test_init_starter_rules_load_without_errors(repo: Path):
@@ -56,27 +56,27 @@ def test_init_starter_rules_load_without_errors(repo: Path):
 
 def test_gitlab_template_written_with_jobs(repo: Path):
     target = write_gitlab_template(repo)
-    assert target == repo / ".gitlab" / "archrev-ci.yml"
+    assert target == repo / ".gitlab" / "bewit-ci.yml"
     content = target.read_text(encoding="utf-8")
-    assert "archrev:rules:" in content
-    assert "archrev check diff --base" in content
-    assert "archrev verify --all" in content
-    assert "archrev:mr-report:" in content
-    assert "ArchRev-Session:" in content  # trailer-based session lookup
-    assert "local: .gitlab/archrev-ci.yml" in content  # include instructions
+    assert "bewit:rules:" in content
+    assert "bewit check diff --base" in content
+    assert "bewit verify --all" in content
+    assert "bewit:mr-report:" in content
+    assert "Bewit-Session:" in content  # trailer-based session lookup
+    assert "local: .gitlab/bewit-ci.yml" in content  # include instructions
 
 
 def test_gitlab_template_pins_install_source(repo: Path):
-    """An unpinned `pip install archrev` would run whatever the index serves."""
+    """An unpinned `pip install bewit` would run whatever the index serves."""
     content = write_gitlab_template(repo).read_text(encoding="utf-8")
     jobs = yaml.safe_load(content)
-    assert jobs[".archrev:base"]["variables"]["ARCHREV_PIP_SPEC"] == (
-        f"archrev=={__version__}"
+    assert jobs[".bewit:base"]["variables"]["BEWIT_PIP_SPEC"] == (
+        f"bewit=={__version__}"
     )
-    for name in ("archrev:rules", "archrev:mr-report"):
-        assert jobs[name]["extends"] == ".archrev:base"
-        assert 'pip install --quiet "$ARCHREV_PIP_SPEC"' in jobs[name]["before_script"]
-    assert "pip install --quiet archrev\n" not in content
+    for name in ("bewit:rules", "bewit:mr-report"):
+        assert jobs[name]["extends"] == ".bewit:base"
+        assert 'pip install --quiet "$BEWIT_PIP_SPEC"' in jobs[name]["before_script"]
+    assert "pip install --quiet bewit\n" not in content
 
 
 # -- prompt privacy ----------------------------------------------------------
@@ -86,7 +86,7 @@ def test_prompt_capture_modes(repo: Path, monkeypatch):
     monkeypatch.chdir(repo)
     secret = "deploy key is hunter2, use it for the migration " + "x" * 300
 
-    (repo / ".archrev" / "config.yaml").write_text(
+    (repo / ".bewit" / "config.yaml").write_text(
         "prompt_capture: excerpt\n", encoding="utf-8"
     )
     assert load_config(repo).prompt_capture == "excerpt"
@@ -96,7 +96,7 @@ def test_prompt_capture_modes(repo: Path, monkeypatch):
     assert len(event["text"]) == 200
     assert event["chars"] == len(secret)
 
-    (repo / ".archrev" / "config.yaml").write_text(
+    (repo / ".bewit" / "config.yaml").write_text(
         "prompt_capture: none\n", encoding="utf-8"
     )
     run_hook("prompt", json.dumps({"conversation_id": "p-no", "prompt": secret}))
@@ -108,7 +108,7 @@ def test_prompt_capture_modes(repo: Path, monkeypatch):
 
 
 def test_invalid_prompt_capture_falls_back_to_full(repo: Path):
-    (repo / ".archrev" / "config.yaml").write_text(
+    (repo / ".bewit" / "config.yaml").write_text(
         "prompt_capture: nonsense\n", encoding="utf-8"
     )
     assert load_config(repo).prompt_capture == "full"
@@ -133,7 +133,7 @@ def _seed_session(repo: Path, sid: str) -> None:
 def test_index_metrics_across_repos(tmp_path: Path):
     for name in ("repo-a", "repo-b"):
         root = tmp_path / name
-        (root / ".archrev").mkdir(parents=True)
+        (root / ".bewit").mkdir(parents=True)
         _seed_session(root, f"s-{name}")
 
     assert [r.name for r in discover_repos([tmp_path])] == ["repo-a", "repo-b"]

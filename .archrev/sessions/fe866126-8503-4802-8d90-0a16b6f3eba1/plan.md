@@ -1,1 +1,0 @@
-Viewer: hide <pasted_content ...> wrapper tags in prompt titles, session heading, prompt box and sidebar excerpt; show the first real line. Files: src/archrev/report/template.html, src/archrev/report/server.py, tests/test_server.py

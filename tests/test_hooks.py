@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from archrev.hooks import run_hook
-from archrev.storage import SessionStore
+from bewit.hooks import run_hook
+from bewit.storage import SessionStore
 
 
 @pytest.fixture()
@@ -84,7 +84,7 @@ def test_read_tools_not_gated_by_edit_rules(in_repo: Path):
 def test_cursor_pretool_read_enforces_read_rules(in_repo: Path):
     """Regression: Cursor agent reads often skip beforeReadFile; preToolUse
     must still enforce ``read`` rules (e.g. deny-secret-reads)."""
-    (in_repo / ".archrev" / "rules" / "secrets.yaml").write_text(
+    (in_repo / ".bewit" / "rules" / "secrets.yaml").write_text(
         """
 - id: no-env
   kind: read
@@ -111,7 +111,7 @@ def test_cursor_pretool_read_enforces_read_rules(in_repo: Path):
 
 def test_grep_is_gated_as_a_read(in_repo: Path):
     """Grep returns file contents, so a read deny must apply to it."""
-    (in_repo / ".archrev" / "rules" / "secrets.yaml").write_text(
+    (in_repo / ".bewit" / "rules" / "secrets.yaml").write_text(
         '- id: no-env\n  kind: read\n  match: [".env"]\n  action: deny\n'
         '  message: "No .env reads."\n',
         encoding="utf-8",
@@ -127,7 +127,7 @@ def test_grep_is_gated_as_a_read(in_repo: Path):
 def test_every_read_is_logged_with_reporting_hook(in_repo: Path):
     """Allowed reads are part of the audit trail too, tagged with the hook
     that reported them, so a missing event proves the runtime skipped us."""
-    (in_repo / ".archrev" / "rules" / "secrets.yaml").write_text(
+    (in_repo / ".bewit" / "rules" / "secrets.yaml").write_text(
         '- id: no-env\n  kind: read\n  match: [".env"]\n  action: deny\n',
         encoding="utf-8",
     )
@@ -244,7 +244,7 @@ def test_final_check_notifies_agent_once(in_repo: Path):
 
 
 def test_acknowledged_findings_are_not_re_raised(in_repo: Path):
-    """`archrev ack` resolves a finding: audited, and no more follow-ups."""
+    """`bewit ack` resolves a finding: audited, and no more follow-ups."""
     run_hook("prompt", _payload(prompt="do something"))
     _shell_write_migration(in_repo)
     out = run_hook("finalize", _payload(status="completed"))
@@ -269,6 +269,56 @@ def test_ack_of_unrelated_target_does_not_suppress(in_repo: Path):
     assert "followup_message" in out
 
 
+def test_final_check_raises_only_new_findings(in_repo: Path):
+    """Reported from real use: the same 16-18 findings came back every
+    turn. A later turn names only what is new, and counts the rest."""
+    from bewit.planning import register_plan
+
+    run_hook("prompt", _payload(prompt="do something"))
+    session = SessionStore(in_repo).session("conv-42")
+    register_plan(session, "Edit `app/main.py`.", in_repo)
+    _shell_write_migration(in_repo)
+    first = run_hook("finalize", _payload(status="completed"))
+    assert "db/migrations/0001_init.sql" in first["followup_message"]
+
+    (in_repo / "app" / "extra.py").write_text("x = 1\n", encoding="utf-8")
+    run_hook("edit", _payload(file_path="app/extra.py", tool_name="Write"))
+    second = run_hook("finalize", _payload(status="completed"))["followup_message"]
+    assert "app/extra.py" in second
+    assert "0001_init.sql" not in second
+    assert "1 earlier finding(s) are still open" in second
+    final = [e for e in session.events() if e["type"] == "final_check"][-1]
+    assert len(final["findings"]) == 2  # the record keeps the full list
+
+
+def test_resolved_then_reopened_finding_is_new_again(in_repo: Path):
+    run_hook("prompt", _payload(prompt="do something"))
+    _shell_write_migration(in_repo)
+    assert "followup_message" in run_hook("finalize", _payload(status="completed"))
+    session = SessionStore(in_repo).session("conv-42")
+    session.append_event("ack", target="db/migrations/0001_init.sql", note="ok")
+    assert run_hook("finalize", _payload(status="completed")) == {}
+    # Changed again after the ack: the finding reopens and is raised again.
+    import time
+    time.sleep(1.1)  # timestamps have second resolution
+    run_hook("shell", _payload(command="./migrate.sh --again"))
+    (in_repo / "db" / "migrations" / "0001_init.sql").write_text("CHANGED\n", encoding="utf-8")
+    run_hook("exec_end", _payload(command="./migrate.sh --again"))
+    out = run_hook("finalize", _payload(status="completed"))
+    assert "0001_init.sql" in out.get("followup_message", "")
+
+
+def test_shell_hook_claims_bewit_commands_for_the_cli(in_repo: Path, monkeypatch):
+    from bewit.storage import SESSION_ENV_VARS
+
+    for var in SESSION_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+    SessionStore(in_repo).session("other-agent").append_event("prompt", text="x")
+    run_hook("shell", _payload(command='bewit plan register --text "Edit `a.py`"'))
+    session, how = SessionStore(in_repo).resolve_caller("latest", "plan register")
+    assert session.id == "conv-42" and "shell hook" in how
+
+
 def test_final_check_clean_session_is_silent(in_repo: Path):
     run_hook("prompt", _payload(prompt="hi"))
     run_hook("edit", _payload(file_path="app/main.py"))
@@ -276,7 +326,7 @@ def test_final_check_clean_session_is_silent(in_repo: Path):
 
 
 def test_final_check_can_be_disabled(in_repo: Path):
-    (in_repo / ".archrev" / "config.yaml").write_text(
+    (in_repo / ".bewit" / "config.yaml").write_text(
         "final_check: false\n", encoding="utf-8"
     )
     run_hook("prompt", _payload(prompt="do something"))
@@ -309,15 +359,15 @@ def test_change_outside_session_commands_is_not_raised(in_repo: Path):
 
 
 def test_checkpoint_failure_never_changes_a_gate_decision(in_repo: Path, monkeypatch):
-    """Fail-open is for ArchRev crashes, not for attribution hiccups: a
+    """Fail-open is for Bewit crashes, not for attribution hiccups: a
     broken checkpoint must not turn an 'ask' into the generic 'allow'."""
-    import archrev.hooks as hooks
+    import bewit.hooks as hooks
 
     def boom(*_args, **_kwargs):
         raise RuntimeError("git exploded")
 
     monkeypatch.setattr(hooks, "record_checkpoint", boom)
-    (in_repo / ".archrev" / "rules" / "shell.yaml").write_text(
+    (in_repo / ".bewit" / "rules" / "shell.yaml").write_text(
         '- id: push\n  kind: shell\n  match_command: ["\\\\bgit\\\\s+push\\\\b"]\n'
         "  action: block\n",
         encoding="utf-8",
@@ -326,13 +376,13 @@ def test_checkpoint_failure_never_changes_a_gate_decision(in_repo: Path, monkeyp
     out = run_hook("shell", _payload(command="git push origin main"))
     assert out["permission"] == "ask"
     assert run_hook("exec_end", _payload(command="git push origin main")) == {}
-    log = (in_repo / ".archrev" / "hook-errors.log").read_text(encoding="utf-8")
+    log = (in_repo / ".bewit" / "hook-errors.log").read_text(encoding="utf-8")
     assert "checkpoint:exec_start" in log and "git exploded" in log
 
 
 def test_cursor_after_shell_event_closes_the_window(in_repo: Path):
-    """`archrev hook auto` with Cursor's afterShellExecution name routes to
-    exec_end, the same handler `archrev hook exec_end` uses."""
+    """`bewit hook auto` with Cursor's afterShellExecution name routes to
+    exec_end, the same handler `bewit hook exec_end` uses."""
     run_hook("prompt", _payload(prompt="go"))
     run_hook("shell", _payload(command="make"))
     assert run_hook(

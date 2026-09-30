@@ -7,20 +7,20 @@ import pytest
 
 pytest.importorskip("cryptography")
 
-from archrev.hooks import run_hook
-from archrev.seal import (
+from bewit.hooks import run_hook
+from bewit.seal import (
     SealUnavailable,
     add_recipient,
     generate_keypair,
     open_sealed,
     seal_text,
 )
-from archrev.storage import SessionStore
+from bewit.storage import SessionStore
 
 
 @pytest.fixture()
 def seal_home(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("archrev.seal.KEY_PATH", tmp_path / "seal.key")
+    monkeypatch.setattr("bewit.seal.KEY_PATH", tmp_path / "seal.key")
     # handle_prompt imports seal_text from the module; KEY_PATH is read
     # inside generate/load via the module global, so patching the attribute
     # the functions close over is the module global itself.
@@ -28,7 +28,7 @@ def seal_home(tmp_path: Path, monkeypatch):
 
 
 def test_seal_roundtrip_hides_plaintext(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("archrev.seal.KEY_PATH", tmp_path / "seal.key")
+    monkeypatch.setattr("bewit.seal.KEY_PATH", tmp_path / "seal.key")
     public = generate_keypair(None)
     add_recipient(tmp_path, "dev", public)
     sealed = seal_text(tmp_path, "the deploy key is hunter2")
@@ -38,7 +38,7 @@ def test_seal_roundtrip_hides_plaintext(tmp_path: Path, monkeypatch):
 
 
 def test_passphrase_wraps_the_private_key(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr("archrev.seal.KEY_PATH", tmp_path / "seal.key")
+    monkeypatch.setattr("bewit.seal.KEY_PATH", tmp_path / "seal.key")
     public = generate_keypair("correct horse")
     add_recipient(tmp_path, "dev", public)
     sealed = seal_text(tmp_path, "secret")
@@ -51,10 +51,10 @@ def test_passphrase_wraps_the_private_key(tmp_path: Path, monkeypatch):
 
 def test_hook_seals_and_never_falls_back_to_plaintext(repo: Path, monkeypatch):
     monkeypatch.chdir(repo)
-    monkeypatch.setattr("archrev.seal.KEY_PATH", repo / "seal.key")
+    monkeypatch.setattr("bewit.seal.KEY_PATH", repo / "seal.key")
     public = generate_keypair(None)
     add_recipient(repo, "dev", public)
-    (repo / ".archrev" / "config.yaml").write_text(
+    (repo / ".bewit" / "config.yaml").write_text(
         "prompt_capture: sealed\n", encoding="utf-8"
     )
     run_hook(
@@ -70,7 +70,7 @@ def test_hook_seals_and_never_falls_back_to_plaintext(repo: Path, monkeypatch):
 
 def test_hook_without_recipients_stores_nothing(repo: Path, monkeypatch):
     monkeypatch.chdir(repo)
-    (repo / ".archrev" / "config.yaml").write_text(
+    (repo / ".bewit" / "config.yaml").write_text(
         "prompt_capture: sealed\n", encoding="utf-8"
     )
     run_hook(

@@ -2,7 +2,9 @@ import json
 import threading
 from pathlib import Path
 
-from archrev.storage import GENESIS, SessionStore, sanitize_session_id
+import pytest
+
+from bewit.storage import GENESIS, SESSION_ENV_VARS, SessionStore, sanitize_session_id
 
 
 def test_event_roundtrip(tmp_path: Path):
@@ -129,3 +131,57 @@ def test_resolve_prefix_and_latest(tmp_path: Path):
     assert store.resolve("session-") is None  # ambiguous
     assert store.resolve("latest") is not None
     assert store.resolve("nope") is None
+
+
+@pytest.fixture()
+def no_session_env(monkeypatch):
+    for var in SESSION_ENV_VARS:
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_caller_refuses_to_guess_between_live_sessions(tmp_path: Path, no_session_env):
+    """Reported from real use: with two agents in one repo, `plan register`
+    bound to the other agent's session and replaced its plan."""
+    store = SessionStore(tmp_path)
+    store.session("agent-a").append_event("prompt", text="a")
+    store.session("agent-b").append_event("prompt", text="b")
+    session, how = store.resolve_caller("latest", "plan register")
+    assert session is None and "2 sessions" in how
+    session, _ = store.resolve_caller("agent-b", "plan register")
+    assert session.id == "agent-b"
+
+
+def test_caller_binds_through_the_runtime_env_var(tmp_path: Path, no_session_env, monkeypatch):
+    store = SessionStore(tmp_path)
+    store.session("agent-a").append_event("prompt", text="a")
+    store.session("agent-b").append_event("prompt", text="b")
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "agent-a")
+    session, how = store.resolve_caller("latest", "check plan")
+    assert session.id == "agent-a" and "CLAUDE_CODE_SESSION_ID" in how
+    # An id from another repository's conversation is ignored.
+    monkeypatch.setenv("CLAUDE_CODE_SESSION_ID", "elsewhere")
+    assert store.resolve_caller("latest", "check plan")[0] is None
+
+
+def test_caller_binds_through_a_hook_claim_once(tmp_path: Path, no_session_env):
+    store = SessionStore(tmp_path)
+    store.session("agent-a").append_event("prompt", text="a")
+    store.session("agent-b").append_event("prompt", text="b")
+    store.claim_command("agent-b", "plan register")
+    session, _ = store.resolve_caller("latest", "check plan")  # other verb
+    assert session is None
+    session, _ = store.resolve_caller("latest", "plan register")
+    assert session.id == "agent-b"
+    assert store.resolve_caller("latest", "plan register")[0] is None  # consumed
+
+    store.claim_command("agent-a", "ack")
+    store.claim_command("agent-b", "ack")
+    session, how = store.resolve_caller("latest", "ack")
+    assert session is None and "at once" in how
+
+
+def test_single_live_session_still_resolves(tmp_path: Path, no_session_env):
+    store = SessionStore(tmp_path)
+    store.session("solo").append_event("prompt", text="a")
+    store.session("human").append_event("human_changes", paths=[])
+    assert store.resolve_caller("latest", "plan register")[0].id == "solo"

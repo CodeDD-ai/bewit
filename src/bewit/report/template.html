@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bewit</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161a21; --panel-2: #1c212b; --panel-3: #232936;
+    --border: #2a303c; --text: #e6e9ef; --text-2: #c3cad6; --muted: #9aa3b2;
+    --accent: #7ab0ff; --ok: #4cc38a; --warn: #f0b429; --bad: #ef6461;
+    --info: #8ab4f8; --human: #b085f5;
+    --ok-bg: rgba(76, 195, 138, .12); --warn-bg: rgba(240, 180, 41, .12);
+    --bad-bg: rgba(239, 100, 97, .12); --info-bg: rgba(138, 180, 248, .12);
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 400 14px/1.6 system-ui, "Segoe UI", -apple-system, sans-serif;
+    height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+  }
+  button { font: inherit; color: inherit; }
+  .mono, code { font-family: var(--mono); font-size: 12.5px; }
+  code { background: var(--panel-3); padding: 1px 5px; border-radius: 4px; }
+  a, .link { color: var(--accent); text-decoration: none; cursor: pointer; background: none; border: none; padding: 0; }
+  a:hover, .link:hover { text-decoration: underline; }
+  .muted { color: var(--muted); }
+  .hidden { display: none !important; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 18px;
+    background: var(--panel); border-bottom: 1px solid var(--border); flex: none;
+  }
+  header .logo { font-weight: 700; font-size: 13px; letter-spacing: .4px; color: var(--muted); }
+  header .logo span { color: var(--accent); }
+  header .project { min-width: 0; padding-left: 12px; border-left: 1px solid var(--border); }
+  header .project-name { font-size: 18px; font-weight: 650; line-height: 1.2; }
+  header .root { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .mode { margin-left: auto; }
+  #project-select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font-size: 13px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 10px;
+    font-size: 12px; font-weight: 500; background: var(--panel-3); color: var(--muted); white-space: nowrap;
+  }
+  .badge.ok { color: var(--ok); background: var(--ok-bg); }
+  .badge.warn { color: var(--warn); background: var(--warn-bg); }
+  .badge.bad { color: var(--bad); background: var(--bad-bg); }
+  .badge.info { color: var(--info); background: var(--info-bg); }
+  .badge.human { color: var(--human); }
+  #banner { display: none; flex: none; padding: 8px 18px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  #banner.error { display: block; background: #3a1f22; color: #ffb4ab; }
+  #banner.warn { display: block; background: #3a2f16; color: #ffd98a; }
+
+  /* ---------- layout ---------- */
+  .layout { flex: 1; min-height: 0; display: grid; grid-template-columns: 320px 1fr; }
+  .layout.single { grid-template-columns: 1fr; }
+  #sidebar, #main { min-height: 0; overflow-y: auto; }
+  #sidebar { border-right: 1px solid var(--border); background: var(--panel); }
+  #main { padding: 22px 32px 64px; }
+  .page { max-width: 1180px; }
+
+  /* ---------- sidebar ---------- */
+  .side-tools { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--panel); z-index: 1; }
+  .side-head { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 14px 6px; font-size: 11px; font-weight: 600; letter-spacing: .6px;
+    text-transform: uppercase; color: var(--muted); }
+  .side-head .hint { text-transform: none; letter-spacing: 0; font-weight: 400; }
+  details.side-other > summary { list-style: none; cursor: pointer; padding: 14px; font-size: 11px;
+    font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+  details.side-other > summary::before { content: "▸ "; }
+  details.side-other[open] > summary::before { content: "▾ "; }
+  button.session-card { display: block; width: 100%; text-align: left; background: transparent;
+    border: none; border-bottom: 1px solid var(--border); padding: 12px 14px; cursor: pointer; }
+  .session-card:hover { background: var(--panel-2); }
+  .session-card.active { background: var(--panel-2); box-shadow: inset 3px 0 0 var(--accent); }
+  .session-card .top { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+  .session-card .top .who { color: var(--text-2); }
+  .session-card .sid { color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+  .session-card .excerpt { font-size: 13px; margin: 4px 0; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .session-card .sub { color: var(--muted); font-size: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .rec-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ok);
+    margin-right: 6px; vertical-align: 1px; animation: rec 2s infinite; }
+  @keyframes rec { 0% { box-shadow: 0 0 0 0 rgba(76,195,138,.6); } 70%, 100% { box-shadow: 0 0 0 6px rgba(76,195,138,0); } }
+  @media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
+
+  /* ---------- session head ---------- */
+  .eyebrow { color: var(--muted); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .eyebrow b { color: var(--text-2); font-weight: 500; }
+  h1.session-title { font-size: 20px; font-weight: 600; line-height: 1.35; margin: 6px 0 18px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* ---------- review box ---------- */
+  .review { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); margin-bottom: 16px; overflow: hidden; }
+  .review-head { display: flex; gap: 12px; align-items: center; padding: 14px 18px; }
+  .review-head .icon { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; flex: none; }
+  .review.clean .icon { background: var(--ok-bg); color: var(--ok); }
+  .review.todo .icon { background: var(--bad-bg); color: var(--bad); }
+  .review.todo { border-color: rgba(239,100,97,.45); }
+  .review-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+  .review-head p { margin: 0; color: var(--muted); font-size: 12.5px; }
+  .finding { border-top: 1px solid var(--border); padding: 14px 18px 14px 58px; position: relative; }
+  .finding::before { content: ""; position: absolute; left: 27px; top: 20px; width: 10px; height: 10px; border-radius: 50%; background: var(--warn); }
+  .finding.high::before { background: var(--bad); }
+  .finding .f-title { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-weight: 500; }
+  .finding dl { display: grid; grid-template-columns: 120px 1fr; gap: 3px 14px; margin: 8px 0 0; font-size: 13px; }
+  .finding dt { color: var(--muted); }
+  .finding dd { margin: 0; color: var(--text-2); overflow-wrap: anywhere; }
+  .finding .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn { background: var(--panel-3); border: 1px solid var(--border); border-radius: 8px; padding: 5px 12px;
+    cursor: pointer; font-size: 13px; color: var(--text); }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: #1d3357; border-color: #2d4f86; }
+  .ack-form { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .bulk { display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; padding: 10px 18px 10px 20px;
+    border-top: 1px solid var(--border); background: var(--panel-2); font-size: 13px; }
+  .bulk label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+  .bulk .count { color: var(--muted); margin-left: auto; }
+  .bulk .btn[disabled] { opacity: .5; cursor: default; border-color: var(--border); }
+  .bulk-form { display: block; padding: 12px 18px 14px 20px; border-top: 1px solid var(--border); background: var(--panel-2); margin: 0; }
+  .bulk-form .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .bulk-form .warnline { color: var(--warn); margin-top: 6px; }
+  .finding.pickable::before { display: none; }
+  .finding .pick { position: absolute; left: 24px; top: 17px; width: 16px; height: 16px; margin: 0; cursor: pointer; accent-color: var(--accent); }
+  .ack-form input { flex: 1; min-width: 240px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text); padding: 6px 10px; }
+  details.fold { border-top: 1px solid var(--border); }
+  details.fold > summary { cursor: pointer; padding: 10px 18px; color: var(--muted); font-size: 13px; list-style: none; }
+  details.fold > summary::before { content: "▸ "; }
+  details.fold[open] > summary::before { content: "▾ "; }
+  .fold-body { padding: 0 18px 12px; font-size: 13px; }
+  .fold-body li { margin: 4px 0; }
+
+  /* ---------- summary cards ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; text-align: left; cursor: pointer; }
+  .card:hover { border-color: var(--accent); }
+  .card .k { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 600; }
+  .card .v { font-size: 15px; margin: 2px 0; }
+  .card .s { font-size: 12.5px; color: var(--muted); }
+
+  /* ---------- tabs ---------- */
+  .tabs { display: flex; gap: 4px; position: sticky; top: -22px; z-index: 3; background: var(--bg);
+    border-bottom: 1px solid var(--border); margin: 0 0 16px; padding-top: 4px; }
+  .tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted);
+    padding: 8px 14px; cursor: pointer; }
+  .tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+  .tabs button:hover { color: var(--text); }
+  .tabs .count { color: var(--muted); font-size: 12px; margin-left: 4px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar input[type="search"] { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 7px 12px; width: 280px; outline: none; }
+  .toolbar input[type="search"]:focus { border-color: var(--accent); }
+  .toolbar label { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+  .hint { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+  .empty { color: var(--muted); font-style: italic; }
+
+  /* ---------- timeline ---------- */
+  .turn { border: 1px solid var(--border); border-radius: 12px; background: var(--panel); margin-bottom: 12px; }
+  button.turn-head { display: grid; grid-template-columns: 72px 110px 1fr auto; gap: 12px; align-items: baseline;
+    width: 100%; text-align: left; background: none; border: none; padding: 12px 16px; cursor: pointer; }
+  button.turn-head:hover { background: var(--panel-2); border-radius: 12px; }
+  .turn-no { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+  .turn-time { color: var(--muted); font-size: 12.5px; }
+  .turn-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .turn-stats { display: flex; gap: 6px; align-items: center; }
+  .turn-body { padding: 0 16px 14px; }
+  .prompt-box { background: var(--panel-2); border-radius: 10px; padding: 12px 14px; white-space: pre-wrap;
+    color: var(--text-2); font-size: 13.5px; margin: 0 0 12px; overflow-wrap: anywhere; }
+  .prompt-box.clamped { max-height: 7.2em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 60%, transparent); mask-image: linear-gradient(#000 60%, transparent); }
+  ol.tl { list-style: none; margin: 0; padding: 0; position: relative; }
+  ol.tl::before { content: ""; position: absolute; left: 95px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+  .tl-item { display: grid; grid-template-columns: 84px 24px 1fr; gap: 0; padding: 6px 0; }
+  .tl-time { color: var(--muted); font-size: 12px; font-family: var(--mono); padding-top: 2px; }
+  .tl-dot { width: 12px; height: 12px; border-radius: 50%; margin: 5px 0 0 6px; background: var(--muted); position: relative; z-index: 1;
+    box-shadow: 0 0 0 3px var(--panel); }
+  .tl-dot.prompt { background: var(--accent); }
+  .tl-dot.plan { background: var(--human); }
+  .tl-dot.ok { background: var(--ok); }
+  .tl-dot.warn { background: var(--warn); }
+  .tl-dot.bad { background: var(--bad); }
+  .tl-dot.info { background: var(--info); }
+  .tl-dot.edit { background: #6b7a99; }
+  .tl-main { min-width: 0; padding-left: 8px; }
+  button.tl-title { background: none; border: none; padding: 0; text-align: left; cursor: pointer; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  button.tl-title:hover .t { text-decoration: underline; }
+  .tl-title .chev { color: var(--muted); font-size: 11px; }
+  .tl-sub { color: var(--text-2); font-size: 12.5px; overflow-wrap: anywhere; }
+  .tl-note { color: var(--muted); font-size: 12.5px; }
+  .tl-detail { margin: 8px 0 4px; padding: 10px 12px; background: var(--panel-2); border-radius: 8px; font-size: 13px; }
+  .tl-detail table { margin: 0; }
+  .file-list { list-style: none; margin: 4px 0 0; padding: 0; }
+  .file-list li { padding: 2px 0; }
+  .file-list button { background: none; border: none; padding: 0; color: var(--text-2); cursor: pointer; font-family: var(--mono); font-size: 12.5px; text-align: left; }
+  .file-list button:hover { color: var(--accent); }
+
+  /* ---------- tables ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.path { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; width: 46%; min-width: 280px; }
+  td.path::before { display: inline-block; width: 14px; }
+  td.loc { white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+  tr.row-click { cursor: pointer; }
+  tr.row-click:hover td { background: var(--panel-2); }
+  tr.row-click td.path::before { content: "▸ "; color: var(--muted); }
+  tr.row-click.open td.path::before { content: "▾ "; }
+  tr.diff-row td { padding: 0; background: #12151b; }
+  .add { color: var(--ok); } .del { color: var(--bad); }
+  pre.diff { margin: 0; padding: 10px 14px; max-height: 460px; overflow: auto; font-family: var(--mono); font-size: 12px; line-height: 1.5; }
+  pre.diff .line { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+  pre.diff .dl-add { color: var(--ok); background: rgba(76,195,138,.1); }
+  pre.diff .dl-del { color: var(--bad); background: rgba(239,100,97,.12); }
+  pre.diff .dl-hunk { color: var(--accent); }
+  pre.diff .dl-meta { color: var(--muted); }
+  pre.output { background: #12151b; border-radius: 8px; padding: 10px 12px; max-height: 300px; overflow: auto;
+    font-family: var(--mono); font-size: 12px; white-space: pre-wrap; margin: 6px 0 0; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; }
+  .panel h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .panel > .hint { margin-bottom: 10px; }
+  .rule-row { border-top: 1px solid var(--border); padding: 10px 0; }
+  .rule-row:first-of-type { border-top: none; }
+  .rule-row .head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .rule-row .msg { color: var(--muted); font-size: 12.5px; }
+  .rule-row .what { color: var(--text-2); font-size: 13px; margin: 2px 0; }
+  .kind-head { margin: 14px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+  .what code, .drawer code { font-size: 12px; }
+
+  /* ---------- rule chips and drawer ---------- */
+  button.rule-chip { font-family: var(--mono); font-size: 12px; border: 1px solid var(--border); cursor: pointer; }
+  button.rule-chip:hover, button.rule-chip:focus-visible { border-color: var(--accent); color: var(--text); outline: none; }
+  .tl-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .tl-why { color: var(--text-2); font-size: 12.5px; }
+  .tl-why .rid { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .hit { padding: 6px 0; border-top: 1px solid var(--border); }
+  .hit:first-child { border-top: none; padding-top: 0; }
+  #drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 20; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(580px, 100vw); z-index: 21; overflow-y: auto;
+    background: var(--panel); border-left: 1px solid var(--border); box-shadow: -16px 0 40px rgba(0, 0, 0, .45);
+    padding: 18px 22px 48px; }
+  .drawer .d-top { display: flex; gap: 10px; align-items: flex-start; }
+  .drawer h2 { margin: 0; font-size: 17px; font-family: var(--mono); font-weight: 600; overflow-wrap: anywhere; flex: 1; }
+  .drawer .d-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 14px; }
+  .drawer h4 { margin: 18px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--muted); }
+  .drawer .d-what { font-size: 15px; line-height: 1.55; }
+  .drawer blockquote { margin: 0; padding: 8px 12px; border-left: 3px solid var(--border); color: var(--text-2); background: var(--panel-2); border-radius: 0 8px 8px 0; }
+  .drawer dl { display: grid; grid-template-columns: 110px 1fr; gap: 6px 14px; margin: 0; font-size: 13px; }
+  .drawer dt { color: var(--muted); }
+  .drawer dd { margin: 0; overflow-wrap: anywhere; }
+  .drawer dd code { display: inline-block; margin: 0 4px 4px 0; }
+  .drawer pre.yaml { background: #12151b; border-radius: 8px; padding: 10px 12px; font-family: var(--mono); font-size: 12px;
+    white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+  .drawer .note { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 10px; }
+  .plan-progress { list-style: none; margin: 6px 0 0; padding: 0; columns: 2; column-gap: 28px; }
+  .plan-progress li { padding: 2px 0; break-inside: avoid; font-family: var(--mono); font-size: 12.5px; }
+  .plan-progress .done::before { content: "✓ "; color: var(--ok); }
+  .plan-progress .pending { color: var(--muted); }
+  .plan-progress .pending::before { content: "○ "; color: var(--warn); }
+  .plan-text { white-space: pre-wrap; background: var(--panel-2); border-radius: 8px; padding: 10px 12px;
+    margin-top: 8px; max-height: 420px; overflow-y: auto; font-size: 13px; }
+  #placeholder { color: var(--muted); padding: 60px; text-align: center; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    #sidebar { max-height: 32vh; border-right: none; border-bottom: 1px solid var(--border); }
+    #main { padding: 16px; }
+    button.turn-head { grid-template-columns: 1fr auto; }
+    .turn-no, .turn-time { display: none; }
+    .finding { padding-left: 40px; }
+    .finding::before { left: 16px; }
+    .finding dl { grid-template-columns: 1fr; }
+    ol.tl::before { left: 11px; }
+    .tl-item { grid-template-columns: 24px 1fr; }
+    .tl-time { display: none; }
+    .plan-progress { columns: 1; }
+  }
+</style>
+</head>
+<body>
+<script>/*__BEWIT_EMBED__*/</script>
+<header>
+  <div class="logo">be<span>wit</span></div>
+  <div class="project">
+    <div class="project-name" id="project-name"></div>
+    <div class="root mono" id="root-path"></div>
+  </div>
+  <select id="project-select" aria-label="Project" hidden></select>
+  <div class="mode"><span class="badge" id="mode-badge"></span></div>
+</header>
+<div id="banner" role="status"></div>
+<div class="layout" id="layout">
+  <nav id="sidebar" aria-label="Sessions"></nav>
+  <main id="main"><div id="placeholder">Select a session</div></main>
+</div>
+
+<script>
+"use strict";
+
+const EXPORT = window.__BEWIT_DATA__ || null;
+const POLL_MS = 2500;
+/** Must match API_LEVEL in report/server.py (see there). */
+const API_LEVEL = 3;
+/** A session counts as "recording now" when it logged an event this recently. */
+const ACTIVE_MS = 15 * 60 * 1000;
+
+let selectedId = null;
+let currentView = null;
+let lastRenderKey = "";
+// UI state survives re-renders.
+const ui = {
+  tab: "timeline", q: "", openTurns: new Set(), turnCount: 0, openEvents: new Set(),
+  openRows: new Set(), diffs: new Map(), fullPrompts: new Set(), ackOpen: null,
+  needsReview: false, showOther: false, seenActivity: null, rule: null,
+  picked: new Set(), bulkOpen: false, bulkBusy: false,
+};
+
+// Hub mode (`bewit serve --all`): the project every API call names.
+let projectId = null;
+let projects = [];
+let latestState = null;
+let lastSidebarKey = "";
+
+const $ = (id) => document.getElementById(id);
+
+/** HTML-escape text for element content AND quoted attribute values. */
+function esc(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** API URL, scoped to the selected project when the viewer is a hub. */
+function api(path, params = {}) {
+  const query = new URLSearchParams(params);
+  if (projectId) query.set("project", projectId);
+  const qs = query.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
+function baseName(path) {
+  return String(path || "").replace(/[\\/]+$/, "").split(/[\\/]/).pop() || "";
+}
+
+function shortId(id) { return id.length > 14 ? id.slice(0, 8) + "…" + id.slice(-4) : id; }
+function plural(n, one, many) { return `${n} ${n === 1 ? one : (many || one + "s")}`; }
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const p2 = (n) => String(n).padStart(2, "0");
+/** "18 Sep 14:47" in local time. */
+function fmtDate(iso) {
+  const d = new Date(iso || "");
+  if (isNaN(d)) return "?";
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+/** "14:47:32" in local time. */
+function fmtTime(iso) {
+  const d = new Date(iso || "");
+  if (isNaN(d)) return "";
+  return `${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
+}
+function relTime(iso, nowMs) {
+  const t = Date.parse(iso || "");
+  if (isNaN(t)) return "?";
+  const min = Math.max(0, Math.round((nowMs - t) / 60000));
+  if (min < 1) return "just now";
+  if (min < 60) return `${min} min ago`;
+  if (min < 24 * 60) return `${Math.floor(min / 60)} h ago`;
+  return fmtDate(iso);
+}
+function duration(fromIso, toMs) {
+  const t = Date.parse(fromIso || "");
+  if (isNaN(t)) return "";
+  const min = Math.max(0, Math.round((toMs - t) / 60000));
+  if (min < 60) return `${min} min`;
+  if (min < 48 * 60) return `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}`;
+  return `${Math.floor(min / 1440)} d`;
+}
+function badge(text, cls, title) {
+  return `<span class="badge ${cls || ""}" ${title ? `title="${esc(title)}"` : ""}>${esc(text)}</span>`;
+}
+function locHtml(added, removed) {
+  const a = Number.isInteger(added) ? `+${added}` : "+?";
+  const r = Number.isInteger(removed) ? `-${removed}` : "-?";
+  return `<span class="add">${a}</span> <span class="del">${r}</span>`;
+}
+function matches(...fields) {
+  if (!ui.q) return true;
+  const q = ui.q.toLowerCase();
+  return fields.some((f) => String(f || "").toLowerCase().includes(q));
+}
+function isReviewNote(text) { return String(text || "").startsWith("Bewit final review found issues"); }
+function isBookkeeping(path) {
+  const p = String(path || "").replace(/\\/g, "/");
+  return p.includes(".bewit/sessions/") || p.endsWith(".bewit/hook-errors.log");
+}
+
+/* ============================== sidebar ============================== */
+
+function nowOf(state) { return Date.parse((state && state.generated_at) || "") || Date.now(); }
+function isRecording(s, nowMs) {
+  const last = Date.parse(s.last_activity || "");
+  return s.category === "agent" && !isNaN(last) && nowMs - last < ACTIVE_MS;
+}
+function sessionGroups(state) {
+  const now = nowOf(state);
+  const groups = { recording: [], earlier: [], other: [] };
+  for (const s of state.sessions || []) {
+    if (s.category !== "agent") groups.other.push(s);
+    else if (isRecording(s, now)) groups.recording.push(s);
+    else if (!ui.needsReview || (s.to_review || 0) > 0) groups.earlier.push(s);
+  }
+  return groups;
+}
+
+function sessionCard(s, nowMs, recording) {
+  const active = s.id === selectedId ? "active" : "";
+  if (s.category !== "agent") {
+    const label = s.category === "human" ? "Commits made without an agent session" : "Hook events with no session id (diagnostics)";
+    return `<button type="button" class="session-card ${active}" data-id="${esc(s.id)}">
+      <div class="top"><span class="who">${esc(s.category === "human" ? "Human changes" : "Unattributed")}</span>
+        <span>${esc(relTime(s.last_activity, nowMs))}</span></div>
+      <div class="sub">${esc(label)}</div></button>`;
+  }
+  // The open session's count comes from its live view, so the sidebar and
+  // the review box always agree; others use the last end-of-turn state.
+  const count = s.id === selectedId && currentView && currentView.id === s.id && currentView.review
+    ? (currentView.review.open || []).length : (s.to_review || 0);
+  const review = count > 0
+    ? badge(`${count} to review`, "bad", "Items in this session's review box (the same list as on the session page).")
+    : "";
+  const who = [s.runtime || "agent", s.branch].filter(Boolean).join(" · ");
+  const when = recording
+    ? `recording ${duration(s.started_at, nowMs)} · last event ${relTime(s.last_activity, nowMs)}`
+    : `${fmtDate(s.started_at)} · ${duration(s.started_at, Date.parse(s.last_activity || "") || nowMs)}`;
+  return `<button type="button" class="session-card ${active}" data-id="${esc(s.id)}">
+      <div class="top"><span class="who">${recording ? `<span class="rec-dot" aria-hidden="true"></span>` : ""}${esc(who)}</span>
+        <span class="sid" title="${esc(s.id)}">${esc(shortId(s.id))}</span></div>
+      <div class="excerpt">${esc(s.prompt_excerpt || "(no prompt captured)")}</div>
+      <div class="sub"><span>${esc(when)}</span>${s.edits ? `<span>· ${plural(s.edits, "edit")}</span>` : ""}${review}</div>
+    </button>`;
+}
+
+function renderSidebar(state, force = false) {
+  latestState = state;
+  const now = nowOf(state);
+  // Redraw only when something visible changed; per-poll redraws break
+  // hover, focus, and screen-reader position.
+  const key = JSON.stringify([state.sessions, selectedId, ui.needsReview, ui.showOther, Math.floor(now / 60000)]);
+  if (!force && key === lastSidebarKey) return;
+  lastSidebarKey = key;
+  const { recording, earlier, other } = sessionGroups(state);
+  const section = (title, hint, items, isRec) => `
+    <div class="side-head"><span>${esc(title)} (${items.length})</span><span class="hint">${esc(hint)}</span></div>
+    ${items.map((s) => sessionCard(s, now, isRec)).join("")
+      || `<div class="sub muted" style="padding: 0 14px 10px; font-size: 12.5px">${isRec ? "No agent activity in the last 15 min." : "Nothing here."}</div>`}`;
+  $("sidebar").innerHTML = `
+    <div class="side-tools">
+      <button type="button" class="btn" data-toggle="review" aria-pressed="${ui.needsReview}"
+        title="Only sessions with items to review">${ui.needsReview ? "✓ " : ""}Needs review only</button>
+    </div>
+    ${section("Recording now", "active < 15 min", recording, true)}
+    ${section("Earlier", "", earlier, false)}
+    ${other.length ? `<details class="side-other" ${ui.showOther ? "open" : ""}>
+      <summary>Other records (${other.length})</summary>
+      ${other.map((s) => sessionCard(s, now, false)).join("")}</details>` : ""}`;
+  document.querySelector("[data-toggle=review]").addEventListener("click", () => {
+    ui.needsReview = !ui.needsReview; renderSidebar(latestState, true);
+  });
+  const others = document.querySelector("details.side-other");
+  if (others) others.addEventListener("toggle", () => { ui.showOther = others.open; });
+  for (const el of document.querySelectorAll(".session-card"))
+    el.addEventListener("click", () => selectSession(el.dataset.id));
+}
+
+function selectSession(id) {
+  if (!id || selectedId === id) return;
+  selectedId = id;
+  Object.assign(ui, { q: "", openTurns: new Set(), turnCount: 0, openEvents: new Set(), openRows: new Set(),
+                      diffs: new Map(), fullPrompts: new Set(), ackOpen: null, seenActivity: null, rule: null,
+                      picked: new Set(), bulkOpen: false });
+  renderDrawer();
+  lastRenderKey = "";
+  writeHash();
+  if (latestState) renderSidebar(latestState, true);
+  refreshSession();
+}
+
+/* deep links: #project=<id>&session=<id>&tab=<tab>&rule=<id> */
+function readHash() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  return { project: params.get("project"), session: params.get("session"), tab: params.get("tab"), rule: params.get("rule") };
+}
+function writeHash() {
+  const params = new URLSearchParams();
+  if (projectId) params.set("project", projectId);
+  if (selectedId) params.set("session", selectedId);
+  if (ui.tab !== "timeline") params.set("tab", ui.tab);
+  if (ui.rule) params.set("rule", ui.rule);
+  const hash = "#" + params.toString();
+  if (location.hash !== hash) history.replaceState(null, "", hash);
+}
+
+/* ============================== session model ============================== */
+
+const OUTCOME = {
+  refused:  { cls: "ok",   label: "refused",        note: "Handled by the rule: the action did not run. Nothing to do." },
+  approved: { cls: "ok",   label: "you approved",   note: "" },
+  declined: { cls: "ok",   label: "did not run",    note: "Declined, or abandoned before you answered." },
+  waiting:  { cls: "warn", label: "waiting for you", note: "Paused: waiting for your decision in the agent's window." },
+  unknown:  { cls: "info", label: "outcome not recorded", note: "Recorded before Bewit tracked approvals." },
+  flagged:  { cls: "info", label: "flagged",        note: "Allowed. The rule asks that you look at this change." },
+};
+const SUBJECT = { edit: "an edit", shell: "a command", read: "a file read", mcp: "an MCP call", tool: "a tool call" };
+const KIND_WORD = { path: "file edits", read: "file reads", shell: "shell commands", mcp: "MCP calls", tool: "tool use", check: "quality check", prompt: "plan policy" };
+const KIND_ORDER = ["path", "read", "shell", "mcp", "tool", "check", "prompt"];
+const KIND_HEAD = { path: "File edits", read: "File reads", shell: "Shell commands", mcp: "MCP calls", tool: "Tool use", check: "Quality checks (end of each turn)", prompt: "Plan policies (the agent attests)" };
+/** Gate event kind -> the rule kind that produces it. */
+const GATE_RULE_KIND = { edit: "path", read: "read", shell: "shell", mcp: "mcp", tool: "tool" };
+const EFFECT = { deny: "refuses it", block: "pauses it until you approve", flag: "lets it run and flags it for your review" };
+const ACTION_BADGE = { deny: ["refuses", "bad"], block: ["asks you first", "warn"], flag: ["flags", "info"] };
+
+/* ============================== rules ============================== */
+
+/**
+ * Every rule id this session mentions, resolved to a definition.
+ * Current definitions come from the project's rules; ids no longer defined
+ * fall back to what the events recorded (action, kind, and, for newer
+ * records, the rule's message), marked ``missing``.
+ */
+function ruleDefs(view) {
+  if (view.__rules) return view.__rules;
+  const defs = new Map((view.active_rules || []).map((r) => [r.id, { ...r, recorded: {} }]));
+  const seen = (id, fields) => {
+    if (!id) return;
+    if (!defs.has(id)) defs.set(id, { id, kind: fields.kind || "", action: fields.action || "", targets: [], applies_to: [],
+                                      message: fields.message || "", policy: fields.policy || "", missing: true, recorded: {} });
+    const rec = defs.get(id).recorded;
+    for (const [k, v] of Object.entries(fields)) if (v && !rec[k]) rec[k] = v;
+  };
+  for (const g of view.gate_events || [])
+    for (const h of g.hits || []) seen(h.rule_id, { kind: GATE_RULE_KIND[g.kind], action: h.action, message: h.message });
+  for (const q of view.quality_checks || []) seen(q.rule_id, { kind: "check", action: q.action, message: q.message });
+  for (const c of view.checks || [])
+    for (const r of c.prompt_rules || []) seen(r.rule_id, { kind: "prompt", policy: r.policy });
+  view.__rules = defs;
+  return defs;
+}
+
+function ruleDef(id) {
+  return (currentView && ruleDefs(currentView).get(id)) || { id, kind: "", action: "", targets: [], applies_to: [], missing: true, recorded: {} };
+}
+
+/** A rule id as a button that opens its definition. */
+function ruleChip(id) {
+  const r = ruleDef(id);
+  const hint = r.message || r.policy || (r.missing ? "No longer defined in .bewit/rules" : "");
+  return `<button type="button" class="badge rule-chip" data-rule="${esc(id)}" title="${esc((hint ? hint + " — " : "") + "click for the full rule")}">${esc(id)}</button>`;
+}
+
+function codeList(items, max = 4) {
+  const list = (items || []).filter(Boolean);
+  if (!list.length) return "<i>nothing</i>";
+  const shown = list.slice(0, max).map((x) => `<code>${esc(x)}</code>`);
+  const rest = list.length - shown.length;
+  if (rest > 0) shown.push(`${rest} more`);
+  return shown.length === 1 ? shown[0] : `${shown.slice(0, -1).join(", ")} or ${shown[shown.length - 1]}`;
+}
+
+/** One plain-language sentence: what the rule does. HTML. */
+function ruleSentence(r) {
+  const effect = EFFECT[r.action] || `applies “${esc(r.action)}”`;
+  const scope = (r.applies_to || []).length ? ` inside ${codeList(r.applies_to)}` : "";
+  if (r.missing) {
+    const kind = r.kind || r.recorded.kind;
+    const what = { path: "file edits", read: "file reads", shell: "shell commands", mcp: "MCP calls", tool: "tool calls", check: "a quality check", prompt: "a plan policy" }[kind];
+    const past = { deny: "refused them", block: "paused them for your approval", flag: "flagged them for review" }[r.action];
+    return `No longer defined in <code>.bewit/rules</code>: it was removed or renamed after it fired, so only what the record kept is shown.`
+      + (what ? ` It was a rule on ${what}${past && !["check", "prompt"].includes(kind) ? ` that ${past}` : ""}.` : "");
+  }
+  const pats = codeList(r.targets);
+  switch (r.kind) {
+    case "path": return `When the agent creates or edits a file matching ${pats}${scope}, Bewit ${effect}.`;
+    case "read": return `When the agent reads a file matching ${pats}${scope} — with a read tool or a recognised shell read such as <code>cat</code> or <code>Get-Content</code> — Bewit ${effect}.`;
+    case "shell": return `When a command the agent runs matches ${pats.includes(" or ") ? "one of the patterns" : "the pattern"} ${pats}${scope}, Bewit ${effect}. Patterns are case-insensitive regular expressions over the command text.`;
+    case "mcp": return `When the agent calls an MCP tool whose name matches ${pats}, Bewit ${effect}.`;
+    case "tool": return `When the agent uses a tool whose name matches ${pats}, Bewit ${effect}.`;
+    case "check": return `At the end of every turn (and in CI), Bewit runs <code>${esc(r.command)}</code> on the changed files matching ${pats}${scope}. ${r.action === "block" ? "If it fails, that is a finding in the review box and <code>bewit check diff</code> fails." : "If it fails, the result is highlighted but is not a finding."}`;
+    case "prompt": return `Before editing, the agent must state whether its plan meets this policy${scope ? `, when the plan touches files${scope}` : ""}. Its answer is a statement, not proof.`;
+    default: return "";
+  }
+}
+
+function yamlStr(s) { return `'${String(s).replace(/'/g, "''")}'`; }
+
+/** The rule as YAML, equivalent to what the rules file declares (comments are not kept). */
+function ruleYaml(r) {
+  const out = [`- id: ${r.id}`, `  kind: ${r.kind}`];
+  const list = (key, items) => { if ((items || []).length) out.push(`  ${key}:`, ...items.map((x) => `    - ${yamlStr(x)}`)); };
+  const key = r.kind === "shell" ? "match_command" : ["mcp", "tool"].includes(r.kind) ? "match_tool" : "match";
+  if (r.kind !== "prompt") list(key, r.targets);
+  list("applies_to", r.applies_to);
+  if (r.command) out.push(`  command: ${yamlStr(r.command)}`);
+  if (r.kind === "check" && r.timeout) out.push(`  timeout: ${r.timeout}`);
+  if (r.action) out.push(`  action: ${r.action}`);
+  if (r.message) out.push(`  message: ${yamlStr(r.message)}`);
+  if (r.policy) out.push(`  policy: ${yamlStr(r.policy)}`);
+  if (r.enabled === false) out.push("  enabled: false");
+  return out.join("\n");
+}
+
+/** Everything this rule did in the session, newest first. */
+function ruleActivity(view, id) {
+  const rows = [];
+  for (const g of view.gate_events || [])
+    if ((g.hits || []).some((h) => h.rule_id === id)) {
+      const o = OUTCOME[g.outcome] || OUTCOME.flagged;
+      rows.push({ ts: g.ts, what: `${SUBJECT[g.kind] || "an action"}`, target: gateTarget(g), badge: badge(o.label, o.cls) });
+    }
+  for (const q of view.quality_checks || [])
+    if (q.rule_id === id)
+      rows.push({ ts: q.ts, what: "check run", target: plural((q.files || []).length, "file"),
+                  badge: q.ok === true ? badge("passed", "ok") : q.ok === false ? badge("failed", q.action === "block" ? "bad" : "warn") : badge("could not run", "info") });
+  for (const c of view.checks || [])
+    for (const r of c.prompt_rules || [])
+      if (r.rule_id === id) rows.push({ ts: c.ts, what: "plan check", target: r.scope || "", badge: verdictBadge(r.verdict) });
+  return rows.sort((a, b) => String(b.ts || "").localeCompare(String(a.ts || "")));
+}
+
+function drawerHtml(view, id) {
+  const r = ruleDef(id);
+  const [actionText, actionCls] = ACTION_BADGE[r.action] || [r.action, ""];
+  const badges = [
+    r.kind ? badge(KIND_WORD[r.kind] || r.kind, "") : "",
+    r.action ? badge(actionText, actionCls) : "",
+    r.enabled === false ? badge("disabled", "warn", "enabled: false — this rule does not run") : "",
+    r.missing ? badge("not defined any more", "warn") : "",
+  ].join("");
+  const recordedMsg = r.recorded.message || r.recorded.policy || "";
+  const current = r.message || r.policy || "";
+  const changed = !r.missing && recordedMsg && current && recordedMsg.trim() !== current.trim();
+  const why = r.missing ? recordedMsg : current;
+  const defs = [
+    r.targets && r.targets.length ? [r.kind === "shell" ? "Command patterns" : ["mcp", "tool"].includes(r.kind) ? "Tool names" : "Files", r.targets.map((t) => `<code>${esc(t)}</code>`).join(" ")] : null,
+    (r.applies_to || []).length ? ["Only inside", r.applies_to.map((t) => `<code>${esc(t)}</code>`).join(" ")] : null,
+    r.command ? ["Runs", `<code>${esc(r.command)}</code>${r.timeout ? ` <span class="muted">(timeout ${r.timeout}s)</span>` : ""}`] : null,
+    r.action ? ["Action", `<code>${esc(r.action)}</code> — ${esc({ deny: "hard stop; the agent is told not to retry a variation", block: "pause for your approval (Codex cannot ask, so it refuses)", flag: "allow, record, and highlight in the review" }[r.action] || "")}`] : null,
+    r.source ? ["Defined in", `<code>${esc(r.source)}</code>`] : null,
+  ].filter(Boolean);
+  const activity = ruleActivity(view, id);
+  return `<div class="d-top"><h2 id="drawer-title">${esc(id)}</h2>
+      <button type="button" class="btn" data-drawer-close aria-label="Close">Close ✕</button></div>
+    <div class="d-badges">${badges}</div>
+    ${changed ? `<div class="note">This rule was edited after it fired here. Below is the current definition; when it fired its message was: “${esc(recordedMsg)}”</div>` : ""}
+    <h4>What it does</h4>
+    <div class="d-what">${ruleSentence(r)}</div>
+    ${why ? `<h4>${r.kind === "prompt" ? "The policy" : "Its message"}${r.missing ? " (as recorded)" : ""}</h4><blockquote>${esc(why)}</blockquote>` : ""}
+    ${defs.length ? `<h4>Definition</h4><dl>${defs.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}</dl>` : ""}
+    ${r.missing ? "" : `<h4>As YAML${r.source ? ` <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">— equivalent to ${esc(r.source)}</span>` : ""}</h4><pre class="yaml">${esc(ruleYaml(r))}</pre>`}
+    <h4>In this session</h4>
+    ${activity.length ? `<table><tbody>${activity.map((a) => `<tr><td class="mono muted" style="white-space:nowrap">${esc(fmtDate(a.ts))}</td><td>${esc(a.what)}${a.target ? `<div class="mono" style="overflow-wrap:anywhere">${esc(a.target)}</div>` : ""}</td><td>${a.badge}</td></tr>`).join("")}</tbody></table>`
+                     : `<p class="empty">It did not fire in this session.</p>`}`;
+}
+
+let drawerReturnFocus = null;
+function openRule(id, trigger) {
+  if (!id) return;
+  drawerReturnFocus = trigger || document.activeElement;
+  ui.rule = id;
+  writeHash();
+  renderDrawer(true);
+}
+function closeRule() {
+  ui.rule = null;
+  writeHash();
+  renderDrawer();
+  if (drawerReturnFocus && document.contains(drawerReturnFocus)) drawerReturnFocus.focus();
+  drawerReturnFocus = null;
+}
+function renderDrawer(focus = false) {
+  let drawer = $("rule-drawer");
+  if (!ui.rule || !currentView) {
+    if (drawer) drawer.remove();
+    const backdrop = $("drawer-backdrop");
+    if (backdrop) backdrop.remove();
+    return;
+  }
+  if (!drawer) {
+    const backdrop = document.createElement("div");
+    backdrop.id = "drawer-backdrop";
+    backdrop.addEventListener("click", closeRule);
+    drawer = document.createElement("aside");
+    drawer.id = "rule-drawer";
+    drawer.className = "drawer";
+    drawer.setAttribute("role", "dialog");
+    drawer.setAttribute("aria-modal", "true");
+    drawer.setAttribute("aria-labelledby", "drawer-title");
+    drawer.addEventListener("click", (ev) => { if (ev.target.closest("[data-drawer-close]")) closeRule(); });
+    document.body.append(backdrop, drawer);
+  }
+  const html = drawerHtml(currentView, ui.rule);
+  if (drawer.renderedHtml !== html) { drawer.innerHTML = html; drawer.renderedHtml = html; }
+  if (focus) { drawer.scrollTop = 0; drawer.querySelector("[data-drawer-close]").focus(); }
+}
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && ui.rule) closeRule(); });
+
+function userPrompts(view) {
+  const out = [];
+  for (const p of view.prompts || []) {
+    if (isReviewNote(p.text)) continue;
+    const prev = out[out.length - 1];
+    if (prev && prev.ts === p.ts && prev.text === p.text) continue; // duplicate hook delivery
+    out.push(p);
+  }
+  return out;
+}
+
+/** Prompt text as the user wrote it: the agent UI's <pasted_content …> wrapper tags are hidden. */
+function promptDisplay(text) {
+  return String(text || "").replace(/<\/?pasted_content\b[^>]*>/g, "").trim();
+}
+
+function promptHeadline(text) {
+  return promptDisplay(text).split("\n")[0].trim();
+}
+
+function headingText(view) {
+  if (view.id === "human") return "Human changes";
+  const prompts = userPrompts(view).filter((p) => promptDisplay(p.text));
+  if (prompts.length) return promptHeadline(prompts[0].text).slice(0, 160);
+  if ((view.prompts || []).some((p) => p.sealed)) return "Sealed prompt";
+  return "No prompt captured";
+}
+
+/** A gate event's outcome, derived when an older server did not send one. */
+function outcomeOf(g) {
+  if (g.outcome) return g.outcome;
+  return g.permission === "deny" ? "refused" : g.permission === "ask" ? "unknown" : "flagged";
+}
+
+function gateTarget(g) {
+  return (g.paths && g.paths.length) ? g.paths.join(", ") : (g.target || "");
+}
+
+/** Every reviewable event in time order, in reviewer language. */
+function collectEvents(view) {
+  const items = [];
+  const add = (e) => items.push(e);
+  for (const p of view.prompts || []) {
+    if (isReviewNote(p.text))
+      add({ ts: p.ts, cat: "review", dot: "warn", title: "Bewit sent the agent its end-of-turn findings",
+            sub: "", detail: `<div class="prompt-box">${esc(p.text)}</div>` });
+  }
+  for (const r of (view.plan || {}).revisions || [])
+    add({ ts: r.ts, cat: "plan", dot: "plan", title: `Plan registered · ${plural((r.declared_files || []).length, "file")} declared`,
+          sub: "", link: { tab: "plan", label: "Open plan" },
+          detail: (r.declared_files || []).length ? `<ul class="file-list">${r.declared_files.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>` : "" });
+  for (const c of view.checks || []) {
+    const verdicts = (c.prompt_rules || []);
+    const bad = verdicts.filter((r) => !["pass", "n/a"].includes(r.verdict));
+    add({ ts: c.ts, cat: "rules", dot: c.ok ? "ok" : "bad",
+          title: c.ok ? "Plan check passed" : "Plan check did not pass",
+          sub: c.ok ? `${plural(verdicts.length, "policy", "policies")} self-attested by the agent`
+                    : (c.plan_registered === false ? "No plan was registered" : `${bad.map((r) => `${r.rule_id}=${r.verdict}`).join(", ")}`),
+          link: { tab: "rules", label: "See policies" },
+          detail: verdicts.length ? `<table><tbody>${verdicts.map((r) => `<tr><td>${verdictBadge(r.verdict)}</td><td>${ruleChip(r.rule_id)}</td><td class="muted">${esc(r.policy || "")}</td></tr>`).join("")}</tbody></table>` : "" });
+  }
+  const defs = ruleDefs(view);
+  const why = (id) => { const r = defs.get(id) || {}; return r.message || r.policy || (r.recorded || {}).message || ""; };
+  for (const g of view.gate_events || []) {
+    const o = OUTCOME[g.outcome] || OUTCOME.flagged;
+    const subject = SUBJECT[g.kind] || "an action";
+    const verb = g.permission === "deny" ? `Rule refused ${subject}` : g.permission === "ask" ? `Rule paused ${subject}` : `Rule flagged ${subject}`;
+    const rules = [...new Set((g.hits || []).map((h) => h.rule_id))];
+    add({ ts: g.ts, cat: "rules", dot: g.permission === "ask" && g.outcome === "waiting" ? "warn" : g.permission === "allow" ? "info" : "ok",
+          title: verb, badges: [badge(o.label, o.cls)], rules,
+          why: rules.map((id) => ({ id, text: why(id) })).filter((w) => w.text),
+          sub: gateTarget(g), mono: true, note: o.note,
+          detail: rules.map((id) => `<div class="hit">${ruleChip(id)}<div class="what">${ruleSentence(defs.get(id) || ruleDef(id))}</div></div>`).join("") });
+  }
+  for (const e of view.edits || []) {
+    if (isBookkeeping(e.path)) continue;
+    add({ ts: e.ts, cat: "edit", path: e.path, origin: e.origin });
+  }
+  for (const c of view.commands || []) {
+    const label = String(c.label || "command");
+    const mcp = label.startsWith("mcp: ");
+    const text = label.replace(/^(shell|mcp): /, "");
+    const ended = c.ended !== false;
+    add({ ts: c.ts, cat: "command", dot: ended ? "edit" : "",
+          title: ended ? (mcp ? "Called an MCP tool" : "Ran a command")
+                       : (mcp ? "Started an MCP call" : "Started a command"),
+          badges: ended ? [] : [badge("no completion recorded", "", "Still running, stopped before it ran (e.g. by the agent runtime's own permission check), or its end hook is not wired.")],
+          sub: label === "shell" ? "(command text not captured: prompt_capture is not full)" : text, mono: true });
+  }
+  for (const f of view.final_checks || []) {
+    const n = (f.findings || []).length;
+    add({ ts: f.ts, cat: "review", dot: n ? "warn" : "ok",
+          title: n ? `End-of-turn review: ${plural(n, "finding")}` : "End-of-turn review: clean",
+          sub: n ? "Shown in the review box above while unresolved" : "",
+          detail: n ? `<ul>${f.findings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "" });
+  }
+  for (const q of view.quality_checks || []) {
+    const status = q.ok === true ? "passed" : q.ok === false ? "failed" : "could not run";
+    add({ ts: q.ts, cat: "rules", dot: q.ok === true ? "ok" : q.ok === false ? (q.action === "block" ? "bad" : "warn") : "info",
+          title: `Quality check ${status}`, rules: [q.rule_id],
+          why: why(q.rule_id) ? [{ id: q.rule_id, text: why(q.rule_id) }] : [],
+          sub: `${plural((q.files || []).length, "file")} checked`,
+          detail: (q.output || q.error) ? `<pre class="output">${esc(q.error || q.output)}</pre>` : "" });
+  }
+  for (const a of view.acks || []) {
+    const agent = a.actor === "agent" || a.actor === "unknown";
+    add({ ts: a.ts, cat: "review", dot: agent ? "warn" : "ok",
+          title: `${a.actor === "agent" ? "The agent" : a.actor === "unknown" ? "Someone (unverified)" : "Reviewer"} acknowledged a finding`,
+          badges: agent ? [badge(a.actor === "agent" ? "agent-made" : "unverified", "warn", a.actor_basis || "")] : [],
+          sub: a.target, mono: true, note: a.note ? `“${a.note}”` : "" });
+  }
+  for (const h of view.human_changes || [])
+    add({ ts: h.ts, cat: "human", dot: "plan", title: `Human commit · ${plural((h.files || []).length, "file")}`,
+          sub: (h.files || []).filter((p) => !isBookkeeping(p)).join(", "), mono: true });
+  for (const c of view.commits || [])
+    add({ ts: c.date || "", cat: "commit", dot: "info", title: `Commit ${String(c.sha || "").slice(0, 10)}`, sub: c.subject || "" });
+  items.sort((a, b) => String(a.ts || "").localeCompare(String(b.ts || "")));
+  return items;
+}
+
+/** Consecutive edits collapse into one "Changed N files" row. */
+function coalesce(events) {
+  const out = [];
+  let batch = null;
+  for (const e of events) {
+    if (e.cat === "edit") {
+      if (!batch) { batch = { ts: e.ts, cat: "edit", dot: "edit", files: [] }; out.push(batch); }
+      const prior = batch.files.find((f) => f.path === e.path);
+      if (prior) prior.count += 1; else batch.files.push({ path: e.path, count: 1 });
+    } else { batch = null; out.push(e); }
+  }
+  for (const b of out) if (b.cat === "edit") {
+    b.title = `Changed ${plural(b.files.length, "file")}`;
+    b.sub = b.files.slice(0, 3).map((f) => f.path).join(", ") + (b.files.length > 3 ? ` +${b.files.length - 3} more` : "");
+    b.mono = true;
+  }
+  return out;
+}
+
+function buildTurns(view) {
+  const prompts = userPrompts(view);
+  const events = collectEvents(view);
+  const turns = [];
+  let current = { prompt: null, ts: view.started_at, events: [] };
+  let pi = 0;
+  for (const e of events) {
+    while (pi < prompts.length && String(prompts[pi].ts || "") <= String(e.ts || "")) {
+      if (current.prompt || current.events.length) turns.push(current);
+      current = { prompt: prompts[pi], ts: prompts[pi].ts, events: [] };
+      pi += 1;
+    }
+    current.events.push(e);
+  }
+  while (pi < prompts.length) {
+    if (current.prompt || current.events.length) turns.push(current);
+    current = { prompt: prompts[pi], ts: prompts[pi].ts, events: [] };
+    pi += 1;
+  }
+  if (current.prompt || current.events.length) turns.push(current);
+  turns.forEach((t, i) => {
+    t.number = i + 1;
+    t.key = `${t.ts || ""}|${t.number}`;
+    // Coalesce in time order, then show newest first.
+    t.events = coalesce(t.events).reverse();
+  });
+  return turns.reverse(); // newest prompt on top
+}
+
+function verdictBadge(v) {
+  return v === "pass" ? badge("pass", "ok") : v === "n/a" ? badge("n/a", "info", "The agent stated this policy does not apply to its plan.")
+       : v === "fail" ? badge("fail", "bad") : badge(v || "unattested", "warn");
+}
+
+/* ============================== session page ============================== */
+
+function reviewBox(view) {
+  const review = view.review || { open: [], resolved: [], notes: [] };
+  const open = review.open || [];
+  const canAck = !EXPORT;
+  const bulk = canAck && open.filter(bulkAckable).length > BULK_MIN;
+  const findings = open.map((item) => {
+    const pick = bulk && bulkAckable(item)
+      ? `<input type="checkbox" class="pick" data-pick="${esc(item.id)}" ${ui.picked.has(item.id) ? "checked" : ""} aria-label="Select: ${esc(item.title)}">` : "";
+    const actions = [];
+    if ((item.paths || []).length === 1 && item.kind !== "quality")
+      actions.push(`<button type="button" class="btn" data-diff="${esc(item.paths[0])}">View diff</button>`);
+    if (item.kind === "quality" && item.output)
+      actions.push(`<button type="button" class="btn" data-output="${esc(item.id)}">View check output</button>`);
+    if (item.kind === "plan-check")
+      actions.push(`<button type="button" class="btn" data-tab="rules">See policies</button>`);
+    if (canAck && item.kind !== "chain")
+      actions.push(`<button type="button" class="btn" data-ack="${esc(item.id)}">Acknowledge…</button>`);
+    const ackForm = ui.ackOpen === item.id ? `<form class="ack-form" data-ack-form="${esc(item.id)}">
+        <input name="note" required placeholder="Why this is fine (stored in the audit log)" autocomplete="off">
+        <button type="submit" class="btn primary">Acknowledge as reviewer</button>
+        <button type="button" class="btn" data-ack-cancel>Cancel</button></form>` : "";
+    return `<div class="finding ${esc(item.severity)} ${pick ? "pickable" : ""}" id="finding-${esc(item.id)}">
+      ${pick}
+      <div class="f-title">${esc(item.title)} ${badge(kindLabel(item.kind), item.severity === "high" ? "bad" : "warn")}</div>
+      <dl>
+        <dt>Why it matters</dt><dd>${esc(item.why)}</dd>
+        ${item.likely_cause ? `<dt>Likely cause</dt><dd class="mono">${esc(item.likely_cause)}</dd>` : ""}
+        <dt>What to do</dt><dd>${esc(item.action)}</dd>
+        ${item.rule_id ? `<dt>Rule</dt><dd>${ruleChip(item.rule_id)}<div class="what">${ruleSentence(ruleDef(item.rule_id))}</div></dd>` : ""}
+      </dl>
+      <div class="actions">${actions.join("")}</div>
+      <div class="inline-slot" data-slot="${esc(item.id)}"></div>
+      ${ackForm}
+    </div>`;
+  }).join("");
+  const resolved = review.resolved || [];
+  const notes = review.notes || [];
+  const head = open.length
+    ? `<div class="icon">!</div><div><h2>${plural(open.length, "thing needs", "things need")} your review</h2>
+        <p>Everything else in this session was handled by the rules or is informational.</p></div>`
+    : `<div class="icon">✓</div><div><h2>Nothing needs your review</h2>
+        <p>No gate bypasses, failed checks, or unplanned changes${resolved.length ? " left open" : ""}. The trace below shows everything that happened.</p></div>`;
+  return `<section class="review ${open.length ? "todo" : "clean"}" aria-label="Review">
+    <div class="review-head">${head}</div>
+    ${bulk ? bulkBar(open) : ""}
+    ${findings}
+    ${resolved.length ? `<details class="fold"><summary>Resolved (${resolved.length})</summary><div class="fold-body"><ul>
+      ${[...resolved].sort((a, b) => String((b.ack || {}).ts || "").localeCompare(String((a.ack || {}).ts || ""))).map((r) => `<li>${esc(r.title)} — acknowledged by ${ackBy(r.ack)}${r.ack && r.ack.note ? `: “${esc(r.ack.note)}”` : ""} <span class="muted">${esc(fmtDate(r.ack && r.ack.ts))}</span></li>`).join("")}
+    </ul></div></details>` : ""}
+    ${notes.length ? `<details class="fold"><summary>Notes (${notes.length})</summary><div class="fold-body"><ul>
+      ${notes.map((n) => `<li>${esc(n.title)} <span class="muted">— ${esc(n.why)}</span></li>`).join("")}
+    </ul></div></details>` : ""}
+  </section>`;
+}
+
+/* ---------- bulk acknowledgment ---------- */
+
+/** Selection appears once more than this many findings are open. */
+const BULK_MIN = 3;
+/** A broken record cannot be acknowledged away. */
+function bulkAckable(item) { return item.kind !== "chain"; }
+
+function pickedItems(view) {
+  return (((view || {}).review || {}).open || []).filter((i) => bulkAckable(i) && ui.picked.has(i.id));
+}
+
+function bulkBar(open) {
+  const ackable = open.filter(bulkAckable);
+  const kinds = [...new Set(ackable.map((i) => i.kind))];
+  const all = ackable.length && ackable.every((i) => ui.picked.has(i.id));
+  const n = ackable.filter((i) => ui.picked.has(i.id)).length;
+  return `<div class="bulk" role="group" aria-label="Acknowledge several findings">
+      <label><input type="checkbox" data-pick-all ${all ? "checked" : ""}> Select all (${ackable.length})</label>
+      ${kinds.length > 1 ? kinds.map((k) => `<button type="button" class="link" data-pick-kind="${esc(k)}">all ${esc(kindLabel(k))} (${ackable.filter((i) => i.kind === k).length})</button>`).join("") : ""}
+      <span class="count" id="bulk-count">${n} selected</span>
+      ${n ? `<button type="button" class="link" data-pick-none>Clear</button>` : ""}
+      <button type="button" class="btn primary" data-bulk-open ${n ? "" : "disabled"}>Acknowledge selected…</button>
+    </div>
+    ${ui.bulkOpen && n ? bulkForm(n) : ""}`;
+}
+
+function bulkSummary(items) {
+  const counts = new Map();
+  for (const i of items) counts.set(i.kind, (counts.get(i.kind) || 0) + 1);
+  const parts = [...counts].map(([k, c]) => `${c} ${kindLabel(k)}`).join(", ");
+  const serious = items.filter((i) => i.severity === "high" || i.kind === "bypass" || i.kind === "quality").length;
+  return `You are accepting ${plural(items.length, "finding")} (${esc(parts)}). Each one is recorded as its own acknowledgment with this note, exactly as if you had acknowledged them one by one.`
+    + (serious ? `<div class="warnline">${plural(serious, "of them is", "of them are")} a gate bypass or failed check. Open ${serious === 1 ? "its" : "their"} diff or output before you accept.</div>` : "");
+}
+
+function bulkForm(n) {
+  return `<form class="bulk-form" data-bulk-form>
+      <div id="bulk-summary">${bulkSummary(pickedItems(currentView))}</div>
+      <div class="row">
+        <input name="note" required placeholder="Why these are fine (stored with each acknowledgment)" autocomplete="off"
+          style="flex:1;min-width:260px;background:var(--panel);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px">
+        <button type="submit" class="btn primary">Acknowledge ${n} as reviewer</button>
+        <button type="button" class="btn" data-bulk-cancel>Cancel</button>
+      </div>
+      <div class="hint" id="bulk-progress" role="status" style="margin:8px 0 0"></div>
+    </form>`;
+}
+
+/** Selection changes update the bar in place; a full re-render would lose scroll and focus. */
+function syncBulk(view) {
+  const items = pickedItems(view);
+  const count = document.getElementById("bulk-count");
+  if (count) count.textContent = `${items.length} selected`;
+  const openBtn = document.querySelector("[data-bulk-open]");
+  if (openBtn) openBtn.disabled = !items.length;
+  const all = document.querySelector("[data-pick-all]");
+  const ackable = ((view.review || {}).open || []).filter(bulkAckable);
+  if (all) all.checked = ackable.length > 0 && items.length === ackable.length;
+  for (const box of document.querySelectorAll("[data-pick]")) box.checked = ui.picked.has(box.dataset.pick);
+  if (ui.bulkOpen) {
+    if (!items.length) { ui.bulkOpen = false; renderSession(view); return; }
+    const summary = document.getElementById("bulk-summary");
+    if (summary) summary.innerHTML = bulkSummary(items);
+    const submit = document.querySelector("[data-bulk-form] [type=submit]");
+    if (submit) submit.textContent = `Acknowledge ${items.length} as reviewer`;
+  }
+}
+
+async function submitBulk(view, form) {
+  const items = pickedItems(view);
+  const note = form.note.value.trim();
+  if (!items.length || !note) return;
+  for (const el of form.querySelectorAll("button, input")) el.disabled = true;
+  const progress = document.getElementById("bulk-progress");
+  const failed = [];
+  let agentMade = null;
+  for (const [n, item] of items.entries()) {
+    if (progress) progress.textContent = `Recording ${n + 1} of ${items.length}…`;
+    try {
+      const res = await fetch("/api/ack", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Bewit": "1" },
+        body: JSON.stringify({ project: projectId || "", session: view.id, target: item.target, note }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) failed.push(`${item.title}: ${data.error || res.statusText}`);
+      else if (data.actor === "agent" || data.actor === "unknown") agentMade = agentMade || data;
+    } catch (err) {
+      failed.push(`${item.title}: ${err.message || err}`);
+    }
+  }
+  ui.bulkOpen = false;
+  ui.picked.clear();
+  const lines = [];
+  if (failed.length) lines.push(`${plural(failed.length, "acknowledgment")} could not be recorded:\n${failed.slice(0, 10).join("\n")}${failed.length > 10 ? `\n… and ${failed.length - 10} more` : ""}`);
+  if (agentMade) lines.push(`Recorded, but not as the reviewer (${agentMade.basis}). Such acknowledgments clear only “not in plan” findings. Retry when the agent is idle.`);
+  if (lines.length) alert(lines.join("\n\n"));
+}
+
+function ackBy(ack) {
+  const actor = (ack || {}).actor;
+  return actor === "agent" ? "the agent (counts for plan drift only)"
+       : actor === "unknown" ? "an unverified actor (counts for plan drift only)"
+       : "the reviewer";
+}
+
+function kindLabel(kind) {
+  return { bypass: "gate bypass", quality: "check failed", "plan-check": "plan check", drift: "not in plan", chain: "record integrity" }[kind] || kind;
+}
+
+function summaryCards(view) {
+  const gates = view.gate_events || [];
+  const refused = gates.filter((g) => g.outcome === "refused").length;
+  const paused = gates.filter((g) => g.permission === "ask");
+  const approved = paused.filter((g) => g.outcome === "approved").length;
+  const waiting = paused.filter((g) => g.outcome === "waiting").length;
+  const flagged = gates.filter((g) => g.outcome === "flagged").length;
+  const stopped = refused + paused.length;
+  const ruleLine = stopped || flagged
+    ? [refused ? `${refused} refused` : "", paused.length ? `${paused.length} paused (${approved} approved${waiting ? `, ${waiting} waiting` : ""})` : "", flagged ? `${flagged} flagged` : ""].filter(Boolean).join(" · ")
+    : "No rule fired";
+  const files = (view.files || []).filter((f) => !isBookkeeping(f.path));
+  const drift = (view.drift || {});
+  const plan = view.plan || {};
+  const chain = view.chain || {};
+  const chainText = chain.ok === false ? `Broken at event #${chain.break_at}` : `Intact · ${plural(chain.checked || 0, "event")}`;
+  return `<div class="cards">
+    <button type="button" class="card" data-tab="rules">
+      <div class="k">Rules at work</div>
+      <div class="v">${stopped ? `Stopped the agent ${plural(stopped, "time")}` : flagged ? "Flagged changes" : "Nothing triggered"}</div>
+      <div class="s">${esc(ruleLine)}${stopped ? ". Rules doing their job; only the review box needs you." : ""}</div>
+    </button>
+    <button type="button" class="card" data-tab="files">
+      <div class="k">Changes</div>
+      <div class="v">${plural(files.length, "file")} changed by the agent</div>
+      <div class="s">${plan.registered ? `${(drift.out_of_plan || []).length} not in plan · ${(drift.unrealized || []).length} planned but untouched` : "No plan registered, so scope can't be checked"}</div>
+    </button>
+    <button type="button" class="card" data-tab="timeline">
+      <div class="k">Record</div>
+      <div class="v">${esc(chainText)}</div>
+      <div class="s">${chain.duplicates ? `${plural(chain.duplicates, "duplicate hook delivery", "duplicate hook deliveries")} (harmless) · ` : ""}Tamper-evident event log</div>
+    </button>
+  </div>`;
+}
+
+function renderSession(view) {
+  // Older servers send no outcome; never show "undefined".
+  for (const g of view.gate_events || []) g.outcome = outcomeOf(g);
+  const reviewChanged = !currentView || currentView.id !== view.id
+    || ((currentView.review || {}).open || []).length !== ((view.review || {}).open || []).length;
+  currentView = view;
+  // Keep only selections that are still open findings.
+  const stillOpen = new Set(((view.review || {}).open || []).map((i) => i.id));
+  for (const id of [...ui.picked]) if (!stillOpen.has(id)) ui.picked.delete(id);
+  if (!ui.picked.size) ui.bulkOpen = false;
+  if (reviewChanged && latestState) renderSidebar(latestState, true);
+  const turns = buildTurns(view);
+  if (turns.length !== ui.turnCount) { if (turns[0]) ui.openTurns.add(turns[0].key); ui.turnCount = turns.length; }
+  const nowMs = Date.now();
+  const files = (view.files || []).filter((f) => !isBookkeeping(f.path));
+  const rulesFired = new Set((view.gate_events || []).flatMap((g) => (g.hits || []).map((h) => h.rule_id))).size;
+  const eyebrow = [
+    `<b>${esc(view.runtime || "agent")}</b>`,
+    view.branch ? `branch <b class="mono">${esc(view.branch)}</b>` : "",
+    `started ${esc(fmtDate(view.started_at))}`,
+    `<span class="mono" title="Session id — use with bewit show / trace">${esc(view.id)}</span>`,
+    view.from_manifest ? `<span title="The event log stays on the machine that recorded this session (record_scope: audit). This is the committed summary as of the session's last turn.">from the committed summary</span>` : "",
+  ].filter(Boolean).join("<span>·</span>");
+  const tab = (id, label, count) =>
+    `<button type="button" role="tab" data-tab="${id}" aria-selected="${ui.tab === id}">${label}${count != null ? `<span class="count">${count}</span>` : ""}</button>`;
+
+  $("main").innerHTML = `<div class="page">
+    <div class="eyebrow">${eyebrow}</div>
+    <h1 class="session-title" title="${esc(headingText(view))}">${esc(headingText(view))}</h1>
+    ${(view.prompts || []).some((p) => p.sealed) && !EXPORT ? `<form id="unseal-form" class="toolbar">
+      <input type="password" id="unseal-pass" placeholder="Seal passphrase (empty if the key is unprotected)" autocomplete="off"
+        style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;min-width:280px">
+      <button type="submit" class="btn">Unseal prompts</button>
+      <span class="hint" style="margin:0">Decrypted in this tab only. Nothing is written back.</span></form>` : ""}
+    ${view.id === "human" ? "" : reviewBox(view)}
+    ${view.id === "human" ? "" : summaryCards(view)}
+    <nav class="tabs" role="tablist">
+      ${tab("timeline", "Timeline", turns.length)}
+      ${tab("files", "Files", files.length)}
+      ${tab("rules", "Rules", rulesFired)}
+      ${tab("plan", "Plan", (view.plan || {}).registered ? ((view.plan || {}).revisions || []).length : 0)}
+    </nav>
+    <div id="panel">${panelHtml(view, turns)}</div>
+  </div>`;
+  wire(view);
+  if (pendingRule) { ui.rule = pendingRule; pendingRule = null; writeHash(); renderDrawer(true); }
+  else renderDrawer();
+  updateTitle();
+}
+
+function panelHtml(view, turns) {
+  if (ui.tab === "files") return filesPanel(view);
+  if (ui.tab === "rules") return rulesPanel(view);
+  if (ui.tab === "plan") return planPanel(view);
+  return timelinePanel(view, turns);
+}
+
+/* ---------- timeline ---------- */
+
+function timelinePanel(view, turns) {
+  const toolbar = `<div class="toolbar">
+    <input type="search" id="search-box" placeholder="Search prompts, files, rules…" value="${esc(ui.q)}">
+    <span class="hint" style="margin:0">One card per prompt. Click a card or an event to expand it.</span></div>`;
+  const html = turns.map((turn) => {
+    const index = turn.key;
+    const events = turn.events.filter((e) => matches(e.title, e.sub, e.note, (e.files || []).map((f) => f.path).join(" "),
+                                                     (e.rules || []).join(" "), (e.why || []).map((w) => w.text).join(" ")));
+    const headHit = matches(turn.prompt && turn.prompt.text);
+    if (ui.q && !headHit && !events.length) return "";
+    const open = ui.q ? true : ui.openTurns.has(index);
+    const shown = ui.q && !headHit ? events : turn.events;
+    const fileCount = turn.events.filter((e) => e.cat === "edit").reduce((n, e) => n + e.files.length, 0);
+    const stops = turn.events.filter((e) => /^Rule (refused|paused)/.test(e.title || "")).length;
+    const findings = turn.events.filter((e) => e.cat === "review" && /End-of-turn review: \d/.test(e.title || "")).length;
+    const title = turn.prompt ? (promptHeadline(turn.prompt.text) || (turn.prompt.sealed ? "(sealed prompt)" : "(empty prompt)"))
+                              : (view.id === "human" ? "Human changes" : "Before the first prompt");
+    const commandCount = turn.events.filter((e) => e.cat === "command").length;
+    const stats = [
+      fileCount ? badge(plural(fileCount, "file"), "") : "",
+      commandCount ? badge(plural(commandCount, "command"), "") : "",
+      stops ? badge(`${stops} stopped by rules`, "", "Actions a rule refused or paused. Handled, unless the review box says otherwise.") : "",
+      findings ? badge("findings raised", "warn") : "",
+    ].join("");
+    const prompt = turn.prompt ? (() => {
+      const text = promptDisplay(turn.prompt.text) || (turn.prompt.sealed ? "(sealed)" : "");
+      const long = text.split("\n").length > 5 || text.length > 500;
+      const full = ui.fullPrompts.has(index);
+      return `<div class="prompt-box ${long && !full ? "clamped" : ""}">${esc(text)}</div>
+        ${long ? `<button type="button" class="link" data-prompt-toggle="${index}" style="margin:-6px 0 12px">${full ? "Show less" : "Show full prompt"}</button>` : ""}`;
+    })() : "";
+    return `<article class="turn">
+      <button type="button" class="turn-head" data-turn="${index}" aria-expanded="${open}">
+        <span class="turn-no">${turn.prompt ? `Prompt ${userPrompts(view).indexOf(turn.prompt) + 1}` : "Setup"}</span>
+        <span class="turn-time">${esc(fmtDate(turn.ts))}</span>
+        <span class="turn-title">${esc(title)}</span>
+        <span class="turn-stats">${stats}<span class="muted">${open ? "▾" : "▸"}</span></span>
+      </button>
+      ${open ? `<div class="turn-body">${prompt}
+        ${shown.length ? `<ol class="tl">${shown.map((e) => eventRow(e, `${index}|${e.ts}|${e.title}`)).join("")}</ol>`
+                        : `<p class="empty">No actions recorded for this prompt.</p>`}
+      </div>` : ""}
+    </article>`;
+  }).join("");
+  return toolbar + (html || `<p class="empty">Nothing matches “${esc(ui.q)}”.</p>`);
+}
+
+function eventRow(e, key) {
+  const open = ui.openEvents.has(key);
+  const expandable = !!(e.detail || e.files || e.link);
+  let detail = "";
+  if (open) {
+    if (e.cat === "edit") {
+      detail = `<ul class="file-list">${e.files.map((f) => `<li><button type="button" data-diff="${esc(f.path)}">${esc(f.path)}</button>${f.count > 1 ? ` <span class="muted">×${f.count}</span>` : ""}
+        <div class="inline-slot" data-slot="diff:${esc(f.path)}"></div></li>`).join("")}</ul>`;
+    } else {
+      detail = (e.detail || "") + (e.link ? `<div style="margin-top:6px"><button type="button" class="link" data-tab="${e.link.tab}">${esc(e.link.label)} →</button></div>` : "");
+    }
+    detail = `<div class="tl-detail">${detail}</div>`;
+  }
+  return `<li class="tl-item">
+    <span class="tl-time">${esc(fmtTime(e.ts))}</span>
+    <span class="tl-dot ${e.dot || ""}"></span>
+    <div class="tl-main">
+      <div class="tl-head">
+        <button type="button" class="tl-title" ${expandable ? `data-event="${esc(key)}"` : "disabled"} aria-expanded="${open}">
+          <span class="t">${esc(e.title)}</span>${(e.badges || []).join("")}${expandable ? `<span class="chev">${open ? "▾" : "▸"}</span>` : ""}
+        </button>
+        ${(e.rules || []).map(ruleChip).join("")}
+      </div>
+      ${e.sub ? `<div class="tl-sub ${e.mono ? "mono" : ""}">${esc(e.sub)}</div>` : ""}
+      ${(e.why || []).map((w) => `<div class="tl-why">${(e.why.length > 1) ? `<span class="rid">${esc(w.id)}:</span> ` : ""}“${esc(w.text)}”</div>`).join("")}
+      ${e.note ? `<div class="tl-note">${esc(e.note)}</div>` : ""}
+      ${detail}
+    </div>
+  </li>`;
+}
+
+/* ---------- files ---------- */
+
+function fileStatus(view, path) {
+  const lower = String(path).toLowerCase();
+  const review = view.review || {};
+  const open = (review.open || []).find((i) => (i.paths || []).some((p) => p.toLowerCase() === lower) && i.kind !== "quality");
+  if (open) return badge(open.kind === "bypass" ? "Changed outside the gate — review" : "Not in the plan — review", open.severity === "high" ? "bad" : "warn", open.why);
+  const done = (review.resolved || []).find((i) => (i.paths || []).some((p) => p.toLowerCase() === lower));
+  if (done) return badge(`Acknowledged by ${ackBy(done.ack)}`, "", done.ack && done.ack.note);
+  const gates = (view.gate_events || []).filter((g) => (g.paths || []).some((p) => String(p).toLowerCase() === lower));
+  if (gates.some((g) => g.outcome === "approved")) return badge("Approved by you", "ok", "A rule paused this edit and you approved it.");
+  if (gates.some((g) => g.outcome === "flagged")) return badge("Flagged — worth a look", "info", "A flag rule covers this file; the change was allowed.");
+  return `<span class="muted">OK</span>`;
+}
+
+function filesPanel(view) {
+  const keep = (f) => !isBookkeeping(f.path) && matches(f.path);
+  const files = (view.files || []).filter(keep);
+  const other = (view.other_changes || []).filter(keep);
+  const foreign = (view.other_sessions || []).filter(keep);
+  const background = (view.background_changes || []).filter(keep);
+  const row = (f, extra) => {
+    const rules = (f.rules || []).map((r) => ruleChip(r.rule_id)).join(" ");
+    return `<tr class="row-click ${ui.openRows.has(f.path) ? "open" : ""}" tabindex="0" data-row="${esc(f.path)}">
+      <td class="path">${esc(f.path)}</td><td class="loc">${locHtml(f.added, f.removed)}</td>
+      <td>${fileStatus(view, f.path)}${extra || ""}</td><td>${rules || `<span class="muted">—</span>`}</td></tr>`;
+  };
+  const table = (rows) => `<table><thead><tr><th>File</th><th>Change</th><th>Status</th><th>Rules covering it</th></tr></thead><tbody>${rows}</tbody></table>`;
+  const mine = [...files.map((f) => row(f)),
+    ...other.map((f) => row(f, (f.during || []).length ? `<div class="tl-note">by <span class="mono">${esc(f.during.join("; "))}</span></div>` : ""))];
+  return `<div class="toolbar"><input type="search" id="search-box" placeholder="Filter files…" value="${esc(ui.q)}"></div>
+    <div class="panel"><h3>Changed in this session</h3>
+      <p class="hint">Status tells you whether a file needs you. “OK” means no rule or plan concern. Click a row for the diff against the session's starting commit, or a rule for what it does.</p>
+      ${mine.length ? table(mine.join("")) : `<p class="empty">No file changes.</p>`}</div>
+    ${(foreign.length || background.length) ? `<details class="panel"><summary class="muted" style="cursor:pointer">Not from this session (${foreign.length + background.length}) — other agent sessions, hand edits, or changes that pre-date it</summary>
+      <p class="hint" style="margin-top:10px">Shown for context. They are excluded from this session's review.</p>
+      <table><tbody>${[...foreign.map((f) => `<tr><td class="path">${esc(f.path)}</td><td>${badge("other session", "", (f.sessions || []).join(", "))}</td></tr>`),
+                       ...background.map((f) => `<tr><td class="path">${esc(f.path)}</td><td>${badge("background", "")}</td></tr>`)].join("")}</tbody></table>
+    </details>` : ""}
+    ${(view.outside_repo || []).length ? `<details class="panel"><summary class="muted" style="cursor:pointer">Written outside this repository (${view.outside_repo.length})</summary>
+      <ul class="file-list">${view.outside_repo.map((p) => `<li class="mono">${esc(p)}</li>`).join("")}</ul></details>` : ""}`;
+}
+
+/* ---------- rules ---------- */
+
+function rulesPanel(view) {
+  const active = view.active_rules || [];
+  // What each rule did in this session.
+  const fired = new Map();
+  const note = (id) => { if (!fired.has(id)) fired.set(id, { id, events: [] }); return fired.get(id); };
+  for (const g of view.gate_events || [])
+    for (const id of new Set((g.hits || []).map((h) => h.rule_id))) note(id).events.push({ ts: g.ts, target: gateTarget(g), outcome: g.outcome, subject: SUBJECT[g.kind] });
+  const quality = new Map();
+  for (const q of view.quality_checks || []) quality.set(q.rule_id, q);
+  const defs = ruleDefs(view);
+  const message = (r) => r.message || r.policy || (r.recorded || {}).message || "";
+  const describe = (r) => `<div class="what">${ruleSentence(r)}</div>${message(r) ? `<div class="msg">“${esc(message(r))}”</div>` : ""}`;
+  const firedHtml = [...fired.values()].map((f) => {
+    const rule = defs.get(f.id) || ruleDef(f.id);
+    const counts = {};
+    for (const e of f.events) counts[e.outcome] = (counts[e.outcome] || 0) + 1;
+    const summary = Object.entries(counts).map(([o, n]) => badge(`${n} ${(OUTCOME[o] || {}).label || o}`, (OUTCOME[o] || {}).cls || "")).join(" ");
+    return `<div class="rule-row"><div class="head">${ruleChip(f.id)} ${summary}</div>
+      ${describe(rule)}
+      <details><summary class="muted" style="cursor:pointer;font-size:12.5px">${plural(f.events.length, "time")} — show each</summary>
+        <table><tbody>${[...f.events].reverse().map((e) => `<tr><td class="mono muted">${esc(fmtTime(e.ts))}</td><td class="path">${esc(e.target)}</td><td>${badge((OUTCOME[e.outcome] || {}).label || e.outcome, (OUTCOME[e.outcome] || {}).cls)}</td></tr>`).join("")}</tbody></table>
+      </details></div>`;
+  }).join("");
+
+  const checks = view.checks || [];
+  const last = checks[checks.length - 1];
+  const attest = last ? `<p class="muted" style="font-size:12.5px;margin:0 0 6px">Self-reported: the agent judged its own plan. A pass shows the policy was considered, not that it holds; check it against the diff.</p><table><thead><tr><th>Agent's verdict</th><th>Policy</th><th>What it requires</th></tr></thead><tbody>
+      ${(last.prompt_rules || []).map((r) => `<tr><td>${verdictBadge(r.verdict)}</td><td>${ruleChip(r.rule_id)}</td><td>${esc(r.policy)}${r.scope ? ` <span class="muted">(${esc(r.scope)})</span>` : ""}${r.carried ? ` <span class="muted">(kept from an earlier check)</span>` : ""}</td></tr>`).join("")}
+    </tbody></table>
+    ${checks.length > 1 ? `<details style="margin-top:8px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Earlier checks (${checks.length - 1})</summary>
+      <ul>${checks.slice(0, -1).reverse().map((c) => `<li>${esc(fmtDate(c.ts))} — ${c.ok ? badge("passed", "ok") : badge("not passed", "bad")}</li>`).join("")}</ul></details>` : ""}`
+    : `<p class="empty">The agent never checked its plan against the policies.</p>`;
+
+  const qualityHtml = [...quality.values()].map((q) => `<div class="rule-row"><div class="head">${ruleChip(q.rule_id)}
+      ${q.ok === true ? badge("passed", "ok") : q.ok === false ? badge("failed", q.action === "block" ? "bad" : "warn") : badge("could not run", "info")}
+      <span class="muted">${plural((q.files || []).length, "file")} · latest run ${esc(fmtDate(q.ts))}</span></div>
+      ${describe(defs.get(q.rule_id) || ruleDef(q.rule_id))}
+      ${(q.output || q.error) && q.ok !== true ? `<pre class="output">${esc(q.error || q.output)}</pre>` : ""}</div>`).join("");
+
+  // Every rule in the project, by kind: what each one does.
+  const attested = new Set(((last || {}).prompt_rules || []).map((r) => r.rule_id));
+  const idle = active.filter((r) => r.enabled !== false && !attested.has(r.id) && !fired.has(r.id) && !quality.has(r.id));
+  const disabled = active.filter((r) => r.enabled === false);
+  const byKind = (rules) => KIND_ORDER.concat([...new Set(rules.map((r) => r.kind))].filter((k) => !KIND_ORDER.includes(k)))
+    .map((kind) => [kind, rules.filter((r) => r.kind === kind)]).filter(([, rs]) => rs.length)
+    .map(([kind, rs]) => `<div class="kind-head">${esc(KIND_HEAD[kind] || kind)}</div>
+      ${rs.map((r) => `<div class="rule-row"><div class="head">${ruleChip(r.id)}</div>${describe(r)}</div>`).join("")}`).join("");
+
+  return `
+    <p class="hint">Click any rule name — here, in the timeline, or on the Files tab — to see its full definition and everything it did in this session.</p>
+    <div class="panel"><h3>What the rules did</h3>
+      <p class="hint">Rules act while the agent works. “Refused” and “you approved” mean the rule did its job. Nothing here needs you unless it is also in the review box.</p>
+      ${firedHtml || `<p class="empty">No rule fired in this session.</p>`}</div>
+    <div class="panel"><h3>Plan policies — the agent's self-check</h3>
+      <p class="hint">Before coding, the agent states whether its plan meets each policy. This is its own statement, not proof; the timeline shows what it actually did.</p>
+      ${attest}</div>
+    ${qualityHtml ? `<div class="panel"><h3>Quality checks</h3><p class="hint">Commands run on the changed files at the end of each turn. The latest result per check counts.</p>${qualityHtml}</div>` : ""}
+    <div class="panel"><h3>Other rules in this project <span class="muted" style="font-weight:400">(${idle.length})</span></h3>
+      <p class="hint">Active, but they did not fire in this session. Shown as currently defined in <code>.bewit/rules/</code>.</p>
+      ${byKind(idle) || `<p class="empty">Every active rule fired at least once.</p>`}
+      ${disabled.length ? `<details style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Disabled rules (${disabled.length}) — <code>enabled: false</code>, they do not run</summary>
+        ${byKind(disabled)}</details>` : ""}
+    </div>`;
+}
+
+/* ---------- plan ---------- */
+
+function planPanel(view) {
+  const plan = view.plan || {};
+  if (!plan.registered)
+    return `<div class="panel"><p class="empty">No plan registered, so Bewit cannot tell planned from unplanned changes.</p></div>`;
+  const progress = plan.progress || [];
+  const revisions = plan.revisions || [];
+  const done = progress.filter((p) => p.touched).length;
+  const revHtml = revisions.map((r, i) => {
+    const prev = i ? revisions[i - 1].declared_files || [] : [];
+    const prevSet = new Set(prev.map((p) => p.toLowerCase()));
+    const cur = r.declared_files || [];
+    const curSet = new Set(cur.map((p) => p.toLowerCase()));
+    const added = cur.filter((p) => !prevSet.has(p.toLowerCase()));
+    const removed = prev.filter((p) => !curSet.has(p.toLowerCase()));
+    return { i, html: `<details ${i === revisions.length - 1 ? "open" : ""} style="border-top:1px solid var(--border);padding:8px 0">
+      <summary style="cursor:pointer">Revision ${i + 1} of ${revisions.length} <span class="muted">· ${esc(fmtDate(r.ts))} · ${plural(cur.length, "file")}${added.length && i ? ` · +${added.length}` : ""}${removed.length ? ` · −${removed.length}` : ""}</span></summary>
+      ${i && added.length ? `<p class="hint" style="margin:6px 0">Added: <span class="mono">${esc(added.join(", "))}</span></p>` : ""}
+      ${removed.length ? `<p class="hint" style="margin:6px 0">Dropped: <span class="mono">${esc(removed.join(", "))}</span></p>` : ""}
+      <div class="plan-text">${esc(r.text || "(text not captured — registered before v0.2)")}</div></details>` };
+  }).reverse().map((r) => r.html).join("") // newest revision on top
+    // A manifest-only view (audit scope) has the latest plan text, no revisions.
+    || (plan.text ? `<div class="plan-text">${esc(plan.text)}</div>` : "<p class='empty'>No plan text recorded.</p>");
+  return `<div class="panel"><h3>Declared files</h3>
+      <p class="hint">${done} of ${progress.length} declared files were changed. ○ = declared but not changed (dropped, or changed some other way).</p>
+      <ul class="plan-progress">${progress.map((p) => `<li class="${p.touched ? "done" : "pending"}">${esc(p.path)}</li>`).join("")}</ul></div>
+    <div class="panel"><h3>Plan text</h3><p class="hint">Every registration is kept, so you can see how the plan changed while the agent worked.</p>${revHtml}</div>`;
+}
+
+/* ============================== interaction ============================== */
+
+function renderDiffText(text) {
+  return String(text).split("\n").map((line) => {
+    let cls = "line";
+    if (line.startsWith("@@")) cls += " dl-hunk";
+    else if (/^(diff |index |--- |\+\+\+ )/.test(line)) cls += " dl-meta";
+    else if (line.startsWith("+")) cls += " dl-add";
+    else if (line.startsWith("-")) cls += " dl-del";
+    return `<span class="${cls}">${esc(line) || " "}</span>`;
+  }).join("");
+}
+
+async function loadDiff(path) {
+  if (ui.diffs.has(path)) return ui.diffs.get(path);
+  let text;
+  if (EXPORT) text = (EXPORT.diffs || {})[path] || "(diff not embedded in this export)";
+  else {
+    try { text = (await (await fetch(api("/api/diff", { session: selectedId, path }))).json()).diff || "(no diff available)"; }
+    catch { text = "(viewer unreachable)"; }
+  }
+  ui.diffs.set(path, text);
+  return text;
+}
+
+async function toggleSlot(slot, producer) {
+  if (!slot) return;
+  if (slot.innerHTML) { slot.innerHTML = ""; return; }
+  slot.innerHTML = `<pre class="diff">loading…</pre>`;
+  slot.innerHTML = await producer();
+}
+
+function wire(view) {
+  const main = $("main");
+  // Rule chips sit inside clickable rows and titles: open the rule, nothing else.
+  for (const el of main.querySelectorAll("[data-rule]"))
+    el.addEventListener("click", (ev) => { ev.stopPropagation(); openRule(el.dataset.rule, el); });
+  for (const el of main.querySelectorAll("[data-tab]"))
+    el.addEventListener("click", () => { ui.tab = el.dataset.tab; ui.q = ""; writeHash(); renderSession(currentView); $("main").querySelector(".tabs").scrollIntoView({ block: "start" }); });
+  for (const el of main.querySelectorAll("[data-turn]"))
+    el.addEventListener("click", () => { const i = el.dataset.turn; ui.openTurns.has(i) ? ui.openTurns.delete(i) : ui.openTurns.add(i); renderSession(currentView); });
+  for (const el of main.querySelectorAll("[data-event]"))
+    el.addEventListener("click", () => { const k = el.dataset.event; ui.openEvents.has(k) ? ui.openEvents.delete(k) : ui.openEvents.add(k); renderSession(currentView); });
+  for (const el of main.querySelectorAll("[data-prompt-toggle]"))
+    el.addEventListener("click", () => { const i = el.dataset.promptToggle; ui.fullPrompts.has(i) ? ui.fullPrompts.delete(i) : ui.fullPrompts.add(i); renderSession(currentView); });
+  for (const el of main.querySelectorAll("[data-diff]"))
+    el.addEventListener("click", () => {
+      const path = el.dataset.diff;
+      const slot = el.closest(".finding") ? el.closest(".finding").querySelector(".inline-slot") : el.parentElement.querySelector(".inline-slot");
+      toggleSlot(slot, async () => `<pre class="diff">${renderDiffText(await loadDiff(path))}</pre>`);
+    });
+  for (const el of main.querySelectorAll("[data-output]"))
+    el.addEventListener("click", () => {
+      const item = ((view.review || {}).open || []).find((i) => i.id === el.dataset.output);
+      toggleSlot(el.closest(".finding").querySelector(".inline-slot"), async () => `<pre class="output">${esc(item ? item.output : "")}</pre>`);
+    });
+  for (const el of main.querySelectorAll("[data-pick]"))
+    el.addEventListener("change", () => { el.checked ? ui.picked.add(el.dataset.pick) : ui.picked.delete(el.dataset.pick); syncBulk(view); });
+  const pickAll = main.querySelector("[data-pick-all]");
+  if (pickAll) pickAll.addEventListener("change", () => {
+    for (const i of ((view.review || {}).open || []).filter(bulkAckable)) pickAll.checked ? ui.picked.add(i.id) : ui.picked.delete(i.id);
+    renderSession(view);
+  });
+  for (const el of main.querySelectorAll("[data-pick-kind]"))
+    el.addEventListener("click", () => {
+      for (const i of ((view.review || {}).open || [])) if (i.kind === el.dataset.pickKind && bulkAckable(i)) ui.picked.add(i.id);
+      renderSession(view);
+    });
+  for (const el of main.querySelectorAll("[data-pick-none]"))
+    el.addEventListener("click", () => { ui.picked.clear(); ui.bulkOpen = false; renderSession(view); });
+  for (const el of main.querySelectorAll("[data-bulk-open]"))
+    el.addEventListener("click", () => {
+      ui.bulkOpen = true; ui.ackOpen = null; renderSession(view);
+      const input = main.querySelector("[data-bulk-form] input[name=note]");
+      if (input) input.focus();
+    });
+  for (const el of main.querySelectorAll("[data-bulk-cancel]"))
+    el.addEventListener("click", () => { ui.bulkOpen = false; renderSession(view); });
+  for (const form of main.querySelectorAll("[data-bulk-form]"))
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      ui.bulkBusy = true;
+      try { await submitBulk(view, form); } finally { ui.bulkBusy = false; }
+      lastRenderKey = ""; refreshSession();
+    });
+  for (const el of main.querySelectorAll("[data-ack]"))
+    el.addEventListener("click", () => { ui.ackOpen = el.dataset.ack; renderSession(currentView); const input = main.querySelector("[data-ack-form] input"); if (input) input.focus(); });
+  for (const el of main.querySelectorAll("[data-ack-cancel]"))
+    el.addEventListener("click", () => { ui.ackOpen = null; renderSession(currentView); });
+  for (const form of main.querySelectorAll("[data-ack-form]"))
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const item = ((view.review || {}).open || []).find((i) => i.id === form.dataset.ackForm);
+      if (!item) return;
+      const res = await fetch("/api/ack", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Bewit": "1" },
+        body: JSON.stringify({ project: projectId || "", session: view.id, target: item.target, note: form.note.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.error || "Could not record the acknowledgment."); return; }
+      if (data.actor === "agent") alert(`Recorded, but as agent-made: ${data.basis}. It does not clear this finding. Try again when the agent is idle.`);
+      else if (data.actor === "unknown") alert(`Recorded, but unverified: ${data.basis}. It does not clear this finding; retry once the session has been idle for 30 minutes, or acknowledge in CI review.`);
+      ui.ackOpen = null; lastRenderKey = ""; refreshSession();
+    });
+  for (const row of main.querySelectorAll("tr[data-row]")) {
+    const toggle = async () => {
+      const path = row.dataset.row;
+      const next = row.nextElementSibling;
+      if (next && next.classList.contains("diff-row")) { next.remove(); row.classList.remove("open"); ui.openRows.delete(path); return; }
+      row.classList.add("open"); ui.openRows.add(path);
+      const tr = document.createElement("tr");
+      tr.className = "diff-row";
+      tr.innerHTML = `<td colspan="4"><pre class="diff">loading…</pre></td>`;
+      row.after(tr);
+      tr.querySelector("pre").innerHTML = renderDiffText(await loadDiff(path));
+    };
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); } });
+    if (ui.openRows.has(row.dataset.row)) { ui.openRows.delete(row.dataset.row); toggle(); }
+  }
+  const unseal = $("unseal-form");
+  if (unseal) unseal.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const res = await fetch("/api/unseal", {
+      method: "POST", headers: { "Content-Type": "application/json", "X-Bewit": "1" },
+      body: JSON.stringify({ project: projectId || "", session: view.id, passphrase: ($("unseal-pass") || {}).value || "" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error || "Could not unseal prompts."); return; }
+    for (const item of data.prompts || []) {
+      const prompt = (view.prompts || [])[item.index];
+      if (prompt) prompt.text = item.text; // this tab's copy only
+    }
+    renderSession(view);
+  });
+  const search = $("search-box");
+  if (search) search.addEventListener("input", () => {
+    ui.q = search.value;
+    const pos = search.selectionStart;
+    renderSession(currentView);
+    const again = $("search-box");
+    again.focus(); again.setSelectionRange(pos, pos);
+  });
+}
+
+/* ============================== data flow ============================== */
+
+function updateTitle() {
+  const name = (latestState && latestState.project) || (EXPORT && (EXPORT.project || baseName(EXPORT.root))) || "";
+  const heading = currentView ? headingText(currentView).slice(0, 60) : "";
+  document.title = [name, heading].filter(Boolean).join(" · ") + (name ? " — Bewit" : "Bewit");
+}
+
+function showBanner(kind, message) {
+  const el = $("banner");
+  el.className = message ? kind : "";
+  el.textContent = message || "";
+}
+
+function renderHeader(state) {
+  $("project-name").textContent = state.project || baseName(state.root);
+  $("root-path").textContent = state.root || "";
+  $("root-path").title = state.root || "";
+}
+
+function viewRenderKey(view) {
+  const loc = (view.files || []).reduce((n, f) => n + (f.added || 0) + (f.removed || 0), 0);
+  return [view.id, view.event_count, loc, (view.commits || []).length, (view.other_changes || []).length,
+          (view.background_changes || []).length, ((view.review || {}).open || []).length].join("|");
+}
+
+function defaultSessionId(state) {
+  const wanted = readHash().session;
+  if (wanted && state.sessions.some((s) => s.id === wanted)) return wanted;
+  const { recording, earlier, other } = sessionGroups(state);
+  const first = recording[0] || earlier[0] || other[0];
+  return first ? first.id : null;
+}
+
+async function refreshState() {
+  try {
+    const res = await fetch(api("/api/state"));
+    const state = await res.json();
+    if (!res.ok) throw new Error(state.error || res.statusText);
+    const warnings = state.warnings || [];
+    if ((state.api_level || 0) < API_LEVEL)
+      showBanner("warn", "This viewer process is older than its page, so some details are missing. Restart `bewit serve` (Ctrl+C, then run it again).");
+    else
+      showBanner(warnings.length ? "warn" : "", warnings.length ? `Hook wiring problems: ${warnings.join("; ")}. Run \`bewit init\` in the project to upgrade stale wiring; remove disableAllHooks yourself.` : "");
+    renderHeader(state);
+    renderSidebar(state);
+    if (!selectedId && state.sessions.length) { selectSession(defaultSessionId(state)); return; }
+    // The detail view is expensive (git diff, working-tree fingerprints):
+    // poll it every cycle only while the session records, else on change.
+    const s = state.sessions.find((x) => x.id === selectedId);
+    if (s && (isRecording(s, nowOf(state)) || s.last_activity !== ui.seenActivity)) {
+      ui.seenActivity = s.last_activity;
+      refreshSession();
+    }
+    updateTitle();
+  } catch (err) {
+    showBanner("error", `Cannot reach bewit serve — is it still running? (${err.message || err})`);
+  }
+}
+
+async function loadProjects() {
+  try {
+    const data = await (await fetch("/api/projects")).json();
+    projects = data.projects || [];
+    if (!data.hub || projects.length < 2) return;
+    const wanted = readHash().project;
+    projectId = projects.some((p) => p.id === wanted) ? wanted : projects[0].id;
+    const select = $("project-select");
+    select.innerHTML = projects.map((p) => `<option value="${esc(p.id)}" ${p.id === projectId ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+    select.hidden = false;
+    select.addEventListener("change", () => {
+      projectId = select.value;
+      selectedId = null; currentView = null; lastSidebarKey = ""; lastRenderKey = "";
+      $("main").innerHTML = `<div id="placeholder">Loading…</div>`;
+      history.replaceState(null, "", "#project=" + encodeURIComponent(projectId));
+      refreshState();
+    });
+  } catch { /* older viewer or transient; single-project mode */ }
+}
+
+async function refreshSession() {
+  if (!selectedId || ui.bulkBusy) return; // a batch of acknowledgments is being recorded
+  try {
+    const res = await fetch(api("/api/session/" + encodeURIComponent(selectedId)));
+    if (!res.ok) return;
+    const view = await res.json();
+    const key = viewRenderKey(view);
+    if (key !== lastRenderKey) {
+      lastRenderKey = key;
+      ui.diffs.clear(); // data changed; cached diffs may be stale
+      renderSession(view);
+    }
+  } catch { /* transient; the state poll reports connectivity */ }
+}
+
+const initialTab = readHash().tab;
+if (["timeline", "files", "rules", "plan"].includes(initialTab)) ui.tab = initialTab;
+/** A rule named in the deep link, opened once the session has rendered. */
+let pendingRule = readHash().rule || null;
+
+if (EXPORT) {
+  $("mode-badge").textContent = "exported report";
+  $("mode-badge").classList.add("info");
+  $("project-name").textContent = EXPORT.project || baseName(EXPORT.root);
+  $("root-path").textContent = EXPORT.root || "";
+  $("layout").classList.add("single");
+  $("sidebar").remove();
+  renderSession(EXPORT.session);
+} else {
+  $("mode-badge").textContent = "live";
+  $("mode-badge").title = "This page refreshes every few seconds. Capture does not depend on it.";
+  $("mode-badge").classList.add("ok");
+  window.addEventListener("hashchange", () => {
+    const { session, rule } = readHash();
+    if (session && session !== selectedId) { pendingRule = rule; selectSession(session); }
+    else if (rule && rule !== ui.rule) openRule(rule);
+  });
+  loadProjects().then(() => { refreshState(); setInterval(refreshState, POLL_MS); });
+}
+</script>
+</body>
+</html>

@@ -3,3 +3,6 @@
 *.png binary
 *.jpg binary
 *.ico binary
+
+# ArchRev session records: collapsed in GitHub/GitLab merge-request diffs.
+.archrev/sessions/** linguist-generated=true gitlab-generated=true

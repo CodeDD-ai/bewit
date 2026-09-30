@@ -4,20 +4,46 @@
 
 - id: flag-audit-format
   kind: path
-  match: ["src/archrev/storage.py", "src/archrev/gitutil.py"]
+  match:
+    - "src/archrev/storage.py"    # event log, chain, meta
+    - "src/archrev/drift.py"      # manifest (the committed record)
+    - "src/archrev/worktree.py"   # checkpoint events
+    - "src/archrev/gitutil.py"    # git linkage
+    - "src/archrev/trailer.py"    # ArchRev-Session commit trailers
+    - "src/archrev/refstore.py"   # refs/archrev/records (the shared record)
   action: flag
   message: >-
-    This file defines the on-disk audit format / git linkage. Changes must
-    stay backward-compatible with existing session records.
+    This file defines the on-disk record or its git linkage. Changes must
+    stay readable for existing session records (additive fields only).
 
 - id: flag-enforcement-core
   kind: path
-  match: ["src/archrev/gate.py", "src/archrev/hooks.py", "src/archrev/config.py"]
+  match:
+    - "src/archrev/gate.py"
+    - "src/archrev/hooks.py"
+    - "src/archrev/adapters.py"
+    - "src/archrev/config.py"
+    - "src/archrev/rules.py"      # rule parsing: a bug here disables rules
+    - "src/archrev/planning.py"
+    - "src/archrev/review.py"
+    - "src/archrev/quality.py"    # runs check-rule commands with file names
+    - "src/archrev/scaffold.py"   # hook wiring and the shipped self-protection rules
   action: flag
   message: >-
-    Enforcement-core change (gate semantics, hook fail-open behavior,
-    exemptions). Requires regression tests in tests/test_gate.py or
-    tests/test_hooks.py.
+    Enforcement-core change (rule parsing, gate decisions, hook fail-open
+    behavior, check commands, plan checks, what counts as a finding,
+    shipped rules). Needs regression tests and a run of tests/rule_matrix.py.
+
+- id: flag-viewer-security
+  kind: path
+  match:
+    - "src/archrev/report/server.py"
+    - "src/archrev/report/template.html"
+  action: flag
+  message: >-
+    Viewer: Host-header check, X-ArchRev header on writes, the read-rule
+    filter on diffs (server), and HTML escaping of every recorded value
+    (page). Keep them intact.
 
 - id: block-packaging
   kind: path
@@ -27,7 +53,7 @@
 
 - id: block-license
   kind: path
-  match: ["LICENSE"]
+  match: ["LICENSE", "NOTICE"]
   action: block
   message: "License changes require explicit approval."
 
@@ -41,23 +67,33 @@
   message: "Changed Python files must parse (syntax check writes no bytecode)."
 
 # --- Prompt rules (attested via `archrev check plan`) -----------------------
+# applies_to makes a policy n/a automatically when the plan declares no file
+# in its scope, so the agent only attests what is relevant.
 
 - id: hooks-fail-open
   kind: prompt
+  applies_to: ["src/archrev/hooks.py", "src/archrev/adapters.py", "src/archrev/cli.py"]
   policy: >-
-    Any change to hook handling (src/archrev/hooks.py, src/archrev/cli.py
-    hook command) must preserve fail-open behavior: hooks may never raise,
-    block the editor on internal errors, or break git commits.
+    Changes to hook handling must preserve fail-open behavior: hooks may
+    never raise, block the editor on internal errors, or break git commits.
 
 - id: audit-format-compat
   kind: prompt
+  applies_to:
+    - "src/archrev/storage.py"
+    - "src/archrev/drift.py"
+    - "src/archrev/worktree.py"
+    - "src/archrev/gitutil.py"
+    - "src/archrev/trailer.py"
+    - "src/archrev/refstore.py"
   policy: >-
-    Changes to session file formats (events.jsonl, meta.json, manifest.json)
-    must remain readable for existing records and be reflected in the
-    README storage section.
+    Changes to session record formats (events.jsonl, meta.json,
+    manifest.json, refs/archrev/records) must remain readable for existing
+    records and be reflected in the README storage section and docs/guide.md.
 
 - id: tests-required
   kind: prompt
+  applies_to: ["src/archrev/**"]
   policy: >-
-    New or changed behavior in globmatch, rules, gate, storage, planning,
-    drift, or trailer is covered by pytest before the session ends.
+    New or changed behavior in src/archrev is covered by pytest before the
+    session ends.

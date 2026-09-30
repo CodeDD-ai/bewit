@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from archrev.config import Config, load_config
-from archrev.gate import evaluate_edit, evaluate_read, relativize
-from archrev.rules import load_rules
-from archrev.storage import SessionStore
+from bewit.config import Config, load_config
+from bewit.gate import evaluate_edit, evaluate_read, relativize
+from bewit.rules import load_rules
+from bewit.storage import SessionStore
 
 
 def _session(repo: Path, sid: str = "s1"):
@@ -44,27 +44,27 @@ def test_exempt_paths_never_gated(repo: Path):
     config = Config(strict_plan_check=True)  # would deny anything else
     decision = evaluate_edit(
         config, load_rules(repo), _session(repo),
-        [".archrev/sessions/s1/plan.md", "notes.plan.md"],
+        [".bewit/sessions/s1/plan.md", "notes.plan.md"],
         repo,
     )
     assert decision.permission == "allow"
 
 
 def test_governance_files_are_not_exempt(repo: Path):
-    """Regression: an agent must not be able to edit ArchRev's own config,
+    """Regression: an agent must not be able to edit Bewit's own config,
     rules, or hooks wiring without gating (tamper protection)."""
-    (repo / ".archrev" / "rules" / "90-self.yaml").write_text(
+    (repo / ".bewit" / "rules" / "90-self.yaml").write_text(
         "{id: self-protect, kind: path, action: block,\n"
-        " match: ['.archrev/config.yaml', '.archrev/rules/**', "
-        "'.cursor/hooks.json', '.cursor/rules/archrev.mdc']}",
+        " match: ['.bewit/config.yaml', '.bewit/rules/**', "
+        "'.cursor/hooks.json', '.cursor/rules/bewit.mdc']}",
         encoding="utf-8",
     )
     ruleset = load_rules(repo)
     for path in (
-        ".archrev/config.yaml",
-        ".archrev/rules/rules.yaml",
+        ".bewit/config.yaml",
+        ".bewit/rules/rules.yaml",
         ".cursor/hooks.json",
-        ".cursor/rules/archrev.mdc",
+        ".cursor/rules/bewit.mdc",
     ):
         decision = evaluate_edit(Config(), ruleset, _session(repo), [path], repo)
         assert decision.permission == "ask", path
@@ -75,7 +75,7 @@ def test_strict_mode_denies_until_plan_checked(repo: Path):
     session = _session(repo)
     decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
     assert decision.permission == "deny"
-    assert "archrev plan register" in decision.agent_message
+    assert "bewit plan register" in decision.agent_message
 
     session.append_event("plan_check", ok=True)
     decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
@@ -95,6 +95,38 @@ def test_strict_mode_failed_check_keeps_gate_closed(repo: Path):
     session.append_event("plan_check", ok=True)
     decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
     assert decision.permission == "allow"
+
+
+def test_strict_mode_check_goes_stale_on_re_registration(repo: Path):
+    """Regression: a check of the --text plan kept unlocking the gate after
+    the agent re-registered a different plan from a file."""
+    config = Config(strict_plan_check=True)
+    session = _session(repo)
+    session.append_event("plan_registered", declared_files=["app/main.py"])
+    session.append_event("plan_check", ok=True)
+    session.append_event("plan_registered", declared_files=["app/other.py"])
+    decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
+    assert decision.permission == "deny"
+    assert "registered again" in decision.agent_message
+
+    session.append_event("plan_check", ok=True)
+    decision = evaluate_edit(config, load_rules(repo), session, ["app/main.py"], repo)
+    assert decision.permission == "allow"
+
+
+def test_strict_mode_does_not_gate_paths_outside_the_repo(repo: Path, tmp_path_factory):
+    """Reported from real use: plan mode could not write its own plan file
+    under ~/.claude/plans before a repository plan existed."""
+    config = Config(strict_plan_check=True)
+    session = _session(repo)
+    outside = str(tmp_path_factory.mktemp("home") / ".claude" / "plans" / "p.md")
+    decision = evaluate_edit(config, load_rules(repo), session, [outside], repo)
+    assert decision.permission == "allow"
+    # One repo path in the same edit still needs the plan.
+    decision = evaluate_edit(
+        config, load_rules(repo), session, [outside, "app/main.py"], repo
+    )
+    assert decision.permission == "deny"
 
 
 def test_enforcement_off_is_the_master_switch(repo: Path):
@@ -132,7 +164,7 @@ def test_relativize_handles_absolute_and_relative(repo: Path):
 
 
 def test_read_rules_skip_exempt_paths(repo: Path):
-    (repo / ".archrev" / "rules" / "reads.yaml").write_text(
+    (repo / ".bewit" / "rules" / "reads.yaml").write_text(
         '- id: read-all\n  kind: read\n  match: ["**"]\n  action: deny\n',
         encoding="utf-8",
     )
@@ -140,7 +172,7 @@ def test_read_rules_skip_exempt_paths(repo: Path):
     denied = evaluate_read(Config(), rules, [".env"], repo)
     assert denied.permission == "deny"
     allowed = evaluate_read(
-        Config(), rules, [".archrev/sessions/s/events.jsonl"], repo
+        Config(), rules, [".bewit/sessions/s/events.jsonl"], repo
     )
     assert allowed.permission == "allow"
     assert not allowed.hits
@@ -153,11 +185,11 @@ def test_relativize_decodes_file_uris(repo: Path):
 
 
 def test_config_exempt_extends_defaults(repo: Path):
-    (repo / ".archrev" / "config.yaml").write_text(
+    (repo / ".bewit" / "config.yaml").write_text(
         "exempt:\n  - docs/**\n", encoding="utf-8"
     )
     config = load_config(repo)
-    assert ".archrev/sessions/**" in config.exempt and "docs/**" in config.exempt
+    assert ".bewit/sessions/**" in config.exempt and "docs/**" in config.exempt
     # Governance paths must never sneak back into the defaults.
-    assert ".archrev/**" not in config.exempt
+    assert ".bewit/**" not in config.exempt
     assert ".cursor/**" not in config.exempt

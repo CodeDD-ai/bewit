@@ -1,0 +1,88 @@
+# Tests, lint, the rule matrix, and a packaging check on every push and PR.
+name: CI
+
+on:
+  push:
+    branches: [master, main, "release_*"]
+  pull_request:
+  workflow_dispatch:
+  workflow_call: # release.yml runs the full CI before publishing
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install "ruff==0.15.0"
+      - run: ruff check src tests
+
+  test:
+    name: test (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      # Tests create repositories and commits; runners have no git identity.
+      - run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+          git config --global init.defaultBranch main
+      - run: pip install -e ".[dev]"
+      # With bewit on PATH, the real `git push` pre-push test runs too.
+      - run: python -m pytest -q
+
+  rule-matrix:
+    # Every rule kind replayed through the real hooks in a fresh `bewit init`.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: |
+          git config --global user.name "CI"
+          git config --global user.email "ci@example.invalid"
+          git config --global init.defaultBranch main
+      - run: pip install -e .
+      - run: python tests/rule_matrix.py
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check --strict dist/*
+      # The viewer page is package data: a wheel without it is broken.
+      - name: Wheel contains the viewer template
+        run: python -m zipfile -l dist/*.whl | grep -q "bewit/report/template.html"
+      - name: Installed wheel runs
+        run: |
+          python -m venv /tmp/wheel-env
+          /tmp/wheel-env/bin/pip install dist/*.whl
+          /tmp/wheel-env/bin/bewit --version

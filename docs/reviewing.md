@@ -1,26 +1,26 @@
 # Reviewing a session
 
 A session is one agent conversation. This page explains how to read it in
-the viewer (`archrev serve`), what each part means, and what to do about
-it. The same content leads `archrev show` and each session's `report.md`.
+the viewer (`bewit serve`), what each part means, and what to do about
+it. The same content leads `bewit show` and each session's `report.md`.
 
 ## Opening the viewer
 
 ```powershell
-archrev serve                 # the project of the current directory; opens the browser
-archrev serve --all ~/code    # every ArchRev repository in ~/code, with a project switcher
-archrev serve --no-open       # print the URL only
+bewit serve                 # the project of the current directory; opens the browser
+bewit serve --all ~/code    # every Bewit repository in ~/code, with a project switcher
+bewit serve --no-open       # print the URL only
 ```
 
-The header names the project. A second `archrev serve` for the same project
+The header names the project. A second `bewit serve` for the same project
 reuses the running viewer. If another project holds the port, the new
 viewer takes the next free port and says so. Links carry
 `#project=…&session=…&tab=…`, so a URL opens the same view for a colleague
 on the same machine.
 
 If a yellow banner says the viewer is older than its page, restart
-`archrev serve`. If it says the hook wiring is out of date, run
-`archrev init` in the project.
+`bewit serve`. If it says the hook wiring is out of date, run
+`bewit init` in the project.
 
 ## The sidebar
 
@@ -44,7 +44,7 @@ has the same four parts:
 - **Title**: what happened, to which file or check.
 - **Why it matters**: the rule or expectation that was not met.
 - **Likely cause**: the command that was running when the change
-  happened, when ArchRev can tell. *Uncertain* means that command never
+  happened, when Bewit can tell. *Uncertain* means that command never
   reported finishing, so the change may come from you, another tool, or
   another session.
 - **What to do**, with **View diff** / **View check output** and
@@ -56,7 +56,7 @@ has the same four parts:
 | **Check failed** | A `block` quality check (`kind: check`) failed on files this session changed. | Read the output. Fix, or acknowledge if expected. |
 | **Plan check** | The agent's own plan check did not pass: no plan, or a policy attested `fail` or left unattested. | Talk it through with the agent; have it re-check, or acknowledge a waiver. |
 | **Not in plan** | The agent changed a file its plan never mentioned. | Confirm it belongs to the task. |
-| **Record integrity** | The event log's hash chain does not verify. | Run `archrev verify`; compare with the committed manifest. |
+| **Record integrity** | The event log's hash chain does not verify. | Run `bewit verify`; compare with the committed manifest. |
 
 Below the findings, **Resolved** lists acknowledged items (who and why),
 and **Notes** lists advisory items: `flag`-level check failures, and
@@ -68,7 +68,14 @@ Acknowledging accepts a finding as legitimate. It is recorded in the
 hash-chained log with your note and never deleted.
 
 - In the viewer: **Acknowledge…**, type why, confirm.
-- In your terminal: `archrev ack <path | check-rule-id | plan-check> --note "why"`.
+- Several at once: with more than three open findings, each gets a
+  checkbox. Tick them, or use **Select all** or *all not in plan* (one
+  link per kind), then **Acknowledge selected…**. The form sums up what
+  you are accepting and warns when it includes a gate bypass or a failed
+  check. One note applies to all. Each finding is still recorded as its
+  own acknowledgment, so the log reads as if you had acknowledged them one
+  by one. A broken record cannot be selected.
+- In your terminal: `bewit ack <path | check-rule-id | plan-check> --note "why"`.
 
 Only the reviewer acknowledges. An acknowledgment made while one of the
 agent's commands is running is recorded as the **agent's**; it clears
@@ -104,7 +111,7 @@ first, each with its time:
 | Started a command · *no completion recorded* | The command may still be running, may have been stopped by the agent runtime's own permission check before it ran, or its end hook is not wired. |
 | Changed N files | Tool edits. Expand for the list; click a file for its diff. |
 | Quality check passed / failed | A `check` rule's result, with output on failure. |
-| End-of-turn review | What ArchRev told the agent when its turn ended. |
+| End-of-turn review | What Bewit told the agent when its turn ended. |
 | Acknowledged a finding | Who (reviewer or agent), and why. |
 | Commit | A commit linked to the session by its trailer. |
 
@@ -132,7 +139,23 @@ never raised as this session's findings.
 **Rules**: *What the rules did* (each rule that fired, its outcomes, and
 every occurrence), *Plan policies* (the latest attestation per policy,
 with earlier checks folded), *Quality checks* (latest result per check),
-and *Active rules that did not fire*.
+and *Other rules in this project* (active rules that did not fire, by
+kind; disabled rules folded). Every rule shows one plain sentence of what
+it does ("When the agent edits a file matching `pyproject.toml`, Bewit
+pauses it until you approve") and its message.
+
+**Rule details.** A rule name anywhere in the viewer (timeline, review
+box, Files, Rules) is a button. It opens the rule's full definition:
+what it does, its message or policy, the patterns and scope, the action,
+the file that defines it, the rule as YAML, and every time it fired in
+this session. The link (`…&rule=<id>`) can be shared. Rule events in the
+timeline also quote the rule's message directly, so you do not have to
+open anything to see why the agent was stopped.
+
+The definition shown is the current one from `.bewit/rules/`. If the
+rule was edited after it fired, the drawer says so and shows the message
+it had then; if it was deleted, it is marked *not defined any more* and
+shows what the record kept (events record each rule's message).
 
 **Plan**: declared files (✓ changed, ○ not changed) and every plan
 revision, newest first, with files added and dropped between revisions.
@@ -140,18 +163,18 @@ revision, newest first, with files added and dropped between revisions.
 ## From the terminal
 
 ```powershell
-archrev show                     # latest session, review first
-archrev show <id> --md -o r.md   # markdown, e.g. for a merge request
-archrev trace src/api/views.py   # sessions that changed a file
-archrev trace 1a2b3c4d           # the session behind a commit
-archrev export <id>              # one HTML file with diffs, for sharing
+bewit show                     # latest session, review first
+bewit show <id> --md -o r.md   # markdown, e.g. for a merge request
+bewit trace src/api/views.py   # sessions that changed a file
+bewit trace 1a2b3c4d           # the session behind a commit
+bewit export <id>              # one HTML file with diffs, for sharing
 ```
 
 ## Terms
 
 | Term | Meaning |
 | --- | --- |
-| **Gate** | The check ArchRev runs before the agent's tool acts. |
+| **Gate** | The check Bewit runs before the agent's tool acts. |
 | **deny / block / flag** | Refuse / pause for your approval / allow and highlight. |
 | **Bypass** | A protected file changed without the gate seeing it. |
 | **Drift** | Files changed but not planned (*not in plan*) or planned but not changed. |

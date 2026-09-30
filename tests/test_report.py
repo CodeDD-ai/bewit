@@ -2,10 +2,9 @@
 
 from pathlib import Path
 
-from archrev.gitutil import Git
-from archrev.report.server import build_file_diff, export_html
-from archrev.storage import SessionStore
-from conftest import git  # pytest puts the tests dir on sys.path (no __init__.py)
+from bewit.gitutil import Git
+from bewit.report.server import build_file_diff, export_html
+from bewit.storage import SessionStore
 
 
 def _session(repo: Path, sid: str = "sess-1"):
@@ -43,19 +42,19 @@ def test_export_embeds_diffs(repo: Path):
 
     html = export_html(repo, session.id)
     assert html is not None
-    assert "__ARCHREV_DATA__" in html
+    assert "__BEWIT_DATA__" in html
     # The diff itself travels inside the export (JSON-escaped).
     assert "print('changed')" in html
 
 
 def test_sidebar_excerpt_is_the_latest_user_prompt(repo: Path):
-    from archrev.report.server import _session_summary
+    from bewit.report.server import _session_summary
 
     session = _session(repo, "sess-excerpt")
     session.append_event("prompt", text="first question about the gate")
     session.append_event(
         "prompt",
-        text="ArchRev final review found issues in this session:\n- drift",
+        text="Bewit final review found issues in this session:\n- drift",
     )
     session.append_event("prompt", text="please also fix the viewer")
     session.append_event(

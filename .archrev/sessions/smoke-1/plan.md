@@ -1,1 +1,0 @@
-Smoke test plan: touch `README.md` and `pyproject.toml` to verify capture, gating and drift.

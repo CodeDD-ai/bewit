@@ -1,1 +1,0 @@
-Also add hook regression tests to tests/test_hooks.py (flag-enforcement-core requirement).

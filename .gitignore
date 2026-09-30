@@ -13,9 +13,17 @@ dist/
 .archrev/fingerprint-cache.json
 .archrev/locks/
 
+
+
 # Editors / OS
 .idea/
 *.swp
 Thumbs.db
 archrev-session-*.html
 .archrev-smoke.html
+
+# >>> archrev session records (managed by `archrev init`; change record_scope, not this block) >>>
+# record_store: ref. Session records (events.jsonl, meta.json, manifest.json per session) are
+# published to refs/archrev/records, never committed with code: archrev sync.
+.archrev/sessions/
+# <<< archrev session records <<<

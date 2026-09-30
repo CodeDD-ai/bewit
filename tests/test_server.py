@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from archrev.gitutil import Git
-from archrev.report.server import (
+from bewit.gitutil import Git
+from bewit.report.server import (
     _session_summary,
     _user_prompt_excerpt,
     bind_viewer,
@@ -19,12 +19,12 @@ from archrev.report.server import (
     make_server,
     project_ids,
 )
-from archrev.storage import SessionStore
+from bewit.storage import SessionStore
 
 
 def _project(tmp_path: Path, name: str) -> Path:
     root = tmp_path / name
-    (root / ".archrev" / "sessions").mkdir(parents=True)
+    (root / ".bewit" / "sessions").mkdir(parents=True)
     return root
 
 
@@ -64,8 +64,8 @@ def test_state_names_the_project_and_classifies_sessions(repo: Path):
 
     state = build_state(repo)
     assert state["project"] == repo.name
-    assert state["app"] == "archrev-viewer"
-    from archrev.report.server import API_LEVEL, _template
+    assert state["app"] == "bewit-viewer"
+    from bewit.report.server import API_LEVEL, _template
 
     assert state["api_level"] == API_LEVEL
     # The page checks the same number; they must move together.
@@ -154,22 +154,46 @@ def test_viewer_ack_is_recorded_as_reviewer(repo: Path, running):
     session.append_event("worktree", phase="start", changed={})  # checkpoint baseline
     _, port = running([repo])
     body = {"session": "s-ack", "target": "db/migrations/0001_init.sql", "note": "reviewed"}
-    assert _post(port, "/api/ack", body)[0] == 403  # no X-ArchRev header (CSRF)
-    status, data = _post(port, "/api/ack", body, {"X-ArchRev": "1"})
+    assert _post(port, "/api/ack", body)[0] == 403  # no X-Bewit header (CSRF)
+    status, data = _post(port, "/api/ack", body, {"X-Bewit": "1"})
     assert status == 200 and data["actor"] == "human"
     ack = session.last_event("ack")
     assert (ack["via"], ack["actor"], ack["note"]) == ("viewer", "human", "reviewed")
 
 
+def test_bulk_acknowledge_records_one_ack_per_finding(repo: Path, running):
+    """The review box's bulk action posts each finding separately: the log
+    reads exactly as if the reviewer had acknowledged them one by one."""
+    from bewit.report.server import _template
+
+    page = _template()
+    assert "const BULK_MIN = 3;" in page and "data-pick-all" in page
+    assert 'fetch("/api/ack"' in page.split("async function submitBulk", 1)[1].split("\nfunction ", 1)[0]
+
+    session = SessionStore(repo).session("s-bulk")
+    session.ensure_meta(None)
+    session.append_event("prompt", text="go")
+    session.append_event("worktree", phase="start", changed={})
+    _, port = running([repo])
+    targets = [f"app/f{i}.py" for i in range(5)]
+    for target in targets:
+        status, data = _post(port, "/api/ack", {"session": "s-bulk", "target": target, "note": "batch"},
+                             {"X-Bewit": "1"})
+        assert status == 200 and data["actor"] == "human"
+    acks = [e for e in session.events() if e["type"] == "ack"]
+    assert [a["target"] for a in acks] == targets
+    assert {a["note"] for a in acks} == {"batch"}
+
+
 def test_viewer_ack_during_an_agent_command_is_agent_made(repo: Path, running, monkeypatch):
-    from archrev.hooks import run_hook
+    from bewit.hooks import run_hook
 
     monkeypatch.chdir(repo)
     run_hook("prompt", json.dumps({"conversation_id": "s-agent", "prompt": "go"}))
     run_hook("shell", json.dumps({"conversation_id": "s-agent", "command": "curl localhost"}))
     _, port = running([repo])
     status, data = _post(port, "/api/ack", {"session": "s-agent", "target": "x", "note": "n"},
-                         {"X-ArchRev": "1"})
+                         {"X-Bewit": "1"})
     assert status == 200 and data["actor"] == "agent"
 
 
@@ -184,10 +208,38 @@ def test_session_view_lists_active_rules_and_review(repo: Path, running):
     assert set(view["review"]) == {"open", "resolved", "notes"}
 
 
-def test_diff_never_serves_files_under_read_rules(repo: Path, running):
-    from archrev.report.server import export_html
+def test_session_view_carries_full_rule_definitions(repo: Path, running):
+    """The rule drawer needs every rule, disabled ones included, with its source."""
+    (repo / ".bewit" / "rules" / "zz-off.yaml").write_text(
+        "- id: old-check\n  kind: check\n  match: ['**/*.py']\n  command: ruff {files}\n"
+        "  action: flag\n  timeout: 30\n  enabled: false\n",
+        encoding="utf-8",
+    )
+    SessionStore(repo).session("s-defs").ensure_meta(None)
+    _, port = running([repo])
+    rules = {r["id"]: r for r in _get(port, "/api/session/s-defs")[1]["active_rules"]}
+    off = rules["old-check"]
+    assert off["enabled"] is False
+    assert (off["command"], off["timeout"], off["source"]) == (
+        "ruff {files}", 30, ".bewit/rules/zz-off.yaml")
+    assert rules["protect-migrations"]["enabled"] is True
+    assert rules["protect-migrations"]["targets"]
+    assert rules["protect-migrations"]["timeout"] is None
 
-    (repo / ".archrev" / "rules" / "secrets.yaml").write_text(
+
+def test_page_resolves_rule_chips_to_a_drawer():
+    """Every place a rule id appears renders it as a chip that opens the drawer."""
+    from bewit.report.server import _template
+
+    page = _template()
+    assert "function ruleChip(" in page and "data-rule=" in page
+    assert "function drawerHtml(" in page and 'params.set("rule"' in page
+
+
+def test_diff_never_serves_files_under_read_rules(repo: Path, running):
+    from bewit.report.server import export_html
+
+    (repo / ".bewit" / "rules" / "secrets.yaml").write_text(
         "- id: no-env\n  kind: read\n  match: ['.env']\n  action: deny\n", encoding="utf-8"
     )
     (repo / ".env").write_text("TOKEN=supersecret\n", encoding="utf-8")  # untracked
@@ -202,7 +254,7 @@ def test_diff_never_serves_files_under_read_rules(repo: Path, running):
 
 
 def test_template_escapes_quotes_for_attributes():
-    from archrev.report.server import _template
+    from bewit.report.server import _template
 
     html = _template()
     assert '.replace(/"/g, "&quot;")' in html

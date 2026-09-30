@@ -4,7 +4,7 @@
 #   on      - enforce rules as written (block rules pause for user approval)
 #   monitor - record everything, downgrade blocks to flags (never stops)
 #   off     - disable the gate entirely (session capture still runs)
-enforcement: on
+enforcement: of
 
 # When true, the first gated edit of a session is denied until the agent has
 # registered a plan and run `archrev check plan` ("no validated plan, no code").
@@ -19,3 +19,5 @@ protected_scan: true
 # config, .archrev/rules/**, and the hook wiring are intentionally not exempt.
 # exempt:
 #   - docs/**
+
+record_store: ref

@@ -1,1 +1,0 @@
-Re-registration after the plan-parser fix: the earlier plan text already declared `CHANGELOG.md` (unreleased changes), which the old parser dropped because the file did not exist yet.

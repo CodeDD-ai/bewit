@@ -3,15 +3,15 @@
 import json
 from pathlib import Path
 
-from archrev.adapters import (
+from bewit.adapters import (
     detect_runtime,
     patch_paths,
     promote_payload,
     runtime_supports_ask,
 )
-from archrev.hooks import run_hook
-from archrev.scaffold import init_repo
-from archrev.storage import SessionStore
+from bewit.hooks import run_hook
+from bewit.scaffold import init_repo
+from bewit.storage import SessionStore
 
 
 def _native(repo: Path, event: str, **extra) -> str:
@@ -25,7 +25,7 @@ def _native(repo: Path, event: str, **extra) -> str:
 
 
 def _write_shell_rule(repo: Path) -> None:
-    (repo / ".archrev" / "rules" / "shell.yaml").write_text(
+    (repo / ".bewit" / "rules" / "shell.yaml").write_text(
         """
 - id: no-rm
   kind: shell
@@ -100,6 +100,27 @@ def test_claude_pretool_write_asks_in_native_shape(repo: Path, monkeypatch):
     assert "approval" in spec["permissionDecisionReason"].lower()
     meta = SessionStore(repo).session("native-sess").meta()
     assert meta["runtime"] == "claude"
+
+
+def test_claude_pretool_flag_does_not_bypass_permission_prompt(
+    repo: Path, monkeypatch
+):
+    monkeypatch.chdir(repo)
+    out = run_hook(
+        "auto",
+        _native(
+            repo,
+            "PreToolUse",
+            prompt_id="p1",
+            tool_name="Write",
+            tool_input={"file_path": "Dockerfile"},
+        ),
+    )
+    spec = out["hookSpecificOutput"]
+    # The flag reaches the agent, but the runtime's permission mode still
+    # decides whether the user is asked.
+    assert "permissionDecision" not in spec
+    assert spec["additionalContext"]
 
 
 def test_claude_pretool_bash_runs_shell_rules(repo: Path, monkeypatch):
@@ -214,8 +235,8 @@ def test_claude_change_after_bash_finished_is_background(repo: Path, monkeypatch
     assert manifest["other_changes"][0]["during"] == ["shell: ./gen.sh"]
     background = [c["path"] for c in manifest["background_changes"]]
     assert "db/migrations/0001_init.sql" in background
-    assert ".archrev/fingerprint-cache.json" not in background
-    assert not any(p.startswith(".archrev/sessions/") for p in background)
+    assert ".bewit/fingerprint-cache.json" not in background
+    assert not any(p.startswith(".bewit/sessions/") for p in background)
     assert manifest["protected_findings"] == []
 
 
@@ -312,17 +333,17 @@ def test_init_writes_claude_and_codex_hooks(repo: Path):
     assert "PreToolUse" in claude["hooks"]
     assert "SessionEnd" in claude["hooks"]
     cmd = claude["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
-    assert cmd == "archrev hook"
+    assert cmd == "bewit hook"
     matcher = claude["hooks"]["PostToolUse"][0]["matcher"]
     assert "apply_patch" in matcher
     # Shell/MCP after-hooks close the session's command window.
     assert "Bash" in matcher and "mcp__" in matcher
-    assert (repo / ".claude" / "rules" / "archrev.md").exists()
+    assert (repo / ".claude" / "rules" / "bewit.md").exists()
 
     codex = json.loads((repo / ".codex" / "hooks.json").read_text(encoding="utf-8"))
     assert "PreToolUse" in codex["hooks"]
     assert (repo / "AGENTS.md").exists()
-    assert "ArchRev" in (repo / "AGENTS.md").read_text(encoding="utf-8")
+    assert "Bewit" in (repo / "AGENTS.md").read_text(encoding="utf-8")
 
 
 def test_init_runtime_subset_skips_other_runtimes(tmp_path: Path):
@@ -343,7 +364,7 @@ def test_reinit_upgrades_native_shim_without_duplicates(repo: Path):
             h
             for g in groups
             for h in g.get("hooks", [])
-            if "archrev" in h.get("command", "")
+            if "bewit" in h.get("command", "")
         ]
         assert len(ours) == 1, event
-        assert ours[0]["command"].startswith("uvx archrev hook")
+        assert ours[0]["command"].startswith("uvx bewit hook")
