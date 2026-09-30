@@ -1,0 +1,157 @@
+{
+  "id": "eb9fea81-e57e-4367-a013-32aa6b4fc443",
+  "started_at": "2026-09-30T13:59:58Z",
+  "head_sha": "6bba504a9d3823e869b66e67104be4068c186ef0",
+  "finalized": true,
+  "generated_at": "2026-09-30T14:00:11Z",
+  "prompts": [],
+  "branch": "release_v1",
+  "runtime": "claude",
+  "checks": [],
+  "final_checks": [],
+  "human_changes": [],
+  "acks": [],
+  "quality_checks": [],
+  "gate_events": [],
+  "reads": [],
+  "commands": [],
+  "edits": [],
+  "files": [],
+  "outside_repo": [],
+  "other_sessions": [],
+  "other_changes": [],
+  "background_changes": [
+    {
+      "path": ".archrev/config.yaml",
+      "added": 0,
+      "removed": 23
+    },
+    {
+      "path": ".archrev/rules/00-starter-rules.yaml",
+      "added": 0,
+      "removed": 38
+    },
+    {
+      "path": ".archrev/rules/10-archrev-repo.yaml",
+      "added": 0,
+      "removed": 99
+    },
+    {
+      "path": ".archrev/rules/20-agent-boundaries.yaml",
+      "added": 0,
+      "removed": 43
+    },
+    {
+      "path": ".archrev/rules/90-archrev-self-protection.yaml",
+      "added": 0,
+      "removed": 50
+    },
+    {
+      "path": ".bewit/config.yaml",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".bewit/rules/00-starter-rules.yaml",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".bewit/rules/90-bewit-self-protection.yaml",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".claude/rules/bewit.md",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".claude/settings.json",
+      "added": 42,
+      "removed": 0
+    },
+    {
+      "path": ".codex/hooks.json",
+      "added": 42,
+      "removed": 0
+    },
+    {
+      "path": ".cursor/hooks.json",
+      "added": 31,
+      "removed": 0
+    },
+    {
+      "path": ".cursor/rules/bewit.mdc",
+      "added": null,
+      "removed": null,
+      "untracked": true
+    },
+    {
+      "path": ".gitattributes",
+      "added": 3,
+      "removed": 0
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "added": 15,
+      "removed": 1
+    },
+    {
+      "path": ".gitignore",
+      "added": 11,
+      "removed": 0
+    },
+    {
+      "path": "AGENTS.md",
+      "added": 28,
+      "removed": 0
+    },
+    {
+      "path": "src/bewit/gate.py",
+      "added": 27,
+      "removed": 5
+    },
+    {
+      "path": "tests/test_gate.py",
+      "added": 39,
+      "removed": 0
+    }
+  ],
+  "attribution": "checkpoints",
+  "drift": {
+    "out_of_plan": [],
+    "no_net_change": [],
+    "unrealized": []
+  },
+  "protected_findings": [],
+  "commits": [],
+  "areas": [],
+  "event_count": 2,
+  "chain_head": "403d3dd4a895538db75d1457195c9c9fc445591a1c5c7a334adfd7df2a94fc23",
+  "chain": {
+    "ok": true,
+    "checked": 2,
+    "legacy": 0,
+    "break_at": null,
+    "reason": null,
+    "duplicates": 0,
+    "forks": 0
+  },
+  "review": {
+    "open": [],
+    "resolved": [],
+    "notes": []
+  },
+  "plan": {
+    "registered": false,
+    "declared_files": [],
+    "progress": [],
+    "text": null
+  },
+  "finalized_at": "2026-09-30T14:00:11Z"
+}
